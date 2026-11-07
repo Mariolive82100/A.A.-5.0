@@ -74,6 +74,16 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .tile:active{transform:scale(.98)}
 .home{position:relative;overflow:hidden;border-radius:28px;min-height:calc(100vh - 230px);display:flex;flex-direction:column;justify-content:flex-start}
 .home .grid{align-content:start}
+.gm-hint{border-radius:16px;padding:10px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
+.gm-hint.su{border-color:rgba(245,165,36,.5)}.gm-hint.giu{border-color:rgba(56,189,248,.5)}
+.gm-hint b{display:block;font-size:20px}.gm-arrow{display:block;font-size:44px;line-height:1.1;animation:gm-pop .5s ease-out}
+.gm-final{position:relative;overflow:hidden;text-align:center;padding:26px 14px;margin-bottom:12px}
+.gm-conf{position:absolute;inset:0;pointer-events:none}.gm-conf span{position:absolute;top:-40px;animation:gm-fall 3.2s linear infinite}
+.gm-cup{font-size:84px;line-height:1.1;animation:gm-bounce 1s ease-in-out infinite}
+.gm-loser{font-size:38px;font-weight:900;margin:6px 0;background:linear-gradient(90deg,#f5a524,#f472b6,#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent;animation:gm-pop .7s ease-out}
+@keyframes gm-fall{to{transform:translateY(420px) rotate(360deg);opacity:.2}}
+@keyframes gm-bounce{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-14px) rotate(8deg)}}
+@keyframes gm-pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 .home .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.55;pointer-events:none;z-index:0}
 .home .grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .gbtn{min-height:min(30vh,210px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px;border-radius:26px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);color:var(--tx);font-weight:800;font-size:clamp(19px,5.4vw,27px);line-height:1.15;box-shadow:0 10px 30px rgba(0,0,0,.28)}
@@ -292,7 +302,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -403,7 +413,8 @@ function connect(gid){
   st.gid = gid;
   const g = db.collection('saletta').doc(gid);
   const docs = s => s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps:'estimate'})}));
-  unsubs.push(g.onSnapshot(s => {
+  // includeMetadataChanges: senza, dopo il primo snapshot dalla cache lo stato restava grigio finché i dati non cambiavano
+  unsubs.push(g.onSnapshot({includeMetadataChanges: true}, s => {
     if(!s.exists){
       if(!s.metadata.fromCache){ toast('Il gruppo non esiste più su questo codice', 'err'); A['esci-gruppo'](true); }
       return;
@@ -505,7 +516,7 @@ function subMovimenti(cutoff, mid){
       return {id: d.id, ...x, _ts: x.ts || null, t: x.ts ? x.ts.toMillis() : (x.cts || Date.now()), _local: d.metadata.hasPendingWrites};
     });
     for(const id of Object.keys(st.pending)) if(st.movimenti.some(m => m.id === id)) delete st.pending[id];
-    st.ready.mv = true; _derCache = null; setSync(s); render();
+    st.ready.mv = true; _derCache = null; render();
   }, onDataErr);
 }
 
@@ -673,7 +684,7 @@ function segOpts(name, opts, sel){
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Scheda Saletta','sparkles'], registro:['Registro movimenti','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], gioco:['Gioco caffè','dice'], registro:['Registro movimenti','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings']
 };
@@ -722,16 +733,16 @@ function doRender(){
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s);
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Registro','receipt'],['pulizie','Saletta','sparkles'],['inventario','Inventario','package'],['eventi','Eventi','calendar'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = av ? cn.fondo : cn.pers;
   if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Registro','receipt'],['notifiche','Notifiche','bell'],['admin','Gestione','shield']);
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${st.page === p ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
@@ -753,7 +764,8 @@ function renderDrawer(){
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
 }
 
-const PAGINE_COLLEGA = ['bar','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
+const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco'];
+const PAGINE_COLLEGA = ['bar','saletta','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
 const PAGINE_ADMIN = ['bar','registro','notifiche','admin','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
@@ -1266,7 +1278,7 @@ function pPulizie(d){
       <b style="font-size:15px">✨ Hai pulito la saletta?</b>
       <p class="mut" style="font-size:13px;margin:6px 0 12px">Registra il tuo turno: +${puntiPulizia()} Punti Pulizia (anche con una data passata).</p>
       <button class="btn violet block" data-act="pulizia">${ic('check','s')} Registra pulizia</button></div>`;
-  if(!adminView()) return `<h2>${ic('sparkles')} Scheda Saletta</h2><p class="sub">Pulizie e compleanni.</p>${reg}${cardPunti(d)}${scad}`;
+  if(!adminView()) return `${backSaletta()}<h2>${ic('sparkles')} Pulizie sala</h2><p class="sub">Turni di pulizia e punti.</p>${reg}${cardPunti(d)}${scad}`;
   const ord = ordinePulizie(d), top = ord.slice(0,3);
   const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || a.nome.localeCompare(b.nome));
   return `<h2>${ic('sparkles')} Scheda Saletta</h2><p class="sub">Turni pulizie e compleanni.</p>
@@ -1292,6 +1304,52 @@ function prossimaData(ev){
   return s;
 }
 function giorniA(iso){ const [y,m,d] = iso.split('-').map(Number); const t = new Date(y, m-1, d), o = new Date(); o.setHours(0,0,0,0); return Math.round((t - o) / 86400000); }
+const backSaletta = () => adminView() ? '' : `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="saletta">← Saletta</button>`;
+function pSaletta(d){
+  return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Pulizie, eventi, scorte e un po' di svago.</p>
+  <div class="grid2" style="gap:14px">
+    <button class="gbtn" id="sal-pulizie" data-act="go" data-p="pulizie"><span class="em">✨</span>Pulizie sala</button>
+    <button class="gbtn" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi</button>
+    <button class="gbtn" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
+    <button class="gbtn" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Gioco caffè</button>
+  </div>`;
+}
+
+/* ---------- Gioco caffè: chi indovina il numero paga il caffè (si gioca passandosi il telefono) ---------- */
+const GIOCO0 = () => ({fase:'setup', min:0, max:1000, sel:null, ord:[], i:0, secret:0, lo:0, hi:1000, ultimo:null, storia:[], perde:null});
+function giocoSt(){ if(!st.gioco) st.gioco = GIOCO0(); if(!st.gioco.sel){ st.gioco.sel = {}; membriAttivi().forEach(m => st.gioco.sel[m.id] = true); } return st.gioco; }
+function pGioco(d){
+  const g = giocoSt(), nome = id => esc(nomeBreve(id) || nomeM(id));
+  const head = `${backSaletta()}<h2>🎲 Gioco caffè</h2>`;
+  if(g.fase === 'setup'){
+    return `${head}<p class="sub">Si sceglie un numero segreto: a turno ognuno prova a indovinarlo. Chi lo indovina perde e paga il caffè!</p>
+    <div class="card"><h3>Intervallo</h3><div class="grid2">
+      <label class="f"><span>Da</span><input class="in mono" id="gm-min" inputmode="numeric" value="${g.min}"></label>
+      <label class="f"><span>A</span><input class="in mono" id="gm-max" inputmode="numeric" value="${g.max}"></label></div></div>
+    <div class="card"><h3>Chi gioca</h3><div class="list">${membriAttivi().map(m => `<button class="li" data-act="gioco-toggle" data-id="${m.id}" style="width:100%;text-align:left;${g.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${g.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(m.id))}</div></div></button>`).join('')}</div></div>
+    <button class="btn amber block big" id="gm-start" data-act="gioco-start">Inizia la partita</button>`;
+  }
+  if(g.fase === 'play'){
+    const cur = g.ord[g.i], u = g.ultimo;
+    return `${head}<div class="card" style="text-align:center">
+      <small class="mut">Il numero segreto è tra</small>
+      <div class="mono amber" id="gm-range" style="font-size:30px;font-weight:800">${g.lo} – ${g.hi}</div>
+      ${u ? `<div id="gm-hint" class="gm-hint ${u.dir}" style="margin:12px 0"><span class="gm-arrow">${u.dir === 'su' ? '⬆️' : '⬇️'}</span><b>${u.dir === 'su' ? 'Troppo basso' : 'Troppo alto'}</b><div class="mut" style="font-size:12px">${nome(u.mid)} ha provato ${u.n}</div></div>` : '<div class="mut" style="margin:12px 0;font-size:13px">Nessun tentativo ancora</div>'}
+      <div class="mut" style="font-size:12px">Tocca a</div>
+      <div id="gm-turno" style="font-size:24px;font-weight:800;margin-bottom:8px">${nome(cur)}</div>
+      <input class="in mono" id="gm-n" inputmode="numeric" placeholder="il tuo numero" style="text-align:center;font-size:20px" autofocus>
+      <button class="btn amber block big" style="margin-top:10px" id="gm-prova" data-act="gioco-prova">Prova</button></div>
+    ${g.storia.length ? `<div class="card"><h3>Tentativi</h3><div class="list">${g.storia.slice().reverse().map(t => `<div class="li"><div class="grow"><div class="t" style="font-size:13px">${nome(t.mid)}: <b class="mono">${t.n}</b></div></div><span class="pill ${t.dir === 'su' ? 'amber' : 'sky'}">${t.dir === 'su' ? '⬆ troppo basso' : '⬇ troppo alto'}</span></div>`).join('')}</div></div>` : ''}
+    <button class="btn link" data-act="gioco-reset">Annulla partita</button>`;
+  }
+  const conf = Array.from({length: 26}, (_, k) => `<span style="left:${(k * 37) % 100}%;animation-delay:${((k * 13) % 20) / 10}s;font-size:${18 + (k * 7) % 16}px">${['☕','🎉','✨','🍪','🥳'][k % 5]}</span>`).join('');
+  return `${head}<div class="card gm-final" id="gm-fine"><div class="gm-conf">${conf}</div>
+    <div class="gm-cup">☕</div>
+    <div class="mut" style="font-size:13px">Il numero era <b class="mono amber">${g.secret}</b> · ${g.storia.length} tentativi</div>
+    <div class="gm-loser" id="gm-perde">${nome(g.perde)}</div>
+    <div style="font-size:20px;font-weight:800">paga il caffè! 😄</div></div>
+    <div class="grid2"><button class="btn amber" id="gm-ancora" data-act="gioco-ancora">Rigioca</button><button class="btn ghost" data-act="gioco-reset">Cambia giocatori</button></div>`;
+}
 function pEventi(){
   const evs = st.eventi.map(e => ({...e, prossima: prossimaData(e)})).sort((a,b) => a.prossima.localeCompare(b.prossima));
   const fut = evs.filter(e => e.prossima >= oggiISO()), pas = evs.filter(e => e.prossima < oggiISO()).reverse();
@@ -1301,7 +1359,7 @@ function pEventi(){
       <div class="grow"><div class="t">${esc(e.titolo)}</div><div class="d mono">${dd}/${m}/${y}${e.tipo === 'compleanno' ? ' · ogni anno' : ''}</div></div>
       <span class="pill ${g === 0 ? 'amber' : g > 0 && g <= 7 ? 'violet' : 'mut'}">${g === 0 ? 'oggi!' : g === 1 ? 'domani' : g > 0 ? 'tra ' + g + ' gg' : 'passato'}</span>
       ${puo ? `<button class="iconbtn" style="width:32px;height:32px" data-act="del-evento" data-id="${e.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div>`; };
-  return `<div class="between" style="margin-bottom:14px"><div><h2>${ic('cake')} Eventi & compleanni</h2><p class="sub" style="margin:0">Scadenzario della saletta</p></div>
+  return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('cake')} Eventi & compleanni</h2><p class="sub" style="margin:0">Scadenzario della saletta</p></div>
     <button class="btn sm" style="background:#db2777;border:0;color:#fff" data-act="evento">${ic('plus','s')} Nuovo</button></div>
   <div class="card">${fut.length ? `<div class="list">${fut.map(row).join('')}</div>` : `<div class="empty">Nessun evento in programma.</div>`}</div>
   ${pas.length ? `<div class="card"><h3>Passati</h3><div class="list">${pas.map(row).join('')}</div></div>` : ''}`;
@@ -1339,7 +1397,7 @@ function pInventario(d){
   const v = p => k === 'stock' ? giacenza(d, p) : k === 'prezzo' ? p.prezzo : k === 'categoria' ? p.categoria : (p.nome||'').toLowerCase();
   const list = st.prodotti.filter(p => adminView() || p.attivo !== false).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
   const th = (key, l, cls='') => `<th class="s ${cls}" data-act="inv-sort" data-k="${key}">${l}${k === key ? (st.invSort.asc ? ' ↑' : ' ↓') : ''}</th>`;
-  return `<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
+  return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
     ${adminView() ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
   ${cardBusta(d, adminView())}
   ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Tutti possono aprire e chiudere le buste del caffè; prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
@@ -1663,6 +1721,29 @@ A['rifiuta-accesso'] = ds => {
   C('richieste').doc(ds.id).set({stato: 'rifiutata', esitoDa: myName(), esitoTs: TS()}, {merge: true}).then(() => toast('Richiesta rifiutata')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
 };
+A['gioco-toggle'] = ds => { const g = giocoSt(); g.sel[ds.id] = !g.sel[ds.id]; render(); };
+A['gioco-reset'] = () => { st.gioco = null; render(); };
+function giocoAvvia(g){
+  g.ord = Object.keys(g.sel).filter(k => g.sel[k] && membro(k)); for(let k = g.ord.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [g.ord[k], g.ord[j]] = [g.ord[j], g.ord[k]]; }
+  g.fase = 'play'; g.i = 0; g.lo = g.min; g.hi = g.max; g.secret = g.min + Math.floor(Math.random() * (g.max - g.min + 1)); g.ultimo = null; g.storia = []; g.perde = null;
+}
+A['gioco-start'] = () => {
+  const g = giocoSt(), mn = parseInt(val('gm-min'), 10), mx = parseInt(val('gm-max'), 10);
+  if(!Number.isInteger(mn) || !Number.isInteger(mx) || mn < 0 || mx > 1000 || mx - mn < 2) return toast('Scegli un intervallo tra 0 e 1000 con almeno 3 numeri', 'err');
+  if(Object.keys(g.sel).filter(k => g.sel[k]).length < 2) return toast('Servono almeno 2 giocatori', 'err');
+  g.min = mn; g.max = mx; giocoAvvia(g); render();
+};
+A['gioco-ancora'] = () => { const g = giocoSt(); giocoAvvia(g); render(); };
+A['gioco-prova'] = () => {
+  const g = giocoSt(), n = parseInt(val('gm-n'), 10);
+  if(!Number.isInteger(n) || n < g.lo || n > g.hi) return toast(`Scrivi un numero tra ${g.lo} e ${g.hi}`, 'err');
+  const mid = g.ord[g.i];
+  if(n === g.secret){ g.storia.push({mid, n, dir: 'ok'}); g.perde = mid; g.fase = 'fine'; try { navigator.vibrate && navigator.vibrate([120, 60, 120, 60, 300]); } catch(e){} render(); return; }
+  const dir = n < g.secret ? 'su' : 'giu';
+  if(dir === 'su') g.lo = n + 1; else g.hi = n - 1;
+  g.ultimo = {mid, n, dir}; g.storia.push({mid, n, dir}); g.i = (g.i + 1) % g.ord.length; render();
+};
+
 A['elimina-gruppo'] = () => {
   if(!st.gruppo) return;
   openSheet(`<h3 style="color:var(--red)">${ic('trash')} Elimina il gruppo</h3>

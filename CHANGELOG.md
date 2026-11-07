@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+- Pagina Saletta con 4 tasti: Pulizie sala, Eventi, Inventario, Gioco caffe (chi indovina il numero paga il caffe).
+- Stato di sincronizzazione piu affidabile (non resta grigio «Collegamento»).
+
 ## 1.0.0 - prima release
 - Caffe e snack con registro trasparente, saldo contabile/disponibile e Totale Fondo in home.
 - Cassa (contanti + Revolut), Fondo Netto, quota annua, inventario (visibile a tutti, modificabile dagli amministratori), buste del caffe con Tasso di Onesta.

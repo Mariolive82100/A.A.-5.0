@@ -1,5 +1,5 @@
 // Armieri 5.0 service worker: rete prima, copia locale se offline
-const CACHE = 'armieri-v1.0.0';
+const CACHE = 'armieri-v1.1.0';
 const FILES = ['./', 'index.html', 'config.js', 'vendor/firebase-app-compat.js', 'vendor/firebase-auth-compat.js', 'vendor/firebase-firestore-compat.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

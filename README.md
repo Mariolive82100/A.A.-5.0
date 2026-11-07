@@ -1,4 +1,4 @@
-# Armieri 5.0 v1.0.0
+# Armieri 5.0 v1.1.0
 
 PWA (HTML + JavaScript, nessuna build) per gestire caffe, snack, cassa e turni della saletta.
 Dati su **Firebase** (Firestore + accesso anonimo), sito pubblicato su **GitHub Pages**.
@@ -42,7 +42,7 @@ La `apiKey` Web e pubblica per natura. Riduci l'abuso:
 ```
 git init -b main
 git add .
-git commit -m "Armieri 5.0 v1.0.0"
+git commit -m "Armieri 5.0 v1.1.0"
 git remote add origin https://github.com/TUOUTENTE/armieri.git
 git push -u origin main
 ```
