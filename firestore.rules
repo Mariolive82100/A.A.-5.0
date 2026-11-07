@@ -7,6 +7,11 @@ service cloud.firestore {
 
       function signed() { return request.auth != null; }
       function gruppo() { return get(/databases/$(database)/documents/saletta/$(gid)).data; }
+      // il creatore del gruppo (stesso telefono, oppure collega 'creatore' da un altro telefono)
+      function isCreatore() {
+        return signed() && (gruppo().get('creatoDa', '') == request.auth.uid
+          || (isMember() && myMid() == gruppo().get('creatoreMid', '--')));
+      }
       function isAdmin() {
         return signed() && exists(/databases/$(database)/documents/saletta/$(gid)/admin/$(request.auth.uid));
       }
@@ -64,6 +69,8 @@ service cloud.firestore {
       // Documento del gruppo (nome, prezzo caffe', quota annua)
       allow get: if signed();
       allow list: if false;
+      // eliminazione del gruppo: solo il creatore (l'app prima svuota tutte le sottocollezioni)
+      allow delete: if isCreatore();
       allow create: if signed()
         && request.resource.data.creatoDa == request.auth.uid
         && request.resource.data.prezzoCaffe is int && request.resource.data.prezzoCaffe >= 0
@@ -79,6 +86,7 @@ service cloud.firestore {
 
       // PIN amministratore: nessuno puo' leggerlo dall'app
       match /segreti/{doc} {
+        allow delete: if isCreatore();
         allow read: if false;
         allow create: if signed() && doc == 'pin'
           && gruppo().creatoDa == request.auth.uid
@@ -96,6 +104,7 @@ service cloud.firestore {
               && get(/databases/$(database)/documents/saletta/$(gid)/utenti/$(aid)).data.mid == gruppo().creatoreMid);
       }
       match /admin/{uid} {
+        allow delete: if isCreatore();
         allow get: if signed() && (request.auth.uid == uid || isAdmin());
         allow list: if isAdmin();
         allow create: if signed() && (
@@ -108,6 +117,7 @@ service cloud.firestore {
 
       // Richieste di diventare amministratore: le crea un collega, le valuta un admin
       match /richiesteAdmin/{uid} {
+        allow delete: if isCreatore();
         allow get: if signed() && (request.auth.uid == uid || isAdmin());
         allow list: if isAdmin();
         allow create: if signed() && request.auth.uid == uid && isMember() && !isAdmin()
@@ -122,6 +132,7 @@ service cloud.firestore {
 
       // Richieste di accesso: il collega scrive nome e nickname, un admin approva o rifiuta
       match /richieste/{uid} {
+        allow delete: if isCreatore();
         allow get: if signed() && (request.auth.uid == uid || isAdmin());
         allow list: if isAdmin();
         allow create: if signed() && request.auth.uid == uid && !bloccato()
@@ -137,11 +148,13 @@ service cloud.firestore {
 
       // Telefoni espulsi: non possono piu' chiedere l'accesso
       match /bloccati/{uid} {
+        allow delete: if isCreatore();
         allow read, write: if isAdmin();
       }
 
       // Collegamento telefono -> collega: lo crea solo un amministratore (approvando la richiesta)
       match /utenti/{uid} {
+        allow delete: if isCreatore();
         allow get: if signed() && (request.auth.uid == uid || isAdmin());
         allow list: if isAdmin();
         allow create, update: if isAdmin()
@@ -152,6 +165,7 @@ service cloud.firestore {
 
       // Colleghi: li gestiscono gli admin; il collega puo' cambiare solo il proprio nickname
       match /membri/{mid} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create: if isAdmin();
         allow delete: if isAdmin() && !(mid == gruppo().get('creatoreMid', ''));
@@ -162,6 +176,7 @@ service cloud.firestore {
 
       // Listino: lo leggono i colleghi accettati, lo modificano gli admin
       match /prodotti/{pid} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create, update: if isAdmin()
           && request.resource.data.prezzo is int && request.resource.data.prezzo >= 0;
@@ -170,6 +185,7 @@ service cloud.firestore {
 
       // Buste di caffe': contatore condiviso (ogni collega varia solo il proprio contributo, al massimo 30 per volta)
       match /buste/{id} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create: if signed() && request.resource.data.stato == 'aperta'
           && (isAdmin() || (isMember() && request.resource.data.apertaDa == myMid()
@@ -189,6 +205,7 @@ service cloud.firestore {
 
       // Eventi: tutti aggiungono, cancella chi l'ha creato o un admin
       match /eventi/{id} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create: if isMember() && request.resource.data.uid == request.auth.uid
           && request.resource.data.titolo is string && request.resource.data.titolo.size() <= 80;
@@ -197,11 +214,13 @@ service cloud.firestore {
 
       // Chiusure di periodo e archivio: solo amministratori (contengono saldi e cassa di tutti)
       match /chiusure/{id} {
+        allow delete: if isCreatore();
         allow read: if isAdmin();
         allow create: if isAdmin();
         allow update, delete: if false;
       }
       match /archivio/{id} {
+        allow delete: if isCreatore();
         allow read: if isAdmin();
         allow create: if isAdmin();
         allow update, delete: if false;
@@ -209,6 +228,7 @@ service cloud.firestore {
 
       // Estratto: saldo di ogni collega all'ultima chiusura; ognuno vede solo il proprio
       match /estratti/{mid} {
+        allow delete: if isCreatore();
         allow read: if signed() && (isAdmin() || mid == myMid());
         allow write: if isAdmin();
       }
@@ -217,6 +237,7 @@ service cloud.firestore {
       // L'admin legge tutto; il collega solo i movimenti intestati a lui.
       // Riscatti di crediti: richieste aperte, visibili a tutti i colleghi (cosi' i debitori possono pagare direttamente)
       match /riscatti/{id} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create: if isMember() && request.resource.data.mid == myMid()
           && request.resource.data.stato == 'aperta' && importoOk(request.resource.data.importo)
@@ -232,6 +253,7 @@ service cloud.firestore {
 
       // Richieste d'acquisto di crediti: pubbliche tra i colleghi. Chi cede crediti ne riduce il residuo alla conferma.
       match /acquisti/{id} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create: if isMember() && request.resource.data.mid == myMid()
           && request.resource.data.stato == 'aperta' && importoOk(request.resource.data.importo)
@@ -248,6 +270,7 @@ service cloud.firestore {
       }
 
       match /movimenti/{id} {
+        allow delete: if isCreatore();
         allow read: if isMember() || isAdmin();
         allow create: if signed()
           && request.resource.data.uid == request.auth.uid

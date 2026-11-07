@@ -766,7 +766,7 @@ function renderEntry(){
   if(!st.uid) return st.sync === 'err'
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
-  if(!st.gid) return st.entry === 'crea' ? entryCrea() : st.entry === 'join' ? entryJoin() : entryWelcome();
+  if(!st.gid) return st.entry === 'crea' ? entryCrea() : st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
   return entryRichiesta();
@@ -786,6 +786,17 @@ function entryJoin(){
     <button class="btn amber block big" data-act="join" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Continua'}</button>
   </div>
   <button class="btn link" data-act="entry" data-v="">← Indietro</button>`;
+}
+
+function entryCreatore(){
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>${esc(st.joinNome || 'Gruppo')}</h1><p>Sei il creatore di questo gruppo?</p></div>
+  <div class="card">
+    <p class="mut" style="font-size:13px;margin:0 0 10px">Se hai creato tu il gruppo, inserisci il PIN amministratore per ritrovare il tuo profilo su questo telefono.</p>
+    <label class="f"><span>PIN amministratore</span><input class="in" id="jc-pin" type="password" autocomplete="off" autocapitalize="off"></label>
+    <button class="btn amber block big" data-act="join-creatore" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Sì, sono il creatore'}</button>
+    <button class="btn block ghost" style="margin-top:8px" data-act="join-collega">No, sono un collega</button>
+  </div>
+  <button class="btn link" data-act="entry" data-v="join">← Cambia codice</button>`;
 }
 
 function entryCrea(){
@@ -1498,7 +1509,10 @@ function pImpostazioni(){
   <div class="card"><h3>Stato</h3>
     <div class="between" style="font-size:13px"><span class="mut">Sincronizzazione</span><span class="row" style="gap:6px"><span class="dot ${({ok:'ok',off:'off',err:'err'})[st.sync]||''}"></span>${st.sync === 'ok' ? 'collegato' : st.sync === 'off' ? 'offline' : st.sync === 'err' ? 'errore' : 'in corso'}</span></div>
     <div class="between" style="font-size:13px;margin-top:6px"><span class="mut">Versione</span><span>v${VERSION}</span></div></div>
-  <button class="btn block ghost" data-act="esci-gruppo" style="color:var(--red)">${ic('logout','s')} Esci dal gruppo su questo telefono</button>`;
+  <button class="btn block ghost" data-act="esci-gruppo" style="color:var(--red)">${ic('logout','s')} Esci dal gruppo su questo telefono</button>
+  ${isCreatore(st.mid) || (st.gruppo && st.gruppo.creatoDa === st.uid) ? `<div class="card" style="border-color:rgba(248,113,113,.45);margin-top:14px"><h3 style="color:var(--red)">Zona pericolosa</h3>
+    <p class="mut" style="font-size:13px;margin:0 0 10px">Solo tu, che hai creato il gruppo, puoi eliminarlo. Vengono cancellati per sempre registro, saldi, cassa, inventario e colleghi. Prima scarica un backup dalle Impostazioni.</p>
+    <button class="btn block" id="btn-elimina-gruppo" data-act="elimina-gruppo" style="background:var(--red);border-color:var(--red);color:#fff">${ic('trash','s')} Elimina il gruppo</button></div>` : ''}`;
 }
 
 /* =====================================================================
@@ -1541,12 +1555,30 @@ A['join'] = async () => {
   try {
     const s = await db.collection('saletta').doc(code).get({source:'server'});
     if(!s.exists) { toast('Codice non trovato', 'err'); return; }
-    st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null;
-    connect(code);
+    st.joinCode = code; st.joinNome = s.data().nome || ''; st.entry = 'creatore';
   } catch(e){ toast('Impossibile verificare il codice (' + errMsg(e) + ')', 'err'); }
   finally { st.busy = false; render(); }
 };
 
+A['join-collega'] = () => { const code = st.joinCode; if(!code) return; st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null; st.joinCode = null; connect(code); render(); };
+A['join-creatore'] = async () => {
+  const code = st.joinCode, pin = val('jc-pin');
+  if(!code) return;
+  if(!pin) return toast('Inserisci il PIN', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione', 'err');
+  st.busy = true; render();
+  try {
+    const g = db.collection('saletta').doc(code);
+    const gd = await g.get({source:'server'}), cm = gd.exists && gd.data().creatoreMid;
+    if(!cm){ toast('Questo gruppo non ha un creatore registrato: entra come collega', 'err'); return; }
+    await g.collection('admin').doc(st.uid).set({pin, nome: gd.data().nome || 'Creatore', ts: TS()}); // le regole verificano il PIN
+    const md = await g.collection('membri').doc(cm).get({source:'server'});
+    await g.collection('utenti').doc(st.uid).set({mid: cm, nome: md.exists ? md.data().nome : 'Creatore', ts: TS()});
+    st.gid = code; LS.set('gid', code); LS.set('mid', cm); LS.del('invito'); st.entry = null; st.joinCode = null;
+    connect(code); toast('Bentornato, creatore del gruppo 🛡️');
+  } catch(e){ toast(/permission/i.test(e.code || e.message) ? 'PIN errato' : 'Errore (' + errMsg(e) + ')', 'err'); }
+  finally { st.busy = false; render(); }
+};
 A['crea'] = async () => {
   const nome = val('c-nome'), io = val('c-io'), nick = val('c-nick'), pin = val('c-pin');
   const pc = parseEuro(val('c-caffe')), qa = parseEuro(val('c-quota'));
@@ -1630,6 +1662,37 @@ A['conferma-approva'] = ds => {
 A['rifiuta-accesso'] = ds => {
   C('richieste').doc(ds.id).set({stato: 'rifiutata', esitoDa: myName(), esitoTs: TS()}, {merge: true}).then(() => toast('Richiesta rifiutata')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
+};
+A['elimina-gruppo'] = () => {
+  if(!st.gruppo) return;
+  openSheet(`<h3 style="color:var(--red)">${ic('trash')} Elimina il gruppo</h3>
+    <p class="sub">Verranno cancellati <b>definitivamente</b> per tutti i colleghi: movimenti, saldi, cassa, inventario, quote, eventi e anagrafica. Non si può annullare.</p>
+    <label class="f"><span>Per confermare scrivi il nome del gruppo: <b>${esc(st.gruppo.nome)}</b></span><input class="in" id="eg-nome" autocomplete="off"></label>
+    <button class="btn block big" data-act="conferma-elimina-gruppo" style="background:var(--red);border-color:var(--red);color:#fff">Elimina per sempre</button>`);
+};
+A['conferma-elimina-gruppo'] = async () => {
+  const g0 = st.gruppo; if(!g0 || st.busy) return;
+  if(val('eg-nome').trim() !== g0.nome) return toast('Il nome non corrisponde', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione per eliminare il gruppo', 'err');
+  const gid = st.gid, g = db.collection('saletta').doc(gid), me = st.uid;
+  st.busy = true; closeSheet(); toast('Eliminazione in corso…');
+  try {
+    // 1) leggo tutto finché le regole mi riconoscono; l'ordine di cancellazione tiene per ultimi amministratori e collegamenti telefono
+    const cols = ['movimenti','buste','riscatti','acquisti','eventi','chiusure','archivio','estratti','prodotti','membri','richieste','richiesteAdmin','bloccati','admin','utenti'];
+    const snaps = await Promise.all(cols.map(n => g.collection(n).get()));
+    const ownUtente = g.collection('utenti').doc(me);
+    const refs = [g.collection('segreti').doc('pin')];
+    cols.forEach((n, i) => snaps[i].docs.forEach(d => { if(!(n === 'utenti' && d.id === me)) refs.push(d.ref); }));
+    disconnect();
+    for(let i = 0; i < refs.length; i += 400){
+      const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit();
+    }
+    await g.delete();
+    await ownUtente.delete().catch(() => {});
+    st.gid = null; st.mid = null; st.entry = null; LS.del('gid'); LS.del('mid'); LS.del('page');
+    toast('Gruppo eliminato');
+  } catch(e){ toast('Eliminazione non riuscita (' + errMsg(e) + '). Riprova: i dati già cancellati non tornano.', 'err'); }
+  finally { st.busy = false; render(); }
 };
 A['esci-gruppo'] = force => {
   if(force !== true && st.isAdmin && st.gid){
