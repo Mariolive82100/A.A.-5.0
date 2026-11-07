@@ -1,0 +1,33 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "movimenti",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "mid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ts",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "movimenti",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dest",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ts",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

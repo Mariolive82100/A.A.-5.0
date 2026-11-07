@@ -1,0 +1,282 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ogni gruppo vive in /saletta/{codice}. Il codice del gruppo e' il "segreto" condiviso.
+    match /saletta/{gid} {
+
+      function signed() { return request.auth != null; }
+      function gruppo() { return get(/databases/$(database)/documents/saletta/$(gid)).data; }
+      function isAdmin() {
+        return signed() && exists(/databases/$(database)/documents/saletta/$(gid)/admin/$(request.auth.uid));
+      }
+      function myMid() {
+        return get(/databases/$(database)/documents/saletta/$(gid)/utenti/$(request.auth.uid)).data.mid;
+      }
+      function isMember() {
+        return signed() && exists(/databases/$(database)/documents/saletta/$(gid)/utenti/$(request.auth.uid));
+      }
+      function bloccato() {
+        return exists(/databases/$(database)/documents/saletta/$(gid)/bloccati/$(request.auth.uid));
+      }
+      function nomeOk(v) { return v is string && v.size() >= 2 && v.size() <= 30; }
+      function nickOk(d) { return !('nick' in d) || (d.nick is string && d.nick.size() <= 20); }
+      function importoOk(v) { return v is int && v > 0 && v <= 50000; }
+      function qtaOk(v) { return v is int && v >= 1 && v <= 30; }
+
+      // Cosa puo' registrare un collega NON amministratore
+      function movimentoCollega(d) {
+        return d.mid == myMid() && (
+          (d.tipo == 'caffe' && qtaOk(d.qta) && d.importo == gruppo().prezzoCaffe * d.qta)
+          || (d.tipo == 'snack' && qtaOk(d.qta) && d.pid is string
+              && get(/databases/$(database)/documents/saletta/$(gid)/prodotti/$(d.pid)).data.attivo == true
+              && d.importo == get(/databases/$(database)/documents/saletta/$(gid)/prodotti/$(d.pid)).data.prezzo * d.qta)
+          || (d.tipo == 'ricarica' && d.stato == 'attesa' && importoOk(d.importo)
+              && d.metodo in ['contanti', 'revolut'])
+          || (d.tipo == 'spesa' && d.stato == 'attesa' && importoOk(d.importo)
+              && d.fonte in ['tasca', 'denaro'])
+          || (d.tipo == 'scambio' && d.stato == 'attesa' && importoOk(d.importo)
+              && d.dest is string && d.dest != d.mid
+              && exists(/databases/$(database)/documents/saletta/$(gid)/membri/$(d.dest))
+              && !('conf' in d && d.conf != d.mid)
+              && ((d.aMid == d.mid && d.daMid == d.dest && d.metodo in ['contanti', 'revolut'] && !('rif' in d) && !('rifAcq' in d) && !('conf' in d))
+                  // vendita proposta a un collega in debito: conferma il destinatario (dest)
+                  || (d.daMid == d.mid && d.aMid == d.dest && d.metodo in ['contanti', 'revolut'] && !('rif' in d) && !('rifAcq' in d) && !('conf' in d))
+                  || (d.aMid == d.mid && d.daMid == d.dest && d.rif is string && d.metodo in ['contanti', 'revolut'] && !('rifAcq' in d) && !('conf' in d)
+                      && get(/databases/$(database)/documents/saletta/$(gid)/riscatti/$(d.rif)).data.mid == d.dest
+                      && get(/databases/$(database)/documents/saletta/$(gid)/riscatti/$(d.rif)).data.stato == 'aperta'
+                      && get(/databases/$(database)/documents/saletta/$(gid)/riscatti/$(d.rif)).data.get('fondo', false) == false)
+                  // cessione in risposta a una richiesta d'acquisto: la conferma finale e' del venditore (conf)
+                  || (d.daMid == d.mid && d.aMid == d.dest && d.conf == d.mid && d.rifAcq is string && !('rif' in d)
+                      && d.metodo in ['contanti', 'revolut']
+                      && get(/databases/$(database)/documents/saletta/$(gid)/acquisti/$(d.rifAcq)).data.mid == d.dest
+                      && get(/databases/$(database)/documents/saletta/$(gid)/acquisti/$(d.rifAcq)).data.stato == 'aperta'
+                      && d.importo <= get(/databases/$(database)/documents/saletta/$(gid)/acquisti/$(d.rifAcq)).data.residuo)))
+          || (d.tipo == 'pulizia' && d.mids is list && d.mids.size() == 1 && d.mids[0] == d.mid
+              && (!('giorno' in d) || (d.giorno is string && d.giorno.size() == 10))
+              && d.punti == gruppo().get('puntiPulizia', 1))
+          // conversione dei Punti Pulizia in crediti (in euro interi, al tasso del gruppo); il saldo punti lo controlla l'app
+          || (d.tipo == 'conversione' && d.importo is int && d.importo >= 100 && d.importo <= 50000 && d.importo % 100 == 0
+              && d.punti == d.importo / 100 * gruppo().get('puntiPerCredito', 3))
+        );
+      }
+
+      // Documento del gruppo (nome, prezzo caffe', quota annua)
+      allow get: if signed();
+      allow list: if false;
+      allow create: if signed()
+        && request.resource.data.creatoDa == request.auth.uid
+        && request.resource.data.prezzoCaffe is int && request.resource.data.prezzoCaffe >= 0
+        && request.resource.data.quotaAnnua is int && request.resource.data.quotaAnnua >= 0;
+      allow update: if isAdmin()
+        && request.resource.data.get('puntiPulizia', 1) is int && request.resource.data.get('puntiPulizia', 1) >= 1
+        && request.resource.data.get('puntiPerCredito', 3) is int && request.resource.data.get('puntiPerCredito', 3) >= 1
+        && request.resource.data.creatoDa == resource.data.creatoDa
+        && request.resource.data.get('creatoreMid', '') == resource.data.get('creatoreMid', '')
+        && request.resource.data.prezzoCaffe is int && request.resource.data.prezzoCaffe >= 0
+        && request.resource.data.quotaAnnua is int && request.resource.data.quotaAnnua >= 0;
+      allow delete: if false;
+
+      // PIN amministratore: nessuno puo' leggerlo dall'app
+      match /segreti/{doc} {
+        allow read: if false;
+        allow create: if signed() && doc == 'pin'
+          && gruppo().creatoDa == request.auth.uid
+          && request.resource.data.pin is string && request.resource.data.pin.size() >= 6;
+        allow update: if isAdmin() && doc == 'pin'
+          && request.resource.data.pin is string && request.resource.data.pin.size() >= 6;
+        allow delete: if false;
+      }
+
+      // Amministratori: si diventa admin col PIN giusto oppure venendo nominati da un admin.
+      // Il creatore del gruppo (telefono creatoDa, o il collega creatoreMid) non puo' essere rimosso da altri.
+      function protettoAdmin(aid) {
+        return gruppo().creatoDa == aid
+          || ('creatoreMid' in gruppo() && exists(/databases/$(database)/documents/saletta/$(gid)/utenti/$(aid))
+              && get(/databases/$(database)/documents/saletta/$(gid)/utenti/$(aid)).data.mid == gruppo().creatoreMid);
+      }
+      match /admin/{uid} {
+        allow get: if signed() && (request.auth.uid == uid || isAdmin());
+        allow list: if isAdmin();
+        allow create: if signed() && (
+          (request.auth.uid == uid
+            && request.resource.data.pin == get(/databases/$(database)/documents/saletta/$(gid)/segreti/pin).data.pin)
+          || (isAdmin() && exists(/databases/$(database)/documents/saletta/$(gid)/utenti/$(uid))));
+        allow update: if false;
+        allow delete: if signed() && (request.auth.uid == uid || (isAdmin() && !protettoAdmin(uid)));
+      }
+
+      // Richieste di diventare amministratore: le crea un collega, le valuta un admin
+      match /richiesteAdmin/{uid} {
+        allow get: if signed() && (request.auth.uid == uid || isAdmin());
+        allow list: if isAdmin();
+        allow create: if signed() && request.auth.uid == uid && isMember() && !isAdmin()
+          && request.resource.data.stato == 'attesa' && request.resource.data.mid == myMid()
+          && nomeOk(request.resource.data.nome);
+        allow update: if signed() && (
+          (request.auth.uid == uid && resource.data.stato == 'rifiutata' && request.resource.data.stato == 'attesa'
+            && request.resource.data.mid == myMid() && nomeOk(request.resource.data.nome))
+          || (isAdmin() && request.resource.data.stato == 'rifiutata'));
+        allow delete: if signed() && (request.auth.uid == uid || isAdmin());
+      }
+
+      // Richieste di accesso: il collega scrive nome e nickname, un admin approva o rifiuta
+      match /richieste/{uid} {
+        allow get: if signed() && (request.auth.uid == uid || isAdmin());
+        allow list: if isAdmin();
+        allow create: if signed() && request.auth.uid == uid && !bloccato()
+          && request.resource.data.stato == 'attesa'
+          && nomeOk(request.resource.data.nome) && nickOk(request.resource.data);
+        allow update: if signed() && (
+          (request.auth.uid == uid && !bloccato() && resource.data.stato in ['attesa', 'rifiutata', 'archiviato']
+            && request.resource.data.stato == 'attesa'
+            && nomeOk(request.resource.data.nome) && nickOk(request.resource.data))
+          || (isAdmin() && request.resource.data.stato in ['approvata', 'rifiutata', 'archiviato', 'espulso']));
+        allow delete: if signed() && (request.auth.uid == uid || isAdmin());
+      }
+
+      // Telefoni espulsi: non possono piu' chiedere l'accesso
+      match /bloccati/{uid} {
+        allow read, write: if isAdmin();
+      }
+
+      // Collegamento telefono -> collega: lo crea solo un amministratore (approvando la richiesta)
+      match /utenti/{uid} {
+        allow get: if signed() && (request.auth.uid == uid || isAdmin());
+        allow list: if isAdmin();
+        allow create, update: if isAdmin()
+          && request.resource.data.mid is string
+          && existsAfter(/databases/$(database)/documents/saletta/$(gid)/membri/$(request.resource.data.mid));
+        allow delete: if signed() && (request.auth.uid == uid || isAdmin());
+      }
+
+      // Colleghi: li gestiscono gli admin; il collega puo' cambiare solo il proprio nickname
+      match /membri/{mid} {
+        allow read: if isMember() || isAdmin();
+        allow create: if isAdmin();
+        allow delete: if isAdmin() && !(mid == gruppo().get('creatoreMid', ''));
+        allow update: if isAdmin() || (isMember() && myMid() == mid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nick'])
+          && nickOk(request.resource.data));
+      }
+
+      // Listino: lo leggono i colleghi accettati, lo modificano gli admin
+      match /prodotti/{pid} {
+        allow read: if isMember() || isAdmin();
+        allow create, update: if isAdmin()
+          && request.resource.data.prezzo is int && request.resource.data.prezzo >= 0;
+        allow delete: if isAdmin();
+      }
+
+      // Buste di caffe': contatore condiviso (ogni collega varia solo il proprio contributo, al massimo 30 per volta)
+      match /buste/{id} {
+        allow read: if isMember() || isAdmin();
+        allow create: if signed() && request.resource.data.stato == 'aperta'
+          && (isAdmin() || (isMember() && request.resource.data.apertaDa == myMid()
+              && request.resource.data.get('n', 0) == 0));
+        allow update: if signed() && (isAdmin() || isMember()) && resource.data.stato == 'aperta' && (
+          (request.resource.data.stato == 'chiusa'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stato', 'chiusaTs', 'chiusaDa']))
+          || (request.resource.data.stato == 'aperta'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['n', 'c_' + myMid()])
+            && request.resource.data.n - resource.data.n != 0
+            && request.resource.data.n - resource.data.n <= 30 && request.resource.data.n - resource.data.n >= -30
+            && request.resource.data.n - resource.data.n
+               == request.resource.data.get('c_' + myMid(), 0) - resource.data.get('c_' + myMid(), 0)
+            && request.resource.data.get('c_' + myMid(), 0) >= 0));
+        allow delete: if false;
+      }
+
+      // Eventi: tutti aggiungono, cancella chi l'ha creato o un admin
+      match /eventi/{id} {
+        allow read: if isMember() || isAdmin();
+        allow create: if isMember() && request.resource.data.uid == request.auth.uid
+          && request.resource.data.titolo is string && request.resource.data.titolo.size() <= 80;
+        allow update, delete: if signed() && (isAdmin() || resource.data.uid == request.auth.uid);
+      }
+
+      // Chiusure di periodo e archivio: solo amministratori (contengono saldi e cassa di tutti)
+      match /chiusure/{id} {
+        allow read: if isAdmin();
+        allow create: if isAdmin();
+        allow update, delete: if false;
+      }
+      match /archivio/{id} {
+        allow read: if isAdmin();
+        allow create: if isAdmin();
+        allow update, delete: if false;
+      }
+
+      // Estratto: saldo di ogni collega all'ultima chiusura; ognuno vede solo il proprio
+      match /estratti/{mid} {
+        allow read: if signed() && (isAdmin() || mid == myMid());
+        allow write: if isAdmin();
+      }
+
+      // Registro movimenti: solo aggiunte, niente cancellazioni.
+      // L'admin legge tutto; il collega solo i movimenti intestati a lui.
+      // Riscatti di crediti: richieste aperte, visibili a tutti i colleghi (cosi' i debitori possono pagare direttamente)
+      match /riscatti/{id} {
+        allow read: if isMember() || isAdmin();
+        allow create: if isMember() && request.resource.data.mid == myMid()
+          && request.resource.data.stato == 'aperta' && importoOk(request.resource.data.importo)
+          && request.resource.data.residuo == request.resource.data.importo
+          && request.resource.data.metodo in ['contanti', 'revolut'];
+        allow update: if isAdmin() || (isMember() && resource.data.mid == myMid()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['residuo', 'stato'])
+          && request.resource.data.residuo is int && request.resource.data.residuo >= 0
+          && request.resource.data.residuo <= resource.data.residuo
+          && request.resource.data.stato in ['aperta', 'chiusa', 'annullata']);
+        allow delete: if false;
+      }
+
+      // Richieste d'acquisto di crediti: pubbliche tra i colleghi. Chi cede crediti ne riduce il residuo alla conferma.
+      match /acquisti/{id} {
+        allow read: if isMember() || isAdmin();
+        allow create: if isMember() && request.resource.data.mid == myMid()
+          && request.resource.data.stato == 'aperta' && importoOk(request.resource.data.importo)
+          && request.resource.data.residuo == request.resource.data.importo
+          && request.resource.data.metodo in ['contanti', 'revolut'];
+        allow update: if isAdmin() || (isMember()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['residuo', 'stato'])
+          && request.resource.data.residuo is int && request.resource.data.residuo >= 0
+          && request.resource.data.residuo <= resource.data.residuo
+          && (resource.data.mid == myMid()
+              ? request.resource.data.stato in ['aperta', 'chiusa', 'annullata']
+              : request.resource.data.stato in ['aperta', 'chiusa']));
+        allow delete: if false;
+      }
+
+      match /movimenti/{id} {
+        allow read: if isMember() || isAdmin();
+        allow create: if signed()
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.ts == request.time
+          && (isAdmin() || movimentoCollega(request.resource.data));
+        allow update: if signed() && (
+          // un admin conferma o rifiuta una richiesta in attesa
+          (isAdmin() && resource.data.stato == 'attesa'
+            && request.resource.data.stato in ['confermata', 'rifiutata']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stato', 'esitoDa', 'esitoTs', 'fonte'])
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fonte'])
+                || (resource.data.tipo == 'spesa' && request.resource.data.fonte in ['contanti', 'revolut'])))
+          // il destinatario di uno scambio di crediti lo accetta o lo rifiuta
+          || (resource.data.get('conf', resource.data.get('dest', '')) == myMid() && resource.data.tipo == 'scambio' && resource.data.stato == 'attesa'
+            && request.resource.data.stato in ['confermata', 'rifiutata']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stato', 'esitoDa', 'esitoTs']))
+          // chi ha fatto la richiesta puo' annullarla finche' e' in attesa
+          || (resource.data.uid == request.auth.uid && resource.data.stato == 'attesa'
+            && request.resource.data.stato == 'annullata'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stato']))
+          // chi ha preso un caffe'/snack per sbaglio puo' annullarlo entro 10 minuti
+          || (resource.data.uid == request.auth.uid && resource.data.tipo in ['caffe', 'snack']
+            && !('stato' in resource.data)
+            && request.time < resource.data.ts + duration.value(10, 'm')
+            && request.resource.data.stato == 'annullata'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stato']))
+        );
+        allow delete: if false;
+      }
+    }
+  }
+}
