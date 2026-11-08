@@ -258,6 +258,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2M14 2v2M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/></symbol>
+  <symbol id="i-bean" viewBox="0 0 24 24"><g transform="rotate(40 12 12)"><ellipse cx="12" cy="12" rx="5.5" ry="9"/><path d="M12 3c-3 3.2 3 6 0 9s3 5.8 0 9"/></g></symbol>
   <symbol id="i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="m7.5 4.27 9 5.15"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
   <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0l1.58 6.14a2 2 0 0 0 1.44 1.44l6.14 1.58a.5.5 0 0 1 0 .96l-6.14 1.58a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/></symbol>
@@ -291,18 +292,16 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
   <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
 </svg>
 
-<!-- config.js: configurazione Firebase · firebase.js: libreria Firebase (SDK ufficiale 10.12.2, cartella vendor) -->
+<!-- config.js: configurazione Firebase · firebase.js: libreria Firebase (in beta: simulatore locale) -->
 <script src="config.js"></script>
-<script src="vendor/firebase-app-compat.js"></script>
-<script src="vendor/firebase-auth-compat.js"></script>
-<script src="vendor/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
 
 <script>
 'use strict';
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -310,6 +309,7 @@ const SOGLIA_SCORTA = 2;          // giacenza sotto cui un articolo e' "da ricom
 const ANNULLA_MIN = 10;           // minuti per annullare un caffe'/snack preso per sbaglio
 const CHIUSURA_MARGINE = 15 * 60000; // i movimenti degli ultimi 15 minuti restano nel periodo aperto
 const ARCHIVIO_CHUNK = 1500;
+const PID_CAFFE = 'caffe';        // articolo speciale: scorta di buste di caffe'
 
 /* ---------- utilita' ---------- */
 const $ = id => document.getElementById(id);
@@ -1043,7 +1043,14 @@ function pAdminHome(d){
       <button class="gbtn adm" style="min-height:130px" data-act="accredito" data-id=""><span class="em">🎁</span>Accredita omaggio / regalo</button>
     </div>
   </div>
-  <div class="card" style="margin-top:14px"><h3><span>Gestione spese in attesa</span>${sp.length ? `<span class="pill red">${sp.length}</span>` : ''}</h3>
+  <div class="card" style="margin-top:14px"><h3>Operazioni rapide</h3>
+    <div class="grid2">
+      <button class="btn sm" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button>
+      <button class="btn sm" data-act="accredito" data-id="">${ic('plus','s')} Accredita crediti</button>
+      <button class="btn sm" data-act="rettifica" data-id="">${ic('edit','s')} Rettifica saldo</button>
+    </div>
+  </div>
+  <div class="card"><h3><span>Gestione spese in attesa</span>${sp.length ? `<span class="pill red">${sp.length}</span>` : ''}</h3>
     ${sp.length ? `<div class="list">${sp.map(m => `<div class="li" style="display:block">
       <div class="between"><b style="font-size:13.5px">${esc(nomeM(m.mid))}</b><b class="mono">${eur(m.importo)}</b></div>
       <div class="tx2" style="font-size:13px;margin:2px 0 6px">${esc(m.descr || '')} <span class="pill ${m.fonte === 'denaro' ? 'amber' : 'violet'}">${m.fonte === 'denaro' ? 'Denaro reale' : 'In crediti'}</span></div>
@@ -1109,28 +1116,15 @@ function bustaInc(q){
   if(q < 0 && (b[c] || 0) < -q) return;
   C('buste').doc(b.id).set({n: firebase.firestore.FieldValue.increment(q), [c]: firebase.firestore.FieldValue.increment(q)}, {merge: true}).catch(() => {});
 }
-function cardBusta(d, ro){
-  const b = bustaAperta(), l = ultimaBustaChiusa();
-  const part = b ? Object.keys(b).filter(k => k.startsWith('c_') && b[k] > 0) : [];
-  const io = b && b['c_' + st.mid] > 0;
-  const vedi = st.isAdmin || io;
-  let h = `<div class="card"><h3><span>☕ Resa Busta Caffè</span>${b ? `<span class="pill green">in corso</span>` : ''}</h3>`;
-  if(b){
-    const n = b.n || 0, pc = Math.min(100, Math.round(n / BUSTA_CAFFE * 100));
-    h += `<div class="between"><b class="mono" id="busta-n" style="font-size:22px">${n} <span class="mut" style="font-size:13px">/ ${BUSTA_CAFFE} caffè</span></b><span class="mut" style="font-size:12px">aperta il ${dataOra(tms(b.apertaTs) || Date.now())}</span></div>
-      <div class="bar" style="margin:8px 0"><i style="width:${pc}%"></i></div>
-      ${vedi && part.length ? `<div class="mut" style="font-size:12.5px;margin-bottom:8px">Hanno registrato caffè in questa busta: ${part.map(k => esc(nomeBreve(k.slice(2))) + ' (' + b[k] + ')').join(', ')}</div>` : ''}
-      ${ro ? '' : `<button class="btn green block" data-act="busta-chiudi" data-id="${b.id}">Busta Terminata</button>`}`;
-  } else {
-    h += `<p class="mut" style="font-size:13px;margin:0 0 10px">Nessuna busta aperta: i caffè non vengono contati finché non ne apri una nuova (1 kg ≈ ${BUSTA_CAFFE} caffè).</p>
-      ${ro ? '' : `<button class="btn amber block" data-act="busta-apri">Apri Nuova Busta</button>`}`;
-  }
-  if(l && (st.isAdmin || l['c_' + st.mid] > 0)){
-    const t = tassoBusta(l), col = t >= 85 ? 'green' : t < 70 ? 'red' : 'amber';
-    h += `<div class="sep"></div><div class="between"><span class="tx2" style="font-size:13px">Ultima busta · Tasso di Onestà</span><b class="mono ${col}" id="busta-tasso" style="font-size:20px">${t}%</b></div>
-      <div class="mut" style="font-size:12px">${l.n || 0} caffè registrati su ${BUSTA_CAFFE} · chiusa il ${dataOra(tms(l.chiusaTs))}</div>`;
-  }
-  return h + `</div>`;
+/* buste di caffe' disponibili = buste caricate dall'admin (articolo speciale 'caffe') meno quelle aperte che le hanno scalate (campo sc) */
+const prodCaffe = () => prodotto(PID_CAFFE);
+function busteCaricate(d){
+  const p = prodCaffe(); if(!p) return 0;
+  return st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 0);
+}
+const busteDisp = d => Math.max(0, busteCaricate(d) - st.buste.filter(b => b.sc).length);
+function cardBusta(){
+  return `<button class="btn amber block big" id="btn-busta" data-act="busta-apri" style="margin-bottom:12px">${ic('bean')} Apri nuova busta caffè</button>`;
 }
 /* ---------- descrizione movimenti ---------- */
 function descMov(m){
@@ -1151,7 +1145,9 @@ function descMov(m){
     case 'addebito_quota': return {ic:'🧾', t: `Quota fondo ${esc(m.anno)} addebitata a ${n}`, a: -m.importo};
     case 'accredito': return {ic:'🎁', t: `Credito accreditato a ${n}${m.causale ? ': ' + esc(m.causale) : ''}`, a: m.importo};
     case 'rettifica': return {ic:'✏️', t: `Rettifica saldo di ${n}${m.causale ? ': ' + esc(m.causale) : ''}`, a: m.importo};
-    case 'carico': { const p = prodotto(m.pid); return {ic:'📦', t: `Giacenza ${esc((p && p.nome) || m.nome || '')} ${m.qta > 0 ? '+' : ''}${m.qta} pz`, a: 0}; }
+    case 'carico': { const p = prodotto(m.pid);
+      if(m.pid === PID_CAFFE) return {ic:'📦', t: `Buste di caffè ${m.qta > 0 ? '+' : ''}${m.qta}`, a: 0};
+      return {ic:'📦', t: `Giacenza ${esc((p && p.nome) || m.nome || '')} ${m.qta > 0 ? '+' : ''}${m.qta} pz`, a: 0}; }
     case 'pulizia': return {ic:'✨', t: `Pulizie: ${(m.mids||[]).map(x => esc(nomeM(x))).join(', ')} (+${m.punti ?? PUNTI_DEF} punti a testa)`, a: 0};
     case 'conversione': return {ic:'🔄', t: `${n} converte ${m.punti} Punti Pulizia in crediti`, a: m.importo};
     case 'storno': { const o = m.orig ? descMov(m.orig) : {t:''}; return {ic:'↩️', t: `Storno di: ${o.t}`, a: o.a ? -o.a : 0, cassa: o.cassa}; }
@@ -1228,7 +1224,7 @@ function pRegolamento(){
     '<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti. Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.'])}
   ${sez('3. Ruoli e poteri', [
     '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
-    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, aggiunge eventi, apre e chiude le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
+    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
     '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, la liquidazione sussidiaria dei crediti invenduti, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
     '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
     '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
@@ -1244,14 +1240,14 @@ function pRegolamento(){
     'Chi acquista prodotti per la saletta (caffè, bibite, snack, detergenti) inserisce la spesa (<b>Acquisto per il fondo</b>) e sceglie il rimborso: <b>in crediti</b> (dopo la convalida l\'importo diventa credito personale, la cassa non cambia) oppure <b>in denaro reale</b> (l\'amministratore usa «Convalida e Paga»: il denaro esce dalla cassa, contanti o Revolut, e il saldo del collega non cambia).','Anche le spese degli amministratori restano in attesa finché non sono convalidate. Gli omaggi e i regali si accreditano a un solo beneficiario, senza toccare la cassa.',
     'Acquisti istituzionali, macchinari e manutenzioni straordinarie sono registrati direttamente dall\'amministratore come uscita di cassa.'])}
   ${sez('7. Inventario e listino', [
-    'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità.',
+    'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità. Per il caffè l\'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.',
     'Gli amministratori fanno verifiche fisiche periodiche: sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.'])}
   ${sez('8. Pulizie e Punti Pulizia', [
     '<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata. In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.',
     `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori). Gli amministratori possono stornare registrazioni non veritiere.`,
     `<b>Conversione:</b> ${rate} Punti Pulizia = 1 credito (1,00 €), in crediti interi. Il rapporto è modificabile solo dagli amministratori. I crediti ottenuti riducono i debiti, finanziano nuovi consumi o si vendono nel Mercato.`])}
   ${sez('9. Busta del caffè e Tasso di Onestà', [
-    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova azzera il contatore comune; ogni caffè registrato lo incrementa. Quando la busta è finita si preme <b>Busta Terminata</b>.`,
+    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
     '<b>Tasso di Onestà = caffè registrati ÷ 130 × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che qualcuno beve senza registrare.',
     'Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.'])}
   ${sez('10. Chiusure, backup e trasparenza', [
@@ -1395,20 +1391,30 @@ function pCassa(d){
 function pInventario(d){
   const k = st.invSort.k, asc = st.invSort.asc ? 1 : -1;
   const v = p => k === 'stock' ? giacenza(d, p) : k === 'prezzo' ? p.prezzo : k === 'categoria' ? p.categoria : (p.nome||'').toLowerCase();
-  const list = st.prodotti.filter(p => adminView() || p.attivo !== false).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
+  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && (adminView() || p.attivo !== false)).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
   const th = (key, l, cls='') => `<th class="s ${cls}" data-act="inv-sort" data-k="${key}">${l}${k === key ? (st.invSort.asc ? ' ↑' : ' ↓') : ''}</th>`;
+  const bd = busteDisp(d), pcf = (st.gruppo && st.gruppo.prezzoCaffe) || 0;
+  const rigaCaffe = `<tr>
+      <td><div><b>${ic('bean','s')} Caffè</b></div><div class="mut" style="font-size:11px">Prezzo a tazzina · scorta in buste</div></td>
+      <td class="r mono amber"><b>${eur(pcf)}</b></td>
+      <td class="c">${adminView() ? `<span class="stepper"><button data-act="carico-caffe" data-v="-1">−</button><b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b><button data-act="carico-caffe" data-v="1">+</button></span>
+        <div class="mut" style="font-size:11px">buste disponibili</div>
+        <div><button class="btn link" style="font-size:11px;padding:2px" data-act="carico-caffe-n">carico…</button></div>`
+        : `<b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b><div class="mut" style="font-size:11px">buste disponibili</div>`}</td></tr>`;
   return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
     ${adminView() ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
-  ${cardBusta(d, adminView())}
-  ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Tutti possono aprire e chiudere le buste del caffè; prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
+  ${cardBusta()}
+  ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Tutti possono aprire una nuova busta del caffè; prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
   <div class="card" style="padding:6px 8px;overflow-x:auto">
-  ${list.length ? `<table><thead><tr>${th('nome','Articolo')}${th('prezzo','Prezzo','r')}${th('stock','Giacenza','c')}</tr></thead><tbody>
+  <table><thead><tr>${th('nome','Articolo')}${th('prezzo','Prezzo','r')}${th('stock','Giacenza','c')}</tr></thead><tbody>
+    ${rigaCaffe}
     ${list.map(p => { const sk = giacenza(d, p); return `<tr class="${p.attivo === false ? 'strike' : ''}">
       <td>${adminView() ? `<button style="text-align:left" data-act="prodotto" data-id="${p.id}">` : '<div>'}<b>${esc(p.emoji||'')} ${esc(p.nome)}</b><div class="mut" style="font-size:11px">${p.categoria === 'fondo' ? 'Dotazione fondo' : 'A consumo'}${p.attivo === false ? ' · non attivo' : ''}${adminView() ? ' · ' + ic('edit','s').replace('class="i s"','class="i s" style="width:11px;height:11px;vertical-align:-1px"') : ''}</div>${adminView() ? '</button>' : '</div>'}</td>
       <td class="r mono amber"><b>${p.categoria === 'fondo' ? '—' : eur(p.prezzo)}</b></td>
       <td class="c">${adminView() ? `<span class="stepper"><button data-act="carico" data-id="${p.id}" data-v="-1">−</button><b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b><button data-act="carico" data-id="${p.id}" data-v="1">+</button></span>
         <div><button class="btn link" style="font-size:11px;padding:2px" data-act="carico-n" data-id="${p.id}">carico…</button></div>` : `<b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b>`}</td></tr>`; }).join('')}
-  </tbody></table>` : `<div class="empty">Nessun articolo. ${adminView() ? 'Aggiungi il primo con “Nuovo”.' : ''}</div>`}
+  </tbody></table>
+  ${list.length ? '' : `<div class="empty">Nessun altro articolo. ${adminView() ? 'Aggiungi il primo con “Nuovo”.' : ''}</div>`}
   </div>`;
 }
 
@@ -1497,14 +1503,6 @@ function pAdmin(d){
 
   ${richiesteFondo(d)}
 
-  <div class="card"><h3>Operazioni rapide</h3>
-    <div class="grid2">
-      <button class="btn sm" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button>
-      <button class="btn sm" data-act="accredito" data-id="">${ic('plus','s')} Accredita crediti</button>
-      <button class="btn sm" data-act="rettifica" data-id="">${ic('edit','s')} Rettifica saldo</button>
-    </div>
-  </div>
-
   <div class="card"><h3>Prezzi e gruppo</h3>
     <div class="grid2">
       <label class="f"><span>Prezzo caffè €</span><input class="in mono" id="ad-caffe" inputmode="decimal" value="${(st.gruppo.prezzoCaffe/100).toFixed(2).replace('.',',')}"></label>
@@ -1584,12 +1582,18 @@ A['mercato'] = () => A['go']({p:'crediti'});
 A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render(); };
 A['vista'] = ds => { st.vista = ds.v === 'user' ? 'user' : 'admin'; LS.set('vista', st.vista); st.page = 'bar'; LS.set('page', 'bar'); closeSheet(); window.scrollTo(0,0); render(); };
 
+/* Apri nuova busta: chiude l'eventuale busta in corso (calcola il Tasso di Onestà), ne apre una a contatore zero
+   e, se ci sono buste disponibili in scorta, la scala (campo sc). */
+let bustaTap = 0;
 A['busta-apri'] = () => {
-  if(bustaAperta()) return toast('C\'è già una busta aperta', 'err');
-  C('buste').doc().set({stato: 'aperta', apertaTs: TS(), apertaDa: st.mid, n: 0}).then(() => toast('Nuova busta aperta: contatore a zero')).catch(e => toast(errMsg(e), 'err'));
-};
-A['busta-chiudi'] = ds => {
-  C('buste').doc(ds.id).update({stato: 'chiusa', chiusaTs: TS(), chiusaDa: st.mid}).then(() => toast('Busta terminata')).catch(e => toast(errMsg(e), 'err'));
+  if(Date.now() - bustaTap < 1500) return; bustaTap = Date.now();
+  const vecchia = bustaAperta(), d = derived();
+  if(vecchia && !confirm(`Aprire una nuova busta? Quella in corso (${vecchia.n || 0} caffè registrati) verrà chiusa e il contatore ripartirà da zero.`)) return;
+  const sc = busteDisp(d) > 0;
+  const b = db.batch(), nuova = C('buste').doc();
+  if(vecchia) b.update(C('buste').doc(vecchia.id), {stato: 'chiusa', chiusaTs: TS(), chiusaDa: st.mid});
+  b.set(nuova, clean({stato: 'aperta', apertaTs: TS(), apertaDa: st.mid, n: 0, sc: sc ? 1 : undefined}));
+  b.commit().then(() => toast('Nuova busta aperta: contatore a zero')).catch(e => toast('Non riuscito (' + errMsg(e) + ')', 'err'));
 };
 A['busta-visto'] = ds => { LS.set('bustaVista_' + ds.id, 1); render(); };
 
@@ -1812,7 +1816,7 @@ A['annulla-richiesta'] = ds => { C('movimenti').doc(ds.id).update({stato:'annull
 
 A['snack'] = () => {
   const d = derived();
-  const list = st.prodotti.filter(p => p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
+  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
   openSheet(`<h3>${ic('cookie')} Acquista snack</h3><p class="sub">Tocca l'articolo che hai preso.</p>
     ${list.length ? `<div class="list">${list.map(p => { const sk = d.S.stock[p.id] || 0, fin = st.isAdmin && sk <= 0; return `<button class="li" style="width:100%;text-align:left;${fin ? 'opacity:.45' : ''}" data-act="prendi-snack" data-id="${p.id}" ${fin ? 'disabled' : ''}>
       <div class="av" style="font-size:22px">${esc(p.emoji || '🍫')}</div><div class="grow"><div class="t">${esc(p.nome)}</div>${st.isAdmin ? `<div class="d">${sk <= 0 ? 'Esaurito' : 'Giacenza ' + sk + ' pz'}</div>` : ''}</div><b class="mono amber">${eur(p.prezzo)}</b></button>`; }).join('')}</div>`
@@ -2069,6 +2073,24 @@ A['conferma-cassa'] = ds => {
 
 /* --- inventario (admin) --- */
 A['inv-sort'] = ds => { if(st.invSort.k === ds.k) st.invSort.asc = !st.invSort.asc; else st.invSort = {k: ds.k, asc: true}; render(); };
+/* scorta buste di caffe': articolo speciale 'caffe' creato dall'admin al primo carico (prezzo 0, categoria fondo: non compare tra gli snack) */
+function caricaBusteCaffe(q){
+  const d = derived();
+  if(q < 0 && -q > busteDisp(d)) return toast('Non ci sono abbastanza buste da togliere', 'err');
+  if(!prodCaffe()) C('prodotti').doc(PID_CAFFE).set({nome: 'Caffè (buste)', emoji: '☕', categoria: 'fondo', prezzo: 0, attivo: true, speciale: 'caffe'}, {merge: true}).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
+  addMov({tipo:'carico', pid: PID_CAFFE, qta: q, nome: 'Caffè (buste)'});
+  return true;
+}
+A['carico-caffe'] = ds => { caricaBusteCaffe(Number(ds.v)); };
+A['carico-caffe-n'] = () => {
+  openSheet(`<h3>${ic('bean')} Carico buste di caffè</h3><p class="sub">Buste aggiunte alla scorta (negativo per toglierle). Ora disponibili: <b class="mono">${busteDisp(derived())}</b>.</p>
+    <label class="f"><span>Buste</span><input class="in mono" id="cc-q" inputmode="numeric" value="5" autofocus></label>
+    <button class="btn amber block big" data-act="conferma-carico-caffe">Registra</button>`);
+};
+A['conferma-carico-caffe'] = () => {
+  const q = parseInt(val('cc-q'), 10); if(!q) return toast('Numero non valido', 'err');
+  if(caricaBusteCaffe(q) === true){ closeSheet(); toast('Scorta buste aggiornata'); }
+};
 A['prodotto'] = ds => {
   const p = ds.id ? prodotto(ds.id) : null;
   openSheet(`<h3>${ic('package')} ${p ? 'Modifica articolo' : 'Nuovo articolo'}</h3><p class="sub">${p ? 'Il nuovo prezzo vale dai prossimi acquisti.' : 'Aggiungi un articolo al listino.'}</p>
