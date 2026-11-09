@@ -225,6 +225,11 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 .code{font-size:20px;font-weight:800;letter-spacing:.08em;text-align:center;padding:12px;border-radius:14px;background:var(--bg2);border:1px dashed var(--line2);user-select:all}
 .spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--amber);animation:sp 1s linear infinite;margin:40px auto}
 @keyframes sp{to{transform:rotate(360deg)}}
+.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.4;color:var(--tx2)}
+.steps li:first-child{border-top:0}
+.steps li::before{content:counter(s);flex:none;width:26px;height:26px;border-radius:50%;background:rgba(245,165,36,.14);color:var(--amber);font-weight:800;font-size:13px;display:grid;place-items:center}
+.steps li b{color:var(--tx)}
 @media (min-width:700px){html{font-size:17px}}
 </style>
 </head>
@@ -303,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.2.2';
+const VERSION = '1.3.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -373,7 +378,7 @@ const st = {
   admins: [], utenti: [], isAdmin: false,
   ready: {}, sync: 'conn', syncErr: '', entry: null, busy: false,
   caffeQta: 1, riscSel: {}, riscMet: 'contanti', invSort: {k:'nome', asc:true}, feedFiltro: 'tutti', statPeriodo: 'corrente',
-  archivio: null
+  archivio: null, skipInstall: false, installata: false
 };
 
 /* ---------- Firebase ---------- */
@@ -761,6 +766,7 @@ function renderDrawer(){
     </div>
     <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}Impostazioni</button>
     <button class="nb ${st.page==='regolamento'?'on':''}" data-act="go" data-p="regolamento">${ic('receipt')}Regolamento</button>
+    <button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>
     <button class="nb" data-act="info">${ic('info')}Info</button>
     ${!st.isAdmin ? `<div class="sep"></div><button class="nb ${st.page==='admin'?'on':''}" data-act="go" data-p="admin">${ic('lock')}Accesso amministratore</button>` : ''}
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
@@ -773,10 +779,33 @@ const PAGINE_ADMIN = ['bar','registro','notifiche','admin','membri','quote','inv
 const adminView = () => st.isAdmin && st.vista === 'admin';
 const pagineConsentite = () => !st.isAdmin ? PAGINE_COLLEGA : adminView() ? PAGINE_ADMIN : PAGINE_UTENTE;
 
+/* ---------- installazione dell'app (PWA) ----------
+   Browser e app installata conservano i dati separati: chi si registra dal browser e poi installa
+   l'app si ritrova da capo. Per questo, finché non è registrato, chi apre l'app dal browser
+   vede prima le istruzioni di installazione. */
+const isStandalone = () => {
+  try {
+    return ['standalone', 'fullscreen', 'minimal-ui'].some(m => window.matchMedia('(display-mode: ' + m + ')').matches)
+      || window.navigator.standalone === true || document.referrer.startsWith('android-app://');
+  } catch(e){ return false; }
+};
+const piattaforma = () => {
+  const ua = navigator.userAgent || '';
+  if(/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+  if(/Android/i.test(ua)) return 'android';
+  return 'desktop';
+};
+const serveInstall = () => !st.gid && !st.skipInstall && !isStandalone();
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; render(); });
+window.addEventListener('appinstalled', () => { installPrompt = null; st.installata = true; render(); });
+const appUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
+
 /* ---------- schermate di ingresso ---------- */
 function renderEntry(){
   if(st.sync === 'nocfg') return `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1><p>Configurazione Firebase mancante.</p></div>
     <div class="card"><p class="tx2" style="margin:0;font-size:14px">Questa copia dell'app non è ancora collegata a un progetto Firebase. Inserisci il blocco <span class="mono">firebaseConfig</span> nel file <span class="mono">config.js</span>.</p></div>`;
+  if(serveInstall()) return entryInstall();
   if(!st.uid) return st.sync === 'err'
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
@@ -784,6 +813,45 @@ function renderEntry(){
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
   return entryRichiesta();
+}
+
+function entryInstall(){
+  const p = piattaforma(), inv = LS.get('invito', '') || '';
+  const passi = {
+    android: [
+      `Apri il menu <b>⋮</b> di Chrome (in alto a destra).`,
+      `Tocca <b>Installa app</b> (oppure <b>Aggiungi a schermata Home</b>) e conferma.`,
+      `Chiudi questa pagina e apri <b>Armieri 5.0</b> dall'icona appena creata.`,
+      `Registrati o entra nel gruppo <b>da lì</b>, non da questa pagina.`
+    ],
+    ios: [
+      `Apri questo link con <b>Safari</b>.`,
+      `Tocca <b>Condividi</b> ${ic('share','s')} (la barra in basso, o in alto a destra su iPad).`,
+      `Scorri e tocca <b>Aggiungi alla schermata Home</b>, poi <b>Aggiungi</b>.`,
+      `Apri <b>Armieri 5.0</b> dall'icona nella schermata Home e registrati <b>da lì</b>.`
+    ],
+    desktop: [
+      `In Chrome o Edge, clicca l'icona <b>Installa</b> ${ic('download','s')} nella barra degli indirizzi (oppure menu <b>⋮</b> → <b>Installa Armieri 5.0</b>).`,
+      `Conferma con <b>Installa</b>.`,
+      `Apri l'app installata e registrati <b>da lì</b>.`
+    ]
+  };
+  const titoli = {android: 'Android · Chrome', ios: 'iPhone / iPad', desktop: 'Computer'};
+  const lista = k => `<ol class="steps">${passi[k].map(s => `<li><span>${s}</span></li>`).join('')}</ol>`;
+  const altri = ['android', 'ios', 'desktop'].filter(k => k !== p);
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('phone','l')}</div><h1>Prima installa l'app</h1><p>Ci vuole un minuto e ti evita di doverti registrare due volte.</p></div>
+  ${st.installata ? `<div class="banner sky" id="inst-ok">${ic('check')}<div><b>App installata!</b> Chiudi questa pagina e apri Armieri 5.0 dall'icona nella schermata Home. Registrati da lì.</div></div>` : ''}
+  <div class="banner amber">${ic('alert')}<div>Se ti registri da questa pagina e <b>poi</b> installi l'app, l'app installata non ti riconosce e ti chiede di registrarti di nuovo. Installa <b>prima</b>, poi registrati dall'app.</div></div>
+  ${inv ? `<div class="card"><h3>Il tuo codice gruppo</h3><div class="code mono" style="margin-bottom:10px">${esc(inv)}</div>
+    <button class="btn sm block" data-act="copia" data-v="${esc(inv)}">${ic('copy','s')} Copia codice</button>
+    <p class="hint" style="margin:10px 0 0">Tienilo a portata di mano: una volta aperta l'app installata potresti doverlo inserire.</p></div>` : ''}
+  <div class="card" id="inst-passi"><h3>${titoli[p]}</h3>
+    ${installPrompt ? `<button class="btn amber block big" id="btn-install" data-act="install-app" style="margin-bottom:6px">${ic('download','s')} Installa app</button>` : ''}
+    ${lista(p)}</div>
+  <details style="margin-bottom:12px"><summary class="mut" style="cursor:pointer;font-size:12.5px;padding:6px 2px">Hai un altro tipo di dispositivo?</summary>
+    ${altri.map(k => `<div class="card" style="margin-top:8px"><h3>${titoli[k]}</h3>${lista(k)}</div>`).join('')}</details>
+  <div style="text-align:center;margin-top:6px"><button class="btn link" id="btn-install-salta" data-act="install-salta" style="color:var(--mut)">Continua nel browser senza installare</button>
+    <p class="hint" style="margin:2px 0 0">Sconsigliato: se installerai l'app più tardi dovrai registrarti di nuovo.</p></div>`;
 }
 
 function entryWelcome(){
@@ -879,8 +947,12 @@ function pBar(d){
       <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
     </div>
-    <div class="stat" style="margin-top:12px"><small>SALDO FONDO</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
-    <p class="hint" style="margin:6px 0 0">Il Saldo Fondo è la cassa (contanti + conto).</p>
+    <div class="grid3" style="margin-top:12px">
+      <div class="stat"><small>Saldo Contabile</small><b class="mono ${s < 0 ? 'red' : 'green'}" id="r-cont">${eurS(s)}</b></div>
+      <div class="stat"><small>Saldo Disponibile</small><b class="mono ${saldoDisp(d) < 0 ? 'red' : 'green'}" id="r-disp">${eurS(saldoDisp(d))}</b></div>
+      <div class="stat"><small>Totale Fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
+    </div>
+    <p class="hint" style="margin:6px 0 0">Il saldo disponibile esclude i crediti già impegnati in riscatti o scambi in corso. Il Totale Fondo è la cassa (contanti + conto).</p>
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
@@ -1209,102 +1281,49 @@ function pFeed(d){
 /* ---------- REGOLAMENTO ---------- */
 function pRegolamento(){
   const g = st.gruppo || {}, rate = puntiPerCredito(), pp = puntiPulizia();
-  const li = r => Array.isArray(r)
-    ? `<li>${r[0]}<ul style="margin:6px 0 2px;padding-left:18px;list-style:circle">${r[1].map(li).join('')}</ul></li>`
-    : `<li style="margin-bottom:6px">${r}</li>`;
-  const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="tx2" style="font-size:13.5px;line-height:1.5;margin:0;padding-left:18px">${righe.map(li).join('')}</ul></div>`;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">Norme di gestione di ${esc(g.nome || 'Armieri 5.0')} · versione 3.4 · novembre 2026</p>
+  const sez = (t, righe) => `<div class="card"><h3>${t}</h3>${righe.map(r => `<p class="tx2" style="font-size:13.5px;line-height:1.5;margin:0 0 9px">${r}</p>`).join('')}</div>`;
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">Norme di gestione di ${esc(g.nome || 'Armieri 5.0')} · versione 3.3 · novembre 2026</p>
   ${sez('1. Finalità e principi', [
-    `Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.`,
-    `<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.`,
-    `<b>Contabilità, non denaro:</b> l'app non incassa nulla, registra solo crediti e debiti.`,
-    `I soldi veri passano in contanti o Revolut, fuori dall'app.`,
-    `<b>Trasparenza:</b> tutti i membri consultano il Registro movimenti completo del fondo (con filtri), il listino e le attività comuni.`,
-    `I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo.`,
-    `Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).`])}
+    'Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.',
+    '<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.',
+    '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
+    '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
   ${sez('2. Il saldo unico', [
-    `Ogni membro ha un solo saldo.`,
-    `<b>Positivo = credito:</b> il gruppo ti deve qualcosa.`,
-    `<b>Negativo = debito:</b> devi qualcosa alla cassa o ai colleghi a credito.`,
-    `<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.`,
-    `<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti.`,
-    `Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.`])}
+    'Ogni membro ha un solo saldo. <b>Positivo = credito</b> (il gruppo ti deve qualcosa), <b>negativo = debito</b> (devi qualcosa alla cassa o ai colleghi a credito).',
+    '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
+    '<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti. Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.'])}
   ${sez('3. Ruoli e poteri', [
-    `<b>Modifica delle regole:</b> regolamento e parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.`,
-    [`<b>Collega</b> — può:`, [
-      `registrare caffè e snack (annullabili entro ${ANNULLA_MIN} minuti);`,
-      `anticipare spese per la saletta (da convalidare);`,
-      `acquistare crediti nel Mercato e riscattarli dal Fondo;`,
-      `registrare le proprie pulizie e convertire i propri Punti Pulizia;`,
-      `aggiungere eventi e aprire le buste di caffè;`,
-      `cambiare il nickname e chiedere di diventare amministratore.`]],
-    `<b>Collega</b> — non vede cassa, statistiche né i saldi degli altri.`,
-    `<b>Collega</b> — riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).`,
-    [`<b>Amministratore:</b> due modalità, selezionabili dall'interruttore in alto:`, [
-      `<b>Profilo Utente:</b> si comporta come un normale collega, con saldo e notifiche personali;`,
-      `<b>Amministrazione Fondo:</b> cassa, fondo netto, spese in attesa, registro globale con storno.`]],
-    [`In amministrazione l'amministratore:`, [
-      `approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti);`,
-      `gestisce inventario e listino;`,
-      `gestisce la tesoreria (contanti, Revolut, giroconti);`,
-      `registra storni e rettifiche motivate;`,
-      `si occupa della liquidazione sussidiaria dei crediti invenduti;`,
-      `esegue chiusure di periodo, backup e rendiconti;`,
-      `nomina e rimuove altri amministratori.`]],
-    `<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database).`,
-    `Il creatore può lasciare il ruolo solo per sua scelta.`,
-    `<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall'app.`])}
+    '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
+    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
+    '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, la liquidazione sussidiaria dei crediti invenduti, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
+    '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
+    '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
   ${sez('4. Quota annuale', [
     `A inizio anno il sistema addebita a tutti la quota (${eur(g.quotaAnnua || 0)}): il saldo parte in negativo di quella cifra.`,
-    [`La quota si salda in uno di questi modi:`, [
-      `<b>Versamento diretto</b> in contanti o Revolut: il debito scende e la cassa sale;`,
-      `<b>Compensazione</b> sui crediti già maturati: la cassa non cambia;`,
-      `<b>Già versata</b>, se il contributo è stato dato fuori dall'app: la convalida un amministratore.`]],
-    `La quota è già inclusa nel saldo: si salda come ogni debito, comprando crediti dal Fondo Gruppo o da un collega nel Mercato.`])}
+    '<b>Versamento diretto</b> in contanti o Revolut (il debito scende e la cassa sale) · <b>Compensazione</b> sui crediti già maturati (la cassa non cambia) · <b>Già versata</b>, se il contributo è stato dato fuori dall\'app, convalidata da un amministratore.',
+    'La quota è già inclusa nel saldo (parte in negativo): si salda come ogni debito, comprando crediti dal Fondo Gruppo o da un collega nel Mercato.'])}
   ${sez('5. Mercato dei Crediti', [
-    `<b>Si acquistano, non si vendono:</b> chiunque può acquistare crediti.`,
-    [`Due modi per acquistare:`, [
-      `dal <b>Fondo Gruppo</b>, versando contanti o Revolut (un amministratore conferma);`,
-      `da un <b>collega a credito</b>, pagandolo fuori dall'app (il collega conferma dalla pagina Notifiche e i crediti passano a te).`]],
-    `Il pulsante «Acquista crediti» è sempre attivo, anche con saldo positivo.`,
-    [`<b>Riscatto:</b> chi ha un saldo positivo preme «Riscatta crediti» e sceglie:`, [
-      `uno o più colleghi <b>con saldo negativo</b> (il contatore scende in tempo reale);`,
-      `e/o il <b>Fondo Gruppo</b> per la rimanenza.`]],
-    `Il collega conferma dalle Notifiche dopo averti pagato fuori dall'app.`,
-    `Il Fondo ti liquida tramite un amministratore, nei limiti della cassa.`,
-    `<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione.`,
-    `L'elenco dei colleghi con crediti è ordinato dal credito maggiore al minore.`])}
+    '<b>Si acquistano, non si vendono:</b> chiunque può acquistare crediti dal <b>Fondo Gruppo</b> (versando contanti o Revolut: un amministratore conferma) oppure da un <b>collega a credito</b> (lo paga fuori dall\'app; il collega conferma dalla pagina Notifiche e i crediti passano a te). Il pulsante «Acquista crediti» è sempre attivo, anche con saldo positivo.',
+    '<b>Riscatto:</b> chi ha un saldo positivo preme «Riscatta crediti» e sceglie uno o più colleghi <b>con saldo negativo</b> (il contatore scende in tempo reale) e/o il <b>Fondo Gruppo</b> per la rimanenza. Il collega conferma dalle Notifiche dopo averti pagato fuori dall\'app; il Fondo ti liquida tramite un amministratore, nei limiti della cassa.',
+    '<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione. L\'elenco dei colleghi con crediti è ordinato dal credito maggiore al minore.'])}
   ${sez('6. Spese e rimborsi', [
-    `Chi acquista prodotti per la saletta (caffè, bibite, snack, detergenti) inserisce la spesa con <b>Acquisto per il fondo</b> e sceglie il rimborso.`,
-    [`Due tipi di rimborso:`, [
-      `<b>In crediti:</b> dopo la convalida l'importo diventa credito personale e la cassa non cambia;`,
-      `<b>In denaro reale:</b> l'amministratore usa «Convalida e Paga»; il denaro esce dalla cassa (contanti o Revolut) e il saldo del collega non cambia.`]],
-    `Anche le spese degli amministratori restano in attesa finché non sono convalidate.`,
-    `Gli omaggi e i regali si accreditano a un solo beneficiario, senza toccare la cassa.`,
-    `Acquisti istituzionali, macchinari e manutenzioni straordinarie sono registrati direttamente dall'amministratore come uscita di cassa.`])}
+    'Chi acquista prodotti per la saletta (caffè, bibite, snack, detergenti) inserisce la spesa (<b>Acquisto per il fondo</b>) e sceglie il rimborso: <b>in crediti</b> (dopo la convalida l\'importo diventa credito personale, la cassa non cambia) oppure <b>in denaro reale</b> (l\'amministratore usa «Convalida e Paga»: il denaro esce dalla cassa, contanti o Revolut, e il saldo del collega non cambia).','Anche le spese degli amministratori restano in attesa finché non sono convalidate. Gli omaggi e i regali si accreditano a un solo beneficiario, senza toccare la cassa.',
+    'Acquisti istituzionali, macchinari e manutenzioni straordinarie sono registrati direttamente dall\'amministratore come uscita di cassa.'])}
   ${sez('7. Inventario e listino', [
-    `Snack e bevande hanno prezzo e scorta nell'inventario; ogni prelievo riduce subito la disponibilità.`,
-    `Per il caffè l'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.`,
-    `Gli amministratori fanno verifiche fisiche periodiche.`,
-    `Sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.`])}
+    'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità. Per il caffè l\'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.',
+    'Gli amministratori fanno verifiche fisiche periodiche: sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.'])}
   ${sez('8. Pulizie e Punti Pulizia', [
-    `<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata.`,
-    `In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.`,
-    `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori).`,
-    `Gli amministratori possono stornare registrazioni non veritiere.`,
-    `<b>Conversione:</b> ${rate} Punti Pulizia = 1 credito (1,00 €), in crediti interi; il rapporto è modificabile solo dagli amministratori.`,
-    `I crediti ottenuti riducono i debiti, finanziano nuovi consumi o si vendono nel Mercato.`])}
+    '<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata. In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.',
+    `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori). Gli amministratori possono stornare registrazioni non veritiere.`,
+    `<b>Conversione:</b> ${rate} Punti Pulizia = 1 credito (1,00 €), in crediti interi. Il rapporto è modificabile solo dagli amministratori. I crediti ottenuti riducono i debiti, finanziano nuovi consumi o si vendono nel Mercato.`])}
   ${sez('9. Busta del caffè e Tasso di Onestà', [
-    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>.`,
-    `Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune.`,
-    `Ogni caffè registrato incrementa il contatore; la busta aperta viene scalata dalle buste disponibili.`,
-    `<b>Tasso di Onestà = caffè registrati ÷ ${BUSTA_CAFFE} × 100.</b>`,
-    `Verde da 85% in su, rosso sotto il 70%: un tasso basso significa che qualcuno beve senza registrare.`,
-    `Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.`])}
+    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
+    '<b>Tasso di Onestà = caffè registrati ÷ 130 × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che qualcuno beve senza registrare.',
+    'Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.'])}
   ${sez('10. Chiusure, backup e trasparenza', [
-    `L'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.`,
-    `Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.`,
-    `A fine esercizio l'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.`])}`;
+    'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
+    'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
+    'A fine esercizio l\'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.'])}`;
 }
 
 /* ---------- PULIZIE ---------- */
@@ -1660,6 +1679,32 @@ A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').c
 A['sheet-close'] = closeSheet;
 A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
+
+/* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
+A['condividi-app'] = async () => {
+  A['drawer-close']();
+  const url = appUrl();
+  if(navigator.share){
+    try { await navigator.share({title: 'Armieri 5.0', url}); return; }
+    catch(e){ if(e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link dell\'app copiato'); }
+  catch(e){ window.open('https://wa.me/?text=' + encodeURIComponent(url), '_blank'); }
+};
+A['install-app'] = async () => {
+  const p = installPrompt; if(!p) return;
+  installPrompt = null;
+  try {
+    p.prompt();
+    const r = await p.userChoice;
+    if(r && r.outcome === 'accepted'){ st.installata = true; toast('Installazione avviata'); }
+  } catch(e){}
+  render();
+};
+A['install-salta'] = () => {
+  if(!confirm('Continuare nel browser? Se installerai l\'app più tardi, l\'app installata non conoscerà la tua registrazione e dovrai registrarti di nuovo.')) return;
+  st.skipInstall = true; render();
+};
 
 A['join'] = async () => {
   const code = normCode(val('j-code'));
