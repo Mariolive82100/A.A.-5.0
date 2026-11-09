@@ -308,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -564,6 +564,7 @@ function applyMov(S, m, sg){
     case 'scambio': if(m.stato === 'confermata'){ add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); } break;
     case 'riscatto': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
     case 'rettifica': case 'accredito': add(S.saldi, m.mid, sg*m.importo); break;
+    case 'caffe_pagato': if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo); break;   // caffè pagati subito, fuori dall'app: nessun effetto sul saldo
     case 'carico': add(S.stock, m.pid, sg*m.qta); break;
     case 'conversione': add(S.saldi, m.mid, sg*m.importo); add(S.puntiConv, m.mid, sg*m.punti); break;
     case 'pulizia': (m.mids || []).forEach(x => { add(S.turni, x, sg); add(S.punti, x, sg*(m.punti ?? PUNTI_DEF)); if(sg > 0) S.ultimo[x] = Math.max(S.ultimo[x] || 0, m.giorno ? new Date(m.giorno + 'T12:00:00').getTime() : (m.t || 0)); }); break;
@@ -572,7 +573,8 @@ function applyMov(S, m, sg){
 }
 function applyStat(T, m, sg){
   sg = sg || 1;
-  if(m.tipo === 'caffe' && m.stato !== 'annullata'){ add(T.caffe, m.mid, sg*m.qta); add(T.euroMid, m.mid, sg*m.importo); }
+  if(m.tipo === 'caffe_pagato'){ add(T.caffe, m.mid, sg*m.qta); add(T.euroMid, m.mid, sg*m.importo); }
+  else if(m.tipo === 'caffe' && m.stato !== 'annullata'){ add(T.caffe, m.mid, sg*m.qta); add(T.euroMid, m.mid, sg*m.importo); }
   else if(m.tipo === 'snack' && m.stato !== 'annullata'){ add(T.snack, m.pid, sg*m.qta); add(T.euroMid, m.mid, sg*m.importo); }
   else if(m.tipo === 'spesa' && m.stato === 'confermata') T.spese += sg*m.importo;
   else if(m.tipo === 'uscita') T.spese += sg*m.importo;
@@ -1197,6 +1199,7 @@ function descMov(m){
   const n = esc(nomeM(m.mid));
   switch(m.tipo){
     case 'caffe': return {ic:'☕', t: m.qta > 1 ? `${n} ha offerto un giro di ${m.qta} caffè` : `${n} ha preso un caffè`, a: -m.importo};
+    case 'caffe_pagato': return {ic:'☕', t: `${n} ha pagato ${m.qta > 1 ? m.qta + ' caffè' : 'un caffè'} subito${m.metodo === 'contanti' || m.metodo === 'revolut' ? ' · ' + FONTI[m.metodo] : ''}`, a: 0, cassa: m.metodo === 'contanti' || m.metodo === 'revolut'};
     case 'snack': { const p = prodotto(m.pid); return {ic: esc((p && p.emoji) || m.emoji || '🍫'), t: `${n} ha preso ${m.qta > 1 ? m.qta + ' × ' : ''}${esc((p && p.nome) || m.nome || 'snack')}`, a: -m.importo}; }
     case 'ricarica': return {ic:'💰', t: `${m.fondo ? 'Quota fondo' : 'Debito saldato'} da ${n} · ${FONTI[m.metodo] || m.metodo}`, a: m.importo, cassa: true};
     case 'scambio': return m.aMid === m.mid
@@ -1257,7 +1260,7 @@ function righeMov(list, d, opt){
 function pFeed(d){
   const f = st.feedFiltro, me = st.mid;
   const mio = m => m.mid === me || m.dest === me || m.daMid === me || m.aMid === me || (m.mids || []).includes(me);
-  const cassaTipi = ['spesa','uscita','entrata','giroconto','ricarica','riscatto','quota','addebito_quota','accredito','rettifica'];
+  const cassaTipi = ['caffe_pagato','spesa','uscita','entrata','giroconto','ricarica','riscatto','quota','addebito_quota','accredito','rettifica'];
   let list = d.movs.slice().reverse();
   if(f === 'miei') list = list.filter(mio);
   if(f === 'bar') list = list.filter(m => ['caffe','snack'].includes(m.tipo));
@@ -1411,7 +1414,7 @@ function pStatSal(d){
     <select class="in" data-chg="salper">${opt('mese','Questo mese')}${opt('mesep','Mese scorso')}${opt('30','Ultimi 30 giorni')}${opt('anno','Quest\'anno')}${opt('tutto','Da sempre')}${opt('custom','Personalizzato…')}</select></label>
     ${st.salPer === 'custom' ? `<div class="grid2" style="margin-top:8px"><label class="f" style="margin:0"><span>Dal</span><input class="in" type="date" id="sal-da" data-chg="saldate" value="${esc(st.salDa)}"></label><label class="f" style="margin:0"><span>Al</span><input class="in" type="date" id="sal-a" data-chg="saldate" value="${esc(st.salA)}"></label></div>` : ''}
   </div>
-  <div class="card"><h3><span>☕ Chi ha preso più caffè</span><b class="mono amber">${tot}</b></h3>
+  <div class="card"><h3><span>☕ Chi ha pagato più caffè</span><b class="mono amber">${tot}</b></h3>
     ${tot ? righe.map((x, i) => `<div style="margin-bottom:9px"><div class="between" style="font-size:13px"><span><span class="mut mono">${i+1}.</span> ${esc(nomeM(x.m.id))}${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</span><b class="mono">${x.n}</b></div><div class="bar"><i style="width:${Math.round(x.n/max*100)}%"></i></div></div>`).join('') : '<div class="empty">Nessun caffè in questo periodo.</div>'}
   </div>
   ${storico || st.isAdmin ? '' : `<p class="hint">I dati partono dall'ultima chiusura di periodo: i caffè più vecchi sono archiviati e visibili solo agli amministratori.</p>`}`;
@@ -2378,7 +2381,8 @@ A['membro'] = ds => {
     ${m && m.espulso ? `<div class="banner red">${ic('alert')}<div>Espulso${m.espulsoDa ? ' da ' + esc(m.espulsoDa) : ''}. I suoi telefoni non possono più chiedere l'accesso.</div></div>`
       : m && m.attivo === false ? `<div class="banner amber">${ic('archive')}<div>Archiviato: non fa più parte della saletta, ma saldo e storico restano.</div></div>` : ''}
     <button class="btn amber block big" data-act="salva-membro" data-id="${m ? m.id : ''}" style="margin-top:6px">Salva</button>
-    ${m && m.attivo !== false ? `<div class="grid3" style="margin-top:10px"><button class="btn sm" data-act="accredito" data-id="${m.id}">${ic('plus','s')} Accredita</button><button class="btn sm" data-act="ricarica-per" data-id="${m.id}">${ic('banknote','s')} Ricarica</button><button class="btn sm" data-act="rettifica" data-id="${m.id}">${ic('edit','s')} Rettifica</button></div>` : ''}
+    ${m && m.attivo !== false ? `<div class="grid3" style="margin-top:10px"><button class="btn sm" data-act="accredito" data-id="${m.id}">${ic('plus','s')} Accredita</button><button class="btn sm" data-act="ricarica-per" data-id="${m.id}">${ic('banknote','s')} Ricarica</button><button class="btn sm" data-act="rettifica" data-id="${m.id}">${ic('edit','s')} Rettifica</button></div>
+    <button class="btn sm block" style="margin-top:8px" data-act="caffe-fuori" data-id="${m.id}">${ic('coffee','s')} Caffè pagati subito (fuori app)</button>` : ''}
     ${m && m.attivo !== false && st.utenti.some(u => u.mid === m.id) ? (isCreatore(m.id) ? `<div class="banner amber">${ic('shield')}<div>Creatore del gruppo: è amministratore e non può essere rimosso.</div></div>`
       : adminDiMembro(m.id).length ? `<button class="btn sm ghost block" style="margin-top:10px" data-act="rimuovi-admin" data-id="${m.id}">${ic('shield','s')} Rimuovi da amministratore</button>`
       : `<button class="btn sm block" style="margin-top:10px" data-act="nomina-admin" data-id="${m.id}">${ic('shield','s')} Nomina amministratore</button>`) : ''}
@@ -2455,6 +2459,18 @@ A['conferma-ricarica-per'] = () => {
   if(!mid || !(imp > 0)) return toast('Dati non validi', 'err');
   addMov({tipo:'ricarica', mid, importo: imp, metodo: radio('rp-met'), stato:'confermata', esitoDa: myName()});
   closeSheet(); toast(`Ricarica di ${eur(imp)} per ${nomeM(mid)}`);
+};
+A['caffe-fuori'] = ds => openSheet(`<h3>${ic('coffee')} Caffè pagati subito</h3><p class="sub">Caffè pagati direttamente, senza usare l'app: contano nelle statistiche ma non toccano il saldo del collega.</p>
+  <label class="f"><span>Collega</span>${selMembro('cf-m', ds.id)}</label>
+  <label class="f"><span>Numero di caffè</span><input class="in mono" id="cf-q" inputmode="numeric" value="1"></label>
+  <label class="f"><span>Dove sono finiti i soldi</span>${segOpts('cf-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut'],['esterno','Già contati']], 'contanti')}</label>
+  <p class="hint">«Già contati»: nessun movimento di cassa (i soldi sono già stati registrati altrove).</p>
+  <button class="btn amber block big" data-act="conferma-caffe-fuori">Registra</button>`);
+A['conferma-caffe-fuori'] = () => {
+  const mid = val('cf-m'), q = parseInt(val('cf-q'), 10), pc = st.gruppo.prezzoCaffe || 0;
+  if(!mid || !(q >= 1 && q <= 30)) return toast('Numero di caffè non valido (1-30)', 'err');
+  addMov({tipo:'caffe_pagato', mid, qta: q, importo: pc * q, metodo: radio('cf-met')});
+  closeSheet(); toast(`${q} caffè registrati per ${nomeM(mid)}`);
 };
 A['rettifica'] = ds => openSheet(`<h3>${ic('edit')} Rettifica saldo</h3><p class="sub">Corregge il saldo di un collega senza toccare la cassa (es. saldo iniziale, errori). Usa il meno per addebitare.</p>
   <label class="f"><span>Collega</span>${selMembro('rt-m', ds.id)}</label>
