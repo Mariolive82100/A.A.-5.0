@@ -308,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.8.0';
+const VERSION = '1.8.1';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -336,6 +336,13 @@ async function hashPin(pin, gid, mid){
   return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 const pinOk = v => /^\d{6}$/.test(String(v || ''));
+const errIngresso = (e, permesso) => {
+  const c = (e && (e.code || e.message)) || '';
+  if(e && e.message === 'crypto-assente') return 'Apri l\'app da https o da localhost per usare il PIN';
+  if(!navigator.onLine || /unavailable|network|offline|deadline/i.test(c)) return 'Connessione assente o instabile: riprova tra poco';
+  if(/permission/i.test(c)) return permesso || 'Operazione non consentita';
+  return 'Errore (' + errMsg(e) + ')';
+};
 const pinErr = e => e && e.message === 'crypto-assente' ? 'Apri l\'app da https o da localhost per usare il PIN' : /permission/i.test((e && (e.code || e.message)) || '') ? 'PIN non accettato' : 'Errore (' + errMsg(e) + ')';
 const eur = c => (c < 0 ? '-' : '') + (Math.abs(c||0)/100).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
 const eurS = c => (c > 0 ? '+' : '') + eur(c);
@@ -751,6 +758,9 @@ function doRender(){
     $('hdr').classList.add('hidden'); $('dock').classList.add('hidden'); closeSheet(); A['drawer-close']();
     main.classList.remove('wide'); main.innerHTML = entryPinGate(); restore(); return;
   }
+  if(!offertaAdminAperta && !st.isAdmin && st.ready.a && st.ready.u && LS.get('offriAdmin_' + st.gid) === st.mid){   // dopo il recupero su un nuovo telefono: ruolo admin opzionale
+    offertaAdminAperta = true; LS.del('offriAdmin_' + st.gid); setTimeout(() => A['offri-admin'](), 400);
+  }
 
   let d = derived();
   assicuraQuote(d); d = derived();
@@ -838,6 +848,7 @@ function renderEntry(){
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
   if(st.entry === 'recupero') return entryRecupero();
+  if(st.entry === 'creatore-pin') return entryCreatorePin();
   if(!st.gid) return st.entry === 'crea' ? entryCrea() : st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
@@ -900,15 +911,24 @@ function entryJoin(){
 }
 
 function entryCreatore(){
-  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>${esc(st.joinNome || 'Gruppo')}</h1><p>Sei il creatore di questo gruppo?</p></div>
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('users','l')}</div><h1>${esc(st.joinNome || 'Gruppo')}</h1><p>Come vuoi entrare?</p></div>
   <div class="card">
-    <p class="mut" style="font-size:13px;margin:0 0 10px">Se hai creato tu il gruppo, inserisci il PIN amministratore per ritrovare il tuo profilo su questo telefono.</p>
-    <label class="f"><span>PIN amministratore</span><input class="in" id="jc-pin" type="password" autocomplete="off" autocapitalize="off"></label>
-    <button class="btn amber block big" data-act="join-creatore" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Sì, sono il creatore'}</button>
-    <button class="btn block ghost" style="margin-top:8px" data-act="recupero-apri">Ho già un profilo (recupero con PIN)</button>
-    <button class="btn block ghost" style="margin-top:8px" data-act="join-collega">Sono un nuovo collega</button>
+    <button class="btn amber block big" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo</button>
+    <p class="hint" style="margin:6px 0 12px">Eri già nel gruppo (nuovo telefono, app reinstallata…): ti ritrovi con il tuo PIN personale.</p>
+    <button class="btn block big" data-act="join-collega">${ic('user','s')} Sono un nuovo collega</button>
+    <p class="hint" style="margin:6px 0 0">Invii una richiesta che un amministratore deve approvare.</p>
   </div>
   <button class="btn link" data-act="entry" data-v="join">← Cambia codice</button>`;
+}
+
+function entryCreatorePin(){
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>Sono il creatore</h1><p>Rientra con il PIN amministratore</p></div>
+  <div class="card">
+    <p class="mut" style="font-size:13px;margin:0 0 10px">Usa questa strada solo se hai creato il gruppo e non hai (o non ricordi) il PIN personale. Serve il <b>PIN amministratore</b> scelto alla creazione del gruppo, non il PIN personale a 6 cifre.</p>
+    <label class="f"><span>PIN amministratore</span><input class="in" id="jc-pin" type="password" autocomplete="off" autocapitalize="off"></label>
+    <button class="btn amber block big" data-act="join-creatore" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Rientra come creatore'}</button>
+  </div>
+  <button class="btn link" data-act="entry" data-v="recupero">← Indietro</button>`;
 }
 
 function entryCrea(){
@@ -971,6 +991,7 @@ function entryRecupero(){
     <button class="btn amber block big" data-act="recupera" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Recupera il mio profilo'}</button>
     <p class="hint" style="margin:10px 0 0">Non ricordi il PIN? Chiedi a un amministratore un PIN temporaneo: ti permette di rientrare e poi ne scegli uno nuovo.</p>` : '<div class="empty">Nessun profilo trovato in questo gruppo.</div>'}
   </div>
+  <div style="text-align:center;margin-top:4px"><button class="btn link" style="color:var(--mut);font-size:12.5px" data-act="entry" data-v="creatore-pin">Sono il creatore e non ho il PIN personale</button></div>
   <button class="btn link" data-act="recupero-indietro">← Indietro</button>`;
 }
 
@@ -1869,21 +1890,30 @@ A['join'] = async () => {
 
 A['join-collega'] = () => { const code = st.joinCode; if(!code) return; st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null; st.joinCode = null; connect(code); render(); };
 A['join-creatore'] = async () => {
-  const code = st.joinCode, pin = val('jc-pin');
+  const code = st.joinCode || st.recCode, pin = val('jc-pin');
   if(!code) return;
-  if(!pin) return toast('Inserisci il PIN', 'err');
+  if(!pin) return toast('Inserisci il PIN amministratore', 'err');
   if(!navigator.onLine) return toast('Serve la connessione', 'err');
   st.busy = true; render();
   try {
     const g = db.collection('saletta').doc(code);
     const gd = await g.get({source:'server'}), cm = gd.exists && gd.data().creatoreMid;
-    if(!cm){ toast('Questo gruppo non ha un creatore registrato: entra come collega', 'err'); return; }
-    await g.collection('admin').doc(st.uid).set({pin, nome: gd.data().nome || 'Creatore', ts: TS()}); // le regole verificano il PIN
-    const md = await g.collection('membri').doc(cm).get({source:'server'});
-    await g.collection('utenti').doc(st.uid).set({mid: cm, nome: md.exists ? md.data().nome : 'Creatore', ts: TS()});
-    st.gid = code; LS.set('gid', code); LS.set('mid', cm); LS.del('invito'); st.entry = null; st.joinCode = null;
-    connect(code); toast('Bentornato, creatore del gruppo 🛡️');
-  } catch(e){ toast(/permission/i.test(e.code || e.message) ? 'PIN errato' : 'Errore (' + errMsg(e) + ')', 'err'); }
+    if(!cm){ toast('Questo gruppo non ha un creatore registrato: entra come nuovo collega', 'err'); return; }
+    // se questo telefono è già amministratore e già collegato non c'è nulla da scrivere
+    const ad = await g.collection('admin').doc(st.uid).get({source:'server'});
+    if(!ad.exists){
+      try { await g.collection('admin').doc(st.uid).set({pin, nome: gd.data().nome || 'Creatore', ts: TS()}); }   // le regole verificano il PIN
+      catch(e){ throw Object.assign(e, {fase: 'pin'}); }
+    }
+    const ut = await g.collection('utenti').doc(st.uid).get({source:'server'});
+    if(!ut.exists){
+      const md = await g.collection('membri').doc(cm).get({source:'server'});
+      await g.collection('utenti').doc(st.uid).set({mid: cm, nome: md.exists ? md.data().nome : 'Creatore', ts: TS()});
+    }
+    const mid = ut.exists ? ut.data().mid : cm;
+    st.gid = code; LS.set('gid', code); LS.set('mid', mid); LS.del('invito'); st.entry = null; st.joinCode = null;
+    connect(code); toast(ad.exists ? 'Bentornato 🛡️ Questo telefono era già amministratore' : 'Bentornato, creatore del gruppo 🛡️');
+  } catch(e){ toast(e && e.fase === 'pin' ? errIngresso(e, 'PIN amministratore errato') : errIngresso(e), 'err'); }
   finally { st.busy = false; render(); }
 };
 A['crea'] = async () => {
@@ -2609,13 +2639,31 @@ A['recupera'] = async () => {
   if(!pinOk(pin)) return toast('Il PIN ha esattamente 6 cifre', 'err');
   if(!navigator.onLine) return toast('Serve la connessione', 'err');
   st.busy = true; render();
+  const entra = (m, msg) => { st.gid = code; LS.set('gid', code); LS.set('mid', m); LS.del('invito'); st.entry = null; st.joinCode = null; st.recLista = null; connect(code); toast(msg); };
   try {
+    const u = db.collection('saletta').doc(code).collection('utenti').doc(st.uid);
+    const ex = await u.get({source:'server'});
+    if(ex.exists){ entra(ex.data().mid, 'Questo telefono è già collegato al tuo profilo: bentornato ✓'); return; }   // identità già collegata: niente da scrivere
     const h = await hashPin(pin, code, mid), m = (st.recLista || []).find(x => x.id === mid);
-    await db.collection('saletta').doc(code).collection('utenti').doc(st.uid).set({mid, nome: m ? m.nome : '', recuperato: true, pinHash: h, ts: TS()});
-    st.gid = code; LS.set('gid', code); LS.set('mid', mid); LS.del('invito'); st.entry = null; st.joinCode = null; st.recLista = null;
-    connect(code); toast('Profilo recuperato ✓');
-  } catch(e){ toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'PIN errato, oppure nessun PIN impostato (chiedi un PIN temporaneo a un amministratore)' : pinErr(e), 'err'); }
+    await u.set({mid, nome: m ? m.nome : '', recuperato: true, pinHash: h, ts: TS()});
+    LS.set('offriAdmin_' + code, mid);
+    entra(mid, 'Profilo recuperato ✓');
+  } catch(e){ toast(errIngresso(e, 'PIN errato, oppure nessun PIN impostato per questo profilo (chiedi un PIN temporaneo a un amministratore)'), 'err'); }
   finally { st.busy = false; render(); }
+};
+let offertaAdminAperta = false;
+A['offri-admin'] = () => openSheet(`<h3>${ic('shield')} Eri amministratore?</h3><p class="sub">Su questo telefono il ruolo non è attivo. Se eri amministratore, inserisci il PIN amministratore per riattivarlo.</p>
+  <label class="f"><span>PIN amministratore</span><input class="in" id="oa-pin" type="password" autocomplete="off" autocapitalize="off" autofocus></label>
+  <button class="btn amber block big" data-act="offri-admin-ok">Riattiva il ruolo</button>
+  <button class="btn block ghost" style="margin-top:8px" data-act="sheet-close">Non sono amministratore / più tardi</button>`);
+A['offri-admin-ok'] = async () => {
+  const pin = val('oa-pin');
+  if(!pin) return toast('Inserisci il PIN amministratore', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione', 'err');
+  try {
+    await C('admin').doc(st.uid).set({pin, nome: myName(), ts: TS()});   // le regole verificano il PIN
+    st.isAdmin = true; syncMode(); closeSheet(); toast('Ruolo di amministratore riattivato 🛡️');
+  } catch(e){ toast(errIngresso(e, 'PIN amministratore errato'), 'err'); }
 };
 A['pin-salva'] = async () => {
   const a = val('pg-1'), b = val('pg-2');
