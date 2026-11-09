@@ -308,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1488,7 +1488,8 @@ function pCassa(d){
   ${st.isAdmin ? `<div class="grid3" style="margin-bottom:12px">
     <button class="btn sm red" data-act="cassa-op" data-v="uscita">${ic('out','s')} Uscita</button>
     <button class="btn sm green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Entrata</button>
-    <button class="btn sm" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>`
+    <button class="btn sm" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>
+    <button class="btn sm block" style="margin:-4px 0 12px" data-act="cassa-corr">${ic('edit','s')} Correggi saldo (contanti / Revolut)</button>`
     : `<div class="banner sky">${ic('lock')}<div>Uscite, entrate e storni li registrano gli amministratori. Se hai preso soldi dalla cassa per fare la spesa usa <b>Ho fatto la spesa</b> dal Bar.</div></div>`}
   <div class="card"><h3>Movimenti di cassa</h3>${righeMov(movC.slice(0, 200), d)}</div>`;
 }
@@ -2195,6 +2196,34 @@ A['cassa-op'] = ds => {
       : `<label class="f"><span>${t === 'uscita' ? 'Prelevato da' : 'Versato su'}</span>${segOpts('k-fonte', [['contanti','Contanti'],['revolut','Revolut']], 'contanti')}</label>`}
     <button class="btn amber block big" data-act="conferma-cassa" data-v="${t}">Registra</button>`);
 };
+/* correzione del saldo di cassa: l'admin inserisce il saldo reale, l'app calcola la differenza */
+const corrInfo = () => {
+  const f = $('cc-fonte') ? $('cc-fonte').value : 'contanti', att = (derived().S.cassa[f]) || 0, reale = parseEuro(val('cc-reale'));
+  return {f, att, reale, diff: reale - att};
+};
+function corrAggiorna(){
+  const i = corrInfo(), a = $('cc-att'), d = $('cc-diff');
+  if(a) a.textContent = eur(i.att);
+  if(d){ const ok = Number.isFinite(i.diff) && i.reale >= 0; d.textContent = ok ? (i.diff === 0 ? 'Nessuna differenza' : eurS(i.diff)) : '—'; d.className = 'mono ' + (!ok || i.diff === 0 ? 'mut' : i.diff > 0 ? 'green' : 'red'); }
+}
+A['cassa-corr'] = () => {
+  openSheet(`<h3>${ic('edit')} Correggi saldo cassa</h3><p class="sub">Inserisci quanto c'è davvero: l'app calcola la differenza e la registra come entrata o uscita.</p>
+    <label class="f"><span>Cassa da correggere</span><select class="in" id="cc-fonte" data-chg="corr"><option value="contanti">Contanti in sala</option><option value="revolut">Conto Revolut</option></select></label>
+    <div class="between" style="font-size:13px;margin:0 0 8px"><span class="tx2">Saldo in app</span><b class="mono" id="cc-att"></b></div>
+    <label class="f"><span>Saldo reale €</span><input class="in mono" id="cc-reale" inputmode="decimal" placeholder="0,00" data-chg="corr" autofocus></label>
+    <div class="between" style="font-size:14px;margin:0 0 8px"><span class="tx2">Differenza</span><b class="mono mut" id="cc-diff">—</b></div>
+    <label class="f"><span>Descrizione</span><input class="in" id="cc-caus" maxlength="60" placeholder="es. contati i soldi in cassetta"></label>
+    <button class="btn amber block big" data-act="conferma-cassa-corr">Registra correzione</button>`);
+  corrAggiorna();
+};
+A['conferma-cassa-corr'] = () => {
+  const i = corrInfo(), caus = val('cc-caus');
+  if(!Number.isFinite(i.reale) || i.reale < 0) return toast('Inserisci il saldo reale', 'err');
+  if(i.diff === 0) return toast('Il saldo coincide già: niente da correggere', 'err');
+  if(!caus) return toast('Scrivi la descrizione', 'err');
+  addMov({tipo: i.diff > 0 ? 'entrata' : 'uscita', importo: Math.abs(i.diff), fonte: i.f, causale: ('Correzione saldo: ' + caus).slice(0, 80)});
+  closeSheet(); toast('Correzione registrata: ' + eurS(i.diff));
+};
 A['conferma-cassa'] = ds => {
   const t = ds.v, imp = parseEuro(val('k-imp'));
   if(!(imp > 0)) return toast('Importo non valido', 'err');
@@ -2699,6 +2728,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target.closest('[data-chg]');
   if(el && el.dataset.chg === 'stat-periodo'){ st.statPeriodo = el.value; render(); }
+  if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
