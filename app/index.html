@@ -315,7 +315,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.9.0';
+const VERSION = '1.10.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -571,7 +571,7 @@ function tuttiMov(){
   const extra = st.movD.filter(m => !ids.has(m.id)); extra.forEach(m => ids.add(m.id));
   return st.movimenti.concat(extra, Object.values(st.pending).filter(p => !ids.has(p.id))).sort((a,b) => a.t - b.t);
 }
-function emptyState(){ return {saldi:{}, cassa:{contanti:0, revolut:0}, stock:{}, turni:{}, ultimo:{}, punti:{}, puntiConv:{}, pcaf:{}, pcafConv:{}, quote:{}, dovute:{}}; }
+function emptyState(){ return {saldi:{}, cassa:{contanti:0, revolut:0}, stock:{}, turni:{}, ultimo:{}, punti:{}, puntiConv:{}, pcaf:{}, pcafConv:{}, pspesa:{}, quote:{}, dovute:{}}; }
 const METODI_QUOTA = {contanti:'Contanti', revolut:'Revolut', credito:'Dal credito', esterno:'Già versata'};
 function emptyStats(){ return {caffe:{}, snack:{}, euroMid:{}, spese:0, ricariche:0, n:0}; }
 
@@ -583,6 +583,7 @@ function applyMov(S, m, sg){
     case 'ricarica': if(m.stato === 'confermata'){ add(S.saldi, m.mid, sg*m.importo); add(S.cassa, m.metodo, sg*m.importo); } break;
     case 'spesa':
       if(m.stato === 'confermata'){
+        S.pspesa = S.pspesa || {}; add(S.pspesa, m.mid, sg*PUNTI_SPESA);   // 2 punti per ogni richiesta convalidata, qualunque sia il numero di articoli
         if(m.fonte === 'tasca') add(S.saldi, m.mid, sg*m.importo); else if(m.fonte === 'contanti' || m.fonte === 'revolut') add(S.cassa, m.fonte, -sg*m.importo);
       } break;
     case 'uscita': add(S.cassa, m.fonte, -sg*m.importo); break;
@@ -596,6 +597,7 @@ function applyMov(S, m, sg){
       else if(m.metodo === 'esterno') add(S.saldi, m.mid, sg*m.importo);
       break;   // 'credito': pagata scalando il credito gia' versato, nessun movimento di soldi
     case 'scambio': if(m.stato === 'confermata'){ add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); } break;
+    case 'regalo': add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); break;
     case 'riscatto': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
     case 'rettifica': case 'accredito': add(S.saldi, m.mid, sg*m.importo); break;
     case 'caffe_pagato': add(S.pcaf, m.mid, sg*m.qta); if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo); break;   // caffè pagati subito, fuori dall'app: nessun effetto sul saldo
@@ -624,7 +626,7 @@ function derived(){
   const movs = tuttiMov();
   const last = st.isAdmin ? ultimaChiusura() : null;
   const S = last && last.stato ? JSON.parse(JSON.stringify(last.stato)) : emptyState();
-  ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','quote','dovute'].forEach(k => S[k] = S[k] || {});
+  ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','quote','dovute'].forEach(k => S[k] = S[k] || {});
   S.cassa = S.cassa || {contanti:0, revolut:0};
   if(!st.isAdmin && st.estratto){
     for(const a in (st.estratto.quote || {})) S.quote[a] = {[st.mid]: st.estratto.quote[a]};
@@ -636,7 +638,9 @@ function derived(){
     if(st.estratto.saldi) S.saldi = {...st.estratto.saldi};
     if(st.estratto.cassa) S.cassa = {contanti: st.estratto.cassa.contanti || 0, revolut: st.estratto.cassa.revolut || 0};
     S.saldi[st.mid] = st.estratto.saldo || 0;
-    S.pcaf = {[st.mid]: st.estratto.pcaf || 0}; S.pcafConv = {[st.mid]: st.estratto.pcafConv || 0};
+    const mp = st.estratto.mp;   // mappe complete di tutti i colleghi all'ultima chiusura (punti e turni): la classifica resta "di sempre"
+    if(mp) ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa'].forEach(k => { S[k] = {...(mp[k] || {})}; });
+    else { S.pcaf = {[st.mid]: st.estratto.pcaf || 0}; S.pcafConv = {[st.mid]: st.estratto.pcafConv || 0}; }
   }
   const T = emptyStats();
   const stornati = new Set();
@@ -663,6 +667,7 @@ function debitoLibero(){
     + d.scambiAttesa.filter(m => m.aMid === st.mid && m.mid === st.mid).reduce((a, m) => a + m.importo, 0);
   return Math.max(0, -s - inCorso);
 }
+const PUNTI_SPESA = 2;
 const puntiPulizia = () => (st.gruppo && st.gruppo.puntiPulizia) || PUNTI_DEF;
 const puntiPerCredito = () => (st.gruppo && st.gruppo.puntiPerCredito) || PUNTI_CREDITO_DEF;
 const puntiCaffeRate = () => (st.gruppo && st.gruppo.puntiCaffePerCredito) || 30;
@@ -732,7 +737,7 @@ function segOpts(name, opts, sel){
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], statsal:['Statistiche','chart'], gioco:['Gioco caffè','dice'], registro:['Registro movimenti','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], classifiche:['Classifiche e statistiche','chart'], gioco:['Gioco caffè','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
@@ -788,16 +793,16 @@ function doRender(){
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s);
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = av ? cn.fondo : cn.pers;
-  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
+  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, statsal:pStatSal, spesa:pSpesa, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
@@ -822,10 +827,10 @@ function renderDrawer(){
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
 }
 
-const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco','statsal','spesa'];
-const PAGINE_COLLEGA = ['bar','saletta','statsal','spesa','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
+const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco','spesa'];
+const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADMIN = ['bar','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
+const PAGINE_ADMIN = ['bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
 const pagineConsentite = () => !st.isAdmin ? PAGINE_COLLEGA : adminView() ? PAGINE_ADMIN : PAGINE_UTENTE;
 
@@ -1042,8 +1047,6 @@ function pBar(d){
       return `<div id="tessera-caffe" style="margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left"><div class="between" style="font-size:13px;margin-bottom:8px"><b>☕ Tessera fedeltà</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       ${ok ? `<button class="btn green block" id="btn-converti-caffe" data-act="converti-caffe" style="margin-top:10px">🎁 Riscatta 1 credito (1,00 €)</button>` : `<p class="hint" style="margin:8px 0 0">Ogni caffè vale 1 punto: ogni ${r} punti ottieni 1 credito.</p>`}</div>`; })()}
-    <div class="stat" style="margin-top:12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
-    <p class="hint" style="margin:6px 0 0">Il saldo disponibile del fondo è la cassa comune (contanti + conto).</p>
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
@@ -1055,13 +1058,14 @@ function pBar(d){
     <div class="grid">
       <button class="gbtn" data-act="caffe-menu"><span class="em">☕</span>Paga caffè<small>${eur(pc)} l'uno</small></button>
       <button class="gbtn" data-act="snack"><span class="em">🍫</span>Acquista snack</button>
-      <button class="gbtn" data-act="pulizia"><span class="em">✨</span>Registra pulizia<small>+${puntiPulizia()} punti</small></button>
+      <button class="gbtn" id="btn-regala" data-act="regala"><span class="em">🎁</span>Regala crediti<small>ai colleghi</small></button>
       <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
     </div>
   </div>
 
   ${recenti.length ? `<div class="card"><h3><span class="row" style="gap:6px">${ic('undo','s')} Preso per sbaglio?</span><span class="mut" style="font-size:10.5px;text-transform:none;letter-spacing:0">annullabile per ${ANNULLA_MIN} min</span></h3>
-    ${righeMov(recenti, d, {compact:true})}</div>` : ''}`;
+    ${righeMov(recenti, d, {compact:true})}</div>` : ''}
+  <button class="btn amber block big" id="btn-classifiche" data-act="go" data-p="classifiche" style="margin-top:6px">📊 Classifiche e statistiche</button>`;
 }
 
 /* ---------- richieste, notifiche, crediti ---------- */
@@ -1259,7 +1263,8 @@ function pAdminHome(d){
       : '<div class="empty">Nessun articolo in listino.</div>'}
     <p class="hint" style="margin:8px 0 0">Palette, zucchero, bicchieri e detersivi non si contano: registrali con «Registra spesa».</p>
   </div>
-  <div class="grid2" style="margin-top:6px"><button class="btn sm ghost" data-act="go" data-p="quote">${ic('wallet','s')} Quote fondo</button><button class="btn sm ghost" data-act="go" data-p="statistiche">${ic('chart','s')} Statistiche</button><button class="btn sm ghost" data-act="go" data-p="cassa">${ic('banknote','s')} Registro cassa</button><button class="btn sm ghost" data-act="go" data-p="pulizie">${ic('sparkles','s')} Saletta</button><button class="btn sm ghost" id="adm-lista-spesa" data-act="go" data-p="spesa">🛒 Lista della spesa${badgeSpesa()}</button></div>`;
+  <div class="grid2" style="margin-top:6px"><button class="btn sm ghost" data-act="go" data-p="quote">${ic('wallet','s')} Quote fondo</button><button class="btn sm ghost" data-act="go" data-p="statistiche">${ic('chart','s')} Statistiche</button><button class="btn sm ghost" data-act="go" data-p="cassa">${ic('banknote','s')} Registro cassa</button><button class="btn sm ghost" data-act="go" data-p="pulizie">${ic('sparkles','s')} Saletta</button><button class="btn sm ghost" id="adm-lista-spesa" data-act="go" data-p="spesa">🛒 Lista della spesa${badgeSpesa()}</button></div>
+  <button class="btn amber block big" id="adm-classifiche" data-act="go" data-p="classifiche" style="margin-top:10px">📊 Classifiche e statistiche</button>`;
 }
 
 /* ---------- registro movimenti, notifiche ---------- */
@@ -1278,6 +1283,7 @@ function notifiche(d){
     else if(m.tipo === 'conversione' && m.mid === me) out.push({t, e: '🔄', x: `Hai convertito ${m.punti} Punti Pulizia in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'riscatto' && m.mid === me) out.push({t, e: '🏦', x: `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
+    else if(m.tipo === 'regalo' && m.aMid === me) out.push({t, e: '🎁', x: `${esc(nomeM(m.daMid))} ti ha regalato ${eur(m.importo)} di crediti${m.msg ? ' · «' + esc(m.msg) + '»' : ''}`});
     else if(m.tipo === 'scambio'){
       if(m.stato === 'confermata' && m.daMid === me) out.push({t, e: '🤝', x: `${esc(nomeM(m.aMid))} ha comprato ${eur(m.importo)} dei tuoi crediti`});
       else if(m.stato === 'confermata' && m.aMid === me) out.push({t, e: '🤝', x: `Hai ricevuto ${eur(m.importo)} di crediti da ${esc(nomeM(m.daMid))}: ricezione confermata`});
@@ -1294,7 +1300,9 @@ function sincronizzaEstratti(){
   const last = ultimaChiusura();
   if(!st.isAdmin || st.sync !== 'ok' || modeKey !== 'admin' || !last || !last.stato || estrSent === last.id) return;
   estrSent = last.id;
-  const dati = {saldi: last.stato.saldi || {}, cassa: last.stato.cassa || {contanti:0, revolut:0}};
+  const ls = last.stato, mp = {};
+  ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa'].forEach(k => { mp[k] = ls[k] || {}; });
+  const dati = {saldi: ls.saldi || {}, cassa: ls.cassa || {contanti:0, revolut:0}, mp, storico: storicoDaChiusure()};
   st.membri.forEach(m => C('estratti').doc(m.id).update(dati).catch(() => {}));
 }
 function sincronizzaGiacenze(d){
@@ -1337,6 +1345,8 @@ function descMov(m){
     case 'scambio': return m.aMid === m.mid
       ? {ic:'🤝', t: `${esc(nomeM(m.aMid))} compra ${eur(m.importo)} di crediti da ${esc(nomeM(m.daMid))} (paga fuori dall'app)`, a: 0, neutro: m.importo}
       : {ic:'🔄', t: `${esc(nomeM(m.daMid))} vende ${eur(m.importo)} di crediti a ${esc(nomeM(m.aMid))}${m.causale ? ': ' + esc(m.causale) : ''}`, a: 0, neutro: m.importo};
+    case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = !adminView();
+      return {ic:'🎁', t: `${esc(nomeM(m.daMid))} ha regalato ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · pagato dalla cassa (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
     case 'spesa': return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: m.fonte !== 'tasca'};
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
@@ -1401,8 +1411,9 @@ function pFeed(d){
   if(f === 'cassa') list = list.filter(m => descMov(m).cassa || cassaTipi.includes(m.tipo));
   if(f === 'attesa') list = list.filter(m => m.stato === 'attesa');
   const last = ultimaChiusura(), av = adminView();
-  return `<h2>${ic('receipt')} Registro movimenti</h2>
-  <p class="sub">Tutta la storia del fondo, visibile a tutti${last ? ' · dal ' + dataOra(last.fino.toMillis()) : ''}.</p>
+  return `<h2>${ic('receipt')} Cassa e registro</h2>
+  <div class="stat" style="margin:0 0 12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
+  <p class="sub">Il saldo è la cassa comune (contanti + conto). Qui sotto tutta la storia del fondo, visibile a tutti${last ? ' · dal ' + dataOra(last.fino.toMillis()) : ''}.</p>
   <div class="chips">${[['tutti','Tutti'],['miei','Miei'],['bar','Caffè & Snack'],['cassa','Cassa & Spese'],['attesa','In attesa']].map(([v,l]) => `<button class="${f===v?'on':''}" data-act="feed-filtro" data-v="${v}">${l}</button>`).join('')}</div>
   <div class="card">${righeMov(list.slice(0, 300), d, {noAct: st.isAdmin && !av})}</div>
   ${st.isAdmin && st.chiusure.length ? `<div class="card"><h3>${ic('archive','s')} Periodi chiusi</h3>
@@ -1420,14 +1431,14 @@ function pRegolamento(){
     'Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.',
     '<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.',
     '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
-    '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
+    '<b>Classifiche:</b> la pagina «Classifiche e statistiche» è visibile a tutti. I Punti spesa valgono 2 per ogni richiesta di rimborso convalidata da un amministratore (nessun punto se è in attesa o respinta); i punti sono totali accumulati e non scendono se li converti in crediti.', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
   ${sez('2. Il saldo unico', [
     'Ogni membro ha un solo saldo. <b>Positivo = credito</b> (il gruppo ti deve qualcosa), <b>negativo = debito</b> (devi qualcosa alla cassa o ai colleghi a credito).',
     '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
     '<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti. Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.'])}
   ${sez('3. Ruoli e poteri', [
     '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
-    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
+    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, regala crediti ai colleghi (subito, senza approvazione e senza annullo), aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
     '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, la liquidazione sussidiaria dei crediti invenduti, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
     '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
     '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
@@ -1472,23 +1483,26 @@ function cardPunti(d){
     <button class="btn violet block" data-act="converti" ${cr > 0 ? '' : 'disabled'}>Converti in crediti</button></div>`;
 }
 function pPulizie(d){
-  const reg = `<div class="card" style="text-align:center;background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
+  const av = adminView(), me = st.mid;
+  const reg = me ? `<div class="card" style="text-align:center;background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
       <b style="font-size:15px">✨ Hai pulito la saletta?</b>
       <p class="mut" style="font-size:13px;margin:6px 0 12px">Registra il tuo turno: +${puntiPulizia()} Punti Pulizia (anche con una data passata).</p>
-      <button class="btn violet block" data-act="pulizia">${ic('check','s')} Registra pulizia</button></div>`;
-  if(!adminView()) return `${backSaletta()}<h2>${ic('sparkles')} Pulizie sala</h2><p class="sub">Turni di pulizia e punti.</p>${reg}${cardPunti(d)}`;
-  const ord = ordinePulizie(d), top = ord.slice(0,3);
-  const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || a.nome.localeCompare(b.nome));
-  return `<h2>${ic('sparkles')} Scheda Saletta</h2><p class="sub">Turni pulizie.</p>
-  <div class="card" style="background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
+      <button class="btn violet block" id="btn-registra-pulizia" data-act="pulizia">${ic('check','s')} Registra pulizia</button></div>` : '';
+  const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || (d.S.turni[b.id]||0) - (d.S.turni[a.id]||0) || a.nome.localeCompare(b.nome));
+  const top = ordinePulizie(d).slice(0,3);
+  const prossimo = av ? `<div class="card" style="background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
     <h3><span>Prossimo turno consigliato</span></h3>
     <div class="grid3" style="margin-bottom:6px">${top.map((m,i) => `<div class="stat" style="border-color:rgba(167,139,250,.3)"><small class="violet">#${i+1}</small><b style="font-size:14px">${esc(m.nome)}</b><div class="mut mono" style="font-size:11px">${d.S.punti[m.id]||0} punti</div></div>`).join('')}</div>
     <p class="hint" style="margin:0">Tocca a chi ha meno Punti Pulizia (a parità, a chi ha pulito da più tempo).</p>
-  </div>
-  <div class="card"><h3>Classifica Punti Pulizia</h3>
+  </div>` : '';
+  return `${backSaletta()}<h2>${ic('sparkles')} Pulizie sala</h2><p class="sub">Registra il tuo turno e guarda la classifica.</p>
+  ${reg}
+  <div class="card" id="classifica-pulizie"><h3>Classifica Punti Pulizia</h3>
     <table><thead><tr><th>#</th><th>Collega</th><th class="c">Punti</th><th class="c">Turni</th></tr></thead><tbody>
-    ${classifica.map((m,i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(m.nome)}</b>${top.some(t => t.id === m.id) ? ' <span class="pill violet">tocca a lui/lei</span>' : ''}</td><td class="c mono violet"><b>${d.S.punti[m.id]||0}</b></td><td class="c mono">${d.S.turni[m.id]||0}</td></tr>`).join('')}
-    </tbody></table></div>`;
+    ${classifica.map((m,i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(m.nome)}</b>${m.id === me ? ' <span class="pill violet">tu</span>' : ''}${av && top.some(t => t.id === m.id) ? ' <span class="pill violet">tocca a lui/lei</span>' : ''}</td><td class="c mono violet"><b>${d.S.punti[m.id]||0}</b></td><td class="c mono">${d.S.turni[m.id]||0}</td></tr>`).join('')}
+    </tbody></table></div>
+  ${prossimo}
+  ${av ? '' : cardPunti(d)}`;
 }
 
 
@@ -1515,7 +1529,6 @@ function pSaletta(d){
     <button class="gbtn" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi</button>
     <button class="gbtn" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
     <button class="gbtn" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Gioco caffè</button>
-    <button class="gbtn" id="sal-stats" data-act="go" data-p="statsal"><span class="em">📊</span>Statistiche</button>
   </div>`;
 }
 
@@ -1542,8 +1555,19 @@ async function caricaArcMov(){
   catch(e){ st.arcMov = []; }
   st.arcLoading = false; render();
 }
-/* serie dei caffè pagati nel periodo: per ora (oggi), per giorno (fino a ~3 mesi), per mese (oltre) */
-function serieCaffe(tutti, r){
+/* ---------- Classifiche e statistiche ----------
+   Tutto si calcola in memoria dai movimenti già caricati (nessuna lettura aggiuntiva da Firestore):
+   periodo corrente = movimenti dall'ultima chiusura; periodi chiusi = riepiloghi salvati nell'estratto (storico). */
+const STORICO_MAX = 24;
+const nz = (o, k) => (o && o[k]) || 0;
+const sumo = o => o ? Object.values(o).reduce((a, b) => a + b, 0) : 0;
+const fCons = m => ((m.tipo === 'caffe' || m.tipo === 'caffe_pagato' || m.tipo === 'snack') && m.stato !== 'annullata') ? (m.qta || 0) : 0;
+const fSpese = m => (m.tipo === 'spesa' && m.stato === 'confermata') ? (m.importo || 0) : 0;
+const fTurni = m => m.tipo === 'pulizia' ? (m.mids || []).length : 0;
+const fRic = m => (m.tipo === 'ricarica' && m.stato === 'confermata') ? (m.importo || 0) : 0;
+
+/* serie nel periodo: per ora (oggi), per giorno (fino a ~3 mesi), per mese (oltre) */
+function serieGen(tutti, r, f){
   const now = Date.now(), fine = Math.min(r.a, now);
   let inizio = r.da;
   if(!inizio){ const ts = tutti.map(m => m.t).filter(Boolean); inizio = ts.length ? Math.min(...ts) : now; }
@@ -1566,69 +1590,188 @@ function serieCaffe(tutti, r){
     if(g === 'ora') cur.setHours(cur.getHours() + 1); else if(g === 'giorno') cur.setDate(cur.getDate() + 1); else cur.setMonth(cur.getMonth() + 1);
   }
   tutti.forEach(m => {
-    const T = emptyStats(); applyStat(T, m);
-    const v = Object.values(T.caffe).reduce((a, b) => a + b, 0); if(!v) return;
-    let t = m.t; if(m.tipo === 'storno' && m.orig && m.orig.t >= r.da && m.orig.t <= r.a) t = m.orig.t;
+    let v, t = m.t;
+    if(m.tipo === 'storno'){ if(!m.orig) return; v = -f(m.orig); if(m.orig.t >= r.da && m.orig.t <= r.a) t = m.orig.t; } else v = f(m);
+    if(!v) return;
     const i = idx[keyOf(t)]; if(i !== undefined) buck[i].n += v;
   });
   buck.forEach(b => { b.n = Math.max(0, b.n); });
   return {g, buck};
 }
-function graficoCaffe(S){
-  const buck = S.buck, N = buck.length, unita = {ora: 'ora', giorno: 'giorno', mese: 'mese'}[S.g];
+/* grafico a barre generico: una serie, un asse, tocca una barra per il dettaglio, tabella dati a scomparsa */
+function graficoBarre(S, o){
+  const buck = S.buck, N = buck.length, unita = {ora: 'ora', giorno: 'giorno', mese: 'mese', periodo: 'periodo'}[S.g];
+  const fmt = o.fmt || (v => String(v)), ax = o.ax || (v => v);
   const tot = buck.reduce((a, b) => a + b.n, 0), max = Math.max(0, ...buck.map(b => b.n));
-  if(!tot) return '<div class="empty">Nessun caffè in questo periodo.</div>';
-  const W = 600, H = 210, ml = 28, mr = 6, mt = 10, mb = 26, iw = W - ml - mr, ih = H - mt - mb;
+  if(!tot) return `<div class="empty">${o.vuoto}</div>`;
+  const W = 600, H = 210, ml = 34, mr = 6, mt = 10, mb = 26, iw = W - ml - mr, ih = H - mt - mb;
   const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
   const step = Math.max(1, [1, 2, 5, 10].map(s => s * mag).find(s => s >= raw)), yMax = step * Math.ceil(max / step);
   const slot = iw / N, bw = Math.max(1.5, Math.min(28, slot - 2)), every = Math.ceil(N / 7);
   let cum = 0, grid = '', bars = '', xl = '';
   for(let t = 0; t <= yMax; t += step){
     const y = mt + ih - t / yMax * ih;
-    grid += `<line class="gl" x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}"/><text x="${ml - 4}" y="${y + 3}" text-anchor="end">${t}</text>`;
+    grid += `<line class="gl" x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}"/><text x="${ml - 4}" y="${y + 3}" text-anchor="end">${ax(t)}</text>`;
   }
-  const sel = st.scSel !== null && st.scSel < N ? st.scSel : null;
+  const sel = st.scSel && st.scSel.c === o.c && st.scSel.i < N ? st.scSel.i : null;
   let selInfo = null;
   buck.forEach((b, i) => {
     cum += b.n;
     const x = ml + i * slot + (slot - bw) / 2, h = b.n / yMax * ih, y = mt + ih - h, r = Math.min(4, bw / 2, h);
-    const fill = sel === i ? 'var(--amber2)' : 'var(--amber)';
-    if(b.n > 0) bars += `<path d="M${x} ${mt + ih}V${y + r}Q${x} ${y} ${x + r} ${y}H${x + bw - r}Q${x + bw} ${y} ${x + bw} ${y + r}V${mt + ih}Z" fill="${fill}"/>`;
-    bars += `<rect class="hit" data-act="sc-pick" data-i="${i}" x="${ml + i * slot}" y="${mt}" width="${slot}" height="${ih}"><title>${esc(b.full)}: ${b.n} caffè (totale ${cum})</title></rect>`;
+    if(b.n > 0) bars += `<path d="M${x} ${mt + ih}V${y + r}Q${x} ${y} ${x + r} ${y}H${x + bw - r}Q${x + bw} ${y} ${x + bw} ${y + r}V${mt + ih}Z" fill="${o.col}" ${sel === i ? '' : 'fill-opacity=".85"'} ${sel === i ? 'stroke="var(--tx)" stroke-width="1.5"' : ''}/>`;
+    bars += `<rect class="hit" data-act="sc-pick" data-c="${o.c}" data-i="${i}" x="${ml + i * slot}" y="${mt}" width="${slot}" height="${ih}"><title>${esc(b.full)}: ${esc(fmt(b.n))} (totale ${esc(fmt(cum))})</title></rect>`;
     if(i % every === 0) xl += `<text x="${ml + i * slot + slot / 2}" y="${H - 8}" text-anchor="middle">${esc(b.lab)}</text>`;
     if(sel === i) selInfo = {b, cum};
   });
-  const info = selInfo ? `<b>${esc(selInfo.b.full)}</b>: ${selInfo.b.n} caffè · totale finora <b>${selInfo.cum}</b>` : `Tocca una barra per il dettaglio · totale periodo <b>${tot}</b>`;
-  const righe = buck.filter(b => b.n > 0);
-  return `<div class="sc-info" id="sc-info">${info}</div>
-    <svg class="sc" id="sc-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Caffè pagati per ${unita}, totale ${tot}">${grid}${bars}${xl}</svg>
-    <p class="hint" style="margin:6px 0 0">Caffè pagati per ${unita}.</p>
+  const info = selInfo ? `<b>${esc(selInfo.b.full)}</b>: ${esc(fmt(selInfo.b.n))} · totale finora <b>${esc(fmt(selInfo.cum))}</b>` : `Tocca una barra per il dettaglio · totale <b>${esc(fmt(tot))}</b>`;
+  const righe = buck.filter(b => b.n > 0), cap = unita.charAt(0).toUpperCase() + unita.slice(1);
+  return `<div class="sc-info">${info}</div>
+    <svg class="sc" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.nome)} per ${unita}, totale ${esc(fmt(tot))}">${grid}${bars}${xl}</svg>
+    <p class="hint" style="margin:6px 0 0">${esc(o.nome)} per ${unita}.</p>
     <details style="margin-top:6px"><summary class="mut" style="cursor:pointer;font-size:12.5px;padding:4px 2px">Tabella dei dati</summary>
-      <table><thead><tr><th>${S.g === 'ora' ? 'Ora' : S.g === 'giorno' ? 'Giorno' : 'Mese'}</th><th class="r">Caffè</th></tr></thead><tbody>${righe.map(b => `<tr><td>${esc(b.full)}</td><td class="r mono">${b.n}</td></tr>`).join('')}</tbody></table></details>`;
+      <table><thead><tr><th>${cap}</th><th class="r">${esc(o.nome)}</th></tr></thead><tbody>${righe.map(b => `<tr><td>${esc(b.full)}</td><td class="r mono">${esc(fmt(b.n))}</td></tr>`).join('')}</tbody></table></details>`;
 }
-function pStatSal(d){
-  if(st.isAdmin && st.arcMov === null && !st.arcLoading) caricaArcMov();
-  const r = rangeSal();
-  const tutti = (st.arcMov || []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
-  const T = emptyStats(); tutti.forEach(m => applyStat(T, m));
-  const righe = st.membri.filter(m => m.attivo !== false || (T.caffe[m.id] || 0) > 0).map(m => ({m, n: Math.max(0, T.caffe[m.id] || 0)})).sort((a, b) => b.n - a.n || a.m.nome.localeCompare(b.m.nome));
-  const tot = righe.reduce((s, x) => s + x.n, 0), max = Math.max(1, ...righe.map(x => x.n));
+A['sc-pick'] = ds => { const i = Number(ds.i); st.scSel = (st.scSel && st.scSel.c === ds.c && st.scSel.i === i) ? null : {c: ds.c, i}; render(); };
+
+/* aggregazione di una lista di movimenti (periodo corrente, oppure movimenti da archiviare alla chiusura) */
+function nuovoAgg(){ return {caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
+function aggMov(G, m, sg){
+  sg = sg || 1; const t = G.tot;
+  switch(m.tipo){
+    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
+    case 'snack': if(m.stato !== 'annullata'){ add(G.snack, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
+    case 'spesa': if(m.stato === 'confermata'){ add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*m.importo; } break;
+    case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*(m.punti ?? PUNTI_DEF)); }); break;
+    case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
+    case 'quota': if(m.metodo === 'contanti' || m.metodo === 'revolut') t.quote += sg*m.importo; break;
+    case 'regalo': t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); break;
+    case 'riscatto': if(m.stato !== 'annullata') t.riscatti += sg*m.importo; break;
+    case 'entrata': t.entrate += sg*m.importo; break;
+    case 'uscita': t.uscite += sg*m.importo; break;
+    case 'giroconto': t.giro += sg*m.importo; break;
+    case 'storno': if(m.orig) aggMov(G, m.orig, -sg); break;
+  }
+}
+function aggrega(list){ const G = nuovoAgg(); list.forEach(m => aggMov(G, m)); return G; }
+let _aggC = {d: null, k: ''};
+function aggPeriodo(d){
+  const r = rangeSal(), k = [st.salPer, st.salDa, st.salA, st.arcMov ? st.arcMov.length : -1, new Date().toDateString()].join('|');
+  if(_aggC.d !== d || _aggC.k !== k){
+    const tutti = (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
+    _aggC = {d, k, r, tutti, G: aggrega(tutti)};
+  }
+  return _aggC;
+}
+/* storico dei periodi chiusi: i colleghi lo leggono dal proprio estratto, l'admin lo ricava dalle chiusure (nessuna lettura in più) */
+function riepDaChiusura(c){
+  if(c.riep) return c.riep;
+  const T = c.stats || {};
+  return {id: c.id, da: c.da && c.da.toMillis ? c.da.toMillis() : 0, fino: c.fino.toMillis(), n: c.n || 0, legacy: true, caffe: T.caffe || {}, snack: null, euro: T.euroMid || {}, spese: null, speseN: null, turni: null, pPul: null, tot: {ric: T.ricariche || 0, speseTot: T.spese || 0}};
+}
+const storicoDaChiusure = () => st.chiusure.map(riepDaChiusura).sort((a, b) => a.fino - b.fino).slice(-STORICO_MAX);
+const storicoPeriodi = () => st.isAdmin ? storicoDaChiusure() : ((st.estratto && st.estratto.storico) || []).slice().sort((a, b) => a.fino - b.fino);
+const dBreve = ms => new Date(ms).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit', year: '2-digit'});
+const riepLabel = p => (p.da ? dBreve(p.da) : 'inizio') + ' → ' + dBreve(p.fino);
+
+function rankList(items, fmt, vuoto){
+  items = items.filter(x => x.v > 0).sort((a, b) => b.v - a.v || nomeM(a.id).localeCompare(nomeM(b.id)));
+  if(!items.length) return `<div class="empty">${vuoto}</div>`;
+  const max = items[0].v;
+  return items.map((x, i) => `<div style="margin-bottom:9px"><div class="between" style="font-size:13px"><span><span class="mut mono">${i+1}.</span> ${esc(nomeM(x.id))}${x.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}${x.sub ? ` <span class="mut" style="font-size:11.5px">${x.sub}</span>` : ''}</span><b class="mono">${fmt(x.v)}</b></div><div class="bar"><i style="width:${Math.round(x.v / max * 100)}%"></i></div></div>`).join('');
+}
+const rigaTot = (e, l, v, sub) => `<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span>${e} ${l}${sub ? ` <span class="mut" style="font-size:11.5px">${sub}</span>` : ''}</span><b class="mono">${v}</b></div>`;
+const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi prima della versione 1.10.0.</div>';
+
+/* R ha la forma di un aggregato: lo stesso per il periodo corrente e per un riepilogo salvato; ch = grafici (solo periodo corrente) */
+function viewAcq(R, ch){
+  const cons = st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.caffe, m.id) + nz(R.snack, m.id)), sub: `☕ ${nz(R.caffe, m.id)}${R.snack ? ` · 🍫 ${nz(R.snack, m.id)}` : ''} · ${eur(nz(R.euro, m.id))}`}));
+  const tot = cons.reduce((a, x) => a + x.v, 0);
+  const spese = R.spese ? st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.spese, m.id)), sub: `${nz(R.speseN, m.id)} ${nz(R.speseN, m.id) === 1 ? 'richiesta' : 'richieste'}`})) : null;
+  return `<div class="card"><h3><span>☕ Classifica consumi</span><b class="mono amber">${tot}</b></h3>
+    ${rankList(cons, v => v, 'Nessun consumo in questo periodo.')}${R.snack ? '' : '<p class="hint" style="margin:6px 0 0">Per questo periodo sono disponibili solo i caffè.</p>'}</div>
+  ${ch ? `<div class="card"><h3><span>📈 Andamento consumi</span></h3>${ch.cons}</div>` : ''}
+  <div class="card"><h3><span>🧾 Spese anticipate per il fondo</span><b class="mono green">${eur(R.tot.speseTot || 0)}</b></h3>
+    ${spese ? rankList(spese, eur, 'Nessuna spesa convalidata in questo periodo.') : `${nonDisp}`}</div>
+  ${ch ? `<div class="card"><h3><span>📈 Andamento spese</span></h3>${ch.spese}</div>` : ''}`;
+}
+function viewPul(R, ch){
+  if(!R.turni) return `<div class="card"><h3>✨ Turni di pulizia</h3>${nonDisp}</div>`;
+  const righe = st.membri.map(m => ({m, t: nz(R.turni, m.id), p: nz(R.pPul, m.id)})).filter(x => x.t > 0 || x.p > 0).sort((a, b) => b.p - a.p || b.t - a.t || a.m.nome.localeCompare(b.m.nome));
+  const tt = righe.reduce((a, x) => a + x.t, 0);
+  return `<div class="card"><h3><span>✨ Turni e punteggi</span><b class="mono violet">${tt}</b></h3>
+    ${righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">Turni</th><th class="c">Punti</th></tr></thead><tbody>${righe.map((x, i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill violet">tu</span>' : ''}</td><td class="c mono">${x.t}</td><td class="c mono violet"><b>${x.p}</b></td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nessun turno registrato in questo periodo.</div>'}</div>
+  ${ch ? `<div class="card"><h3><span>📈 Andamento turni</span></h3>${ch.pul}</div>` : ''}`;
+}
+function viewPag(R, ch){
+  const t = R.tot, netto = (t.ric || 0) + (t.quote || 0) + (t.entrate || 0) - (t.speseCassa || 0) - (t.riscatti || 0) - (t.uscite || 0);
+  const reg = R.regDati ? st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.regDati, m.id))})) : [];
+  return `<div class="card"><h3><span>💰 Riepilogo pagamenti</span></h3>
+    ${rigaTot('💶', 'Ricariche confermate', eur(t.ric || 0))}
+    ${R.legacy ? '' : `${rigaTot('🛡️', 'Quote fondo versate', eur(t.quote || 0), 'contanti / Revolut')}
+    ${rigaTot('🎁', 'Regali tra colleghi', eur(t.regali || 0), (t.regaliN || 0) + (t.regaliN === 1 ? ' regalo' : ' regali'))}
+    ${rigaTot('🧾', 'Spese pagate dalla cassa', eur(t.speseCassa || 0))}
+    ${rigaTot('🏦', 'Riscatti pagati', eur(t.riscatti || 0))}
+    ${rigaTot('📥', 'Entrate registrate', eur(t.entrate || 0))}
+    ${rigaTot('💸', 'Uscite registrate', eur(t.uscite || 0))}
+    ${rigaTot('🔁', 'Giroconti', eur(t.giro || 0), 'tra contanti e conto')}
+    <div class="between" style="padding:10px 0 0;font-size:14px"><b>Flusso netto di cassa</b><b class="mono ${netto < 0 ? 'red' : 'green'}">${eurS(netto)}</b></div>
+    <p class="hint" style="margin:6px 0 0">Ricariche + quote + entrate − spese dalla cassa − riscatti − uscite. I giroconti non cambiano il totale.</p>`}
+    ${R.legacy ? `<div class="hint" style="margin-top:6px">Per questo periodo è disponibile solo il totale delle ricariche.</div>` : ''}</div>
+  ${R.legacy ? '' : `<div class="card"><h3><span>🎁 Chi ha regalato di più</span><b class="mono green">${eur(t.regali || 0)}</b></h3>${rankList(reg, eur, 'Nessun regalo in questo periodo.')}</div>`}
+  ${ch ? `<div class="card"><h3><span>📈 Andamento ricariche</span></h3>${ch.pag}</div>` : ''}`;
+}
+function clPeriodo(d){
+  const r = rangeSal(), chiusi = st.salPer === 'chiusi', L = chiusi ? storicoPeriodi() : [];
   const opt = (v, l) => `<option value="${v}" ${st.salPer === v ? 'selected' : ''}>${l}</option>`;
-  const storico = st.isAdmin ? !!st.arcMov : false;
-  return `${backSaletta()}<h2>${ic('chart')} Statistiche</h2><p class="sub">${esc(r.label)}</p>
-  <div class="card"><label class="f" style="margin:0"><span>Periodo</span>
-    <select class="in" data-chg="salper">${opt('oggi','Oggi')}${opt('settimana','Questa settimana')}${opt('mese','Questo mese')}${opt('anno','Quest\'anno')}${opt('custom','Personalizzato…')}</select></label>
+  const i = st.clPer != null && L[st.clPer] ? st.clPer : L.length - 1;
+  return `<div class="card"><label class="f" style="margin:0"><span>Periodo</span>
+    <select class="in" data-chg="salper">${opt('oggi','Oggi')}${opt('settimana','Questa settimana')}${opt('mese','Questo mese')}${opt('anno','Quest\'anno')}${opt('custom','Personalizzato…')}${opt('chiusi','Periodi chiusi')}</select></label>
     ${st.salPer === 'custom' ? `<div class="grid2" style="margin-top:8px"><label class="f" style="margin:0"><span>Dal</span><input class="in" type="date" id="sal-da" data-chg="saldate" value="${esc(st.salDa)}"></label><label class="f" style="margin:0"><span>Al</span><input class="in" type="date" id="sal-a" data-chg="saldate" value="${esc(st.salA)}"></label></div>` : ''}
+    ${chiusi && L.length ? `<label class="f" style="margin:8px 0 0"><span>Periodo chiuso</span><select class="in" data-chg="clper">${L.map((p, k) => `<option value="${k}" ${k === i ? 'selected' : ''}>${riepLabel(p)}</option>`).join('')}</select></label>` : ''}
+    ${st.isAdmin && !chiusi ? (st.arcMov ? '<p class="hint" style="margin:8px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}
   </div>
-  <div class="card"><h3><span>☕ Chi ha pagato più caffè</span><b class="mono amber">${tot}</b></h3>
-    ${tot ? righe.map((x, i) => `<div style="margin-bottom:9px"><div class="between" style="font-size:13px"><span><span class="mut mono">${i+1}.</span> ${esc(nomeM(x.m.id))}${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</span><b class="mono">${x.n}</b></div><div class="bar"><i style="width:${Math.round(x.n/max*100)}%"></i></div></div>`).join('') : '<div class="empty">Nessun caffè in questo periodo.</div>'}
-  </div>
-  <div class="card"><h3><span>📈 Andamento caffè pagati</span><b class="mono amber">${tot}</b></h3>
-    ${graficoCaffe(serieCaffe(tutti, r))}
-  </div>
-  ${storico || st.isAdmin ? '' : `<p class="hint">I dati partono dall'ultima chiusura di periodo: i caffè più vecchi sono archiviati e visibili solo agli amministratori.</p>`}`;
+  <p class="sub" style="margin:0 0 10px">${chiusi ? 'Riepilogo dei periodi chiusi' : esc(r.label) + (st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo')}</p>`;
 }
-A['sc-pick'] = ds => { const i = Number(ds.i); st.scSel = st.scSel === i ? null : i; render(); };
+function clChiusi(tab){
+  const L = storicoPeriodi();
+  if(!L.length) return '<div class="card"><div class="empty">Nessun periodo chiuso finora.</div></div>';
+  const i = st.clPer != null && L[st.clPer] ? st.clPer : L.length - 1, R = L[i];
+  const conf = {acq: {f: p => sumo(p.caffe) + sumo(p.snack), nome: 'Consumazioni', col: 'var(--amber)'},
+    pul: {f: p => sumo(p.turni), nome: 'Turni', col: 'var(--violet)'},
+    pag: {f: p => (p.tot && p.tot.ric) || 0, nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100)}}[tab];
+  const buck = L.map(p => ({lab: new Date(p.fino).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit'}), full: riepLabel(p), n: Math.max(0, conf.f(p))}));
+  const grafico = `<div class="card"><h3><span>📈 ${conf.nome} per periodo chiuso</span></h3>${graficoBarre({g: 'periodo', buck}, {c: 'per' + tab, nome: conf.nome, col: conf.col, fmt: conf.fmt, ax: conf.ax, vuoto: 'Nessun dato nei periodi chiusi.'})}</div>`;
+  return grafico + (tab === 'acq' ? viewAcq(R, null) : tab === 'pul' ? viewPul(R, null) : viewPag(R, null));
+}
+function clClassifica(d){
+  const k = (st.clSort && st.clSort.k) || 'tot', dir = (st.clSort && st.clSort.dir) || -1;
+  const righe = membriAttivi().map(m => { const c = nz(d.S.pcaf, m.id), p = nz(d.S.punti, m.id), s = nz(d.S.pspesa, m.id); return {m, nome: m.nome, c, p, s, tot: c + p + s}; });
+  const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
+  righe.sort((a, b) => k === 'nome' ? dir * a.nome.localeCompare(b.nome) : dir * (a[k] - b[k]) || b.tot - a.tot || a.nome.localeCompare(b.nome));
+  const th = (key, l, cls) => `<th class="${cls || 'c'}"><button class="btn link" style="padding:0;font-size:11.5px;font-weight:800" data-act="cl-sort" data-k="${key}">${l}${k === key ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
+  return `<div class="card"><h3><span>🏆 La classifica</span></h3>
+    ${righe.length ? `<table><thead><tr><th>#</th>${th('nome', 'Nome', '')}${th('c', '☕ Caffè')}${th('p', '✨ Pulizie')}${th('s', '🧾 Spesa')}${th('tot', 'Totale')}</tr></thead><tbody>
+    ${righe.map(x => `<tr ${x.m.id === st.mid ? 'style="background:rgba(245,165,36,.10)"' : ''}><td class="mut mono">${pos[x.m.id]}</td><td><b>${esc(nomeBreve(x.m.id) || x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.p}</td><td class="c mono">${x.s}</td><td class="c mono amber"><b>${x.tot}</b></td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty">Nessun collega.</div>'}
+    <p class="hint" style="margin:8px 0 0">Tocca un'intestazione per ordinare. Caffè: 1 punto per ogni caffè registrato. Pulizie: ${puntiPulizia()} per turno. Spesa: ${PUNTI_SPESA} per ogni richiesta convalidata (nessun punto se in attesa o respinta). Sono punti totali accumulati: convertirli in crediti non ti fa scendere.</p></div>`;
+}
+function pClassifiche(d){
+  const tab = st.clTab || 'class';
+  const tabs = [['class', '🏆 LA CLASSIFICA'], ['acq', 'ACQUISTI'], ['pul', 'PULIZIE'], ['pag', 'PAGAMENTI']];
+  const head = `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button><h2>${ic('chart')} Classifiche e statistiche</h2>
+    <div class="chips">${tabs.map(([v, l]) => `<button id="cl-tab-${v}" class="${tab === v ? 'on' : ''}" data-act="cl-tab" data-v="${v}">${l}</button>`).join('')}</div>`;
+  if(tab === 'class') return head + clClassifica(d);
+  if(st.salPer === 'chiusi') return head + clPeriodo(d) + clChiusi(tab);
+  const c = aggPeriodo(d), r = c.r, T = c.tutti, G = c.G;
+  const ch = tab === 'acq' ? {cons: graficoBarre(serieGen(T, r, fCons), {c: 'cons', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo in questo periodo.'}),
+      spese: graficoBarre(serieGen(T, r, fSpese), {c: 'spese', nome: 'Spese', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna spesa convalidata in questo periodo.'})}
+    : tab === 'pul' ? {pul: graficoBarre(serieGen(T, r, fTurni), {c: 'pul', nome: 'Turni', col: 'var(--violet)', vuoto: 'Nessun turno in questo periodo.'})}
+    : {pag: graficoBarre(serieGen(T, r, fRic), {c: 'pag', nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna ricarica in questo periodo.'})};
+  return head + clPeriodo(d) + (tab === 'acq' ? viewAcq(G, ch) : tab === 'pul' ? viewPul(G, ch) : viewPag(G, ch));
+}
+A['cl-tab'] = ds => { st.clTab = ds.v; st.scSel = null; render(); };
+A['cl-sort'] = ds => { const c = st.clSort || {k: 'tot', dir: -1}; st.clSort = c.k === ds.k ? {k: c.k, dir: -c.dir} : {k: ds.k, dir: ds.k === 'nome' ? 1 : -1}; render(); };
+A['carica-arc-mov'] = () => { if(!st.arcLoading && !st.arcMov) caricaArcMov(); };
 
 /* ---------- Lista della spesa collaborativa ---------- */
 function pSpesa(d){
@@ -2446,6 +2589,41 @@ A['conferma-pulizia'] = () => {
   addMov({tipo:'pulizia', mid: st.mid, mids: [st.mid], punti: puntiPulizia(), giorno});
   closeSheet(); toast(`Pulizia registrata: +${puntiPulizia()} punti ✨`);
 };
+/* --- regala crediti (immediato, senza approvazione) --- */
+function rgAggiorna(){
+  if(!$('rg-q')) return;
+  const n = document.querySelectorAll('#sheet input.rg-c:checked').length;
+  const raw = val('rg-q'), qOk = /^\d{1,3}$/.test(raw) && +raw >= 1 && +raw <= 500, q = qOk ? +raw : 0;
+  const tot = n * q, ins = qOk && tot * 100 > creditoLibero();
+  const t = $('rg-tot');
+  if(t) t.innerHTML = !qOk ? 'Indica quanti crediti regalare (numero intero)' : n ? `${n} ${n === 1 ? 'collega' : 'colleghi'} × ${q} ${q === 1 ? 'credito' : 'crediti'} = <b class="mono ${ins ? 'red' : 'green'}">${tot} ${tot === 1 ? 'credito totale' : 'crediti totali'}</b>` : 'Seleziona almeno un collega';
+  const w = $('rg-warn'); if(w) w.style.display = ins ? '' : 'none';
+  const b = $('rg-send'); if(b) b.disabled = !(n > 0 && qOk && !ins);
+}
+A['regala'] = () => {
+  const col = membriAttivi().filter(m => m.id !== st.mid).slice().sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
+  if(!col.length) return toast('Non ci sono altri colleghi', 'err');
+  openSheet(`<h3>🎁 Regala crediti</h3>
+    <p class="sub">Il regalo è immediato: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
+    <div class="between" style="margin-bottom:8px"><b style="font-size:13px">Colleghi</b><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="rg-tutti" data-v="1">Seleziona tutti</button><button class="btn sm ghost" data-act="rg-tutti" data-v="0">Deseleziona tutti</button></span></div>
+    <div style="max-height:34vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check"><input type="checkbox" class="rg-c" value="${m.id}" data-chg="rg-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}</div>
+    <label class="f"><span>Crediti per ogni collega</span><input class="in mono" id="rg-q" inputmode="numeric" maxlength="3" value="1" data-chg="rg-upd"></label>
+    <label class="f"><span>Causale (facoltativa)</span><input class="in" id="rg-msg" maxlength="80" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
+    <div id="rg-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
+    <div id="rg-warn" class="banner red" style="display:none">${ic('alert')}<div><b>Saldo insufficiente</b></div></div>
+    <button class="btn green block big" id="rg-send" data-act="rg-invia" disabled>Invia i crediti</button>`);
+  rgAggiorna();
+};
+A['rg-tutti'] = ds => { document.querySelectorAll('#sheet input.rg-c').forEach(x => { x.checked = ds.v === '1'; }); rgAggiorna(); };
+A['rg-invia'] = () => {
+  const ids = [...document.querySelectorAll('#sheet input.rg-c:checked')].map(x => x.value).filter(x => x !== st.mid && membro(x));
+  const raw = val('rg-q'); if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > 500) return toast('Quantità non valida', 'err');
+  const q = +raw, imp = q * 100, msg = val('rg-msg').slice(0, 80);
+  if(!ids.length) return toast('Seleziona almeno un collega', 'err');
+  if(ids.length * imp > creditoLibero()) return toast('Saldo insufficiente', 'err');
+  ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {})}));
+  closeSheet(); toast(`🎁 Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
+};
 A['converti'] = () => {
   const d = derived(), rate = puntiPerCredito(), max = Math.floor(puntiDisp(d, st.mid) / rate);
   if(max < 1) return toast(`Servono almeno ${rate} Punti Pulizia`, 'err');
@@ -2966,20 +3144,23 @@ A['chiudi-periodo'] = async () => {
   try {
     const prev = ultimaChiusura();
     const S = prev && prev.stato ? JSON.parse(JSON.stringify(prev.stato)) : emptyState();
-    ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','quote','dovute'].forEach(k => S[k] = S[k] || {}); S.cassa = S.cassa || {contanti:0, revolut:0};
+    ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','quote','dovute'].forEach(k => S[k] = S[k] || {}); S.cassa = S.cassa || {contanti:0, revolut:0};
     const T = emptyStats();
     incl.forEach(m => { applyMov(S, m); applyStat(T, m); });
     let fino = incl[0]._ts;
     incl.forEach(m => { if(m._ts.seconds > fino.seconds || (m._ts.seconds === fino.seconds && m._ts.nanoseconds > fino.nanoseconds)) fino = m._ts; });
     const id = 'c' + fino.toMillis();
     const b = db.batch();
-    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
+    const G = aggrega(incl), riep = {id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, tot: G.tot};
+    const storico = st.chiusure.map(riepDaChiusura).concat([riep]).sort((x, y) => x.fino - y.fino).slice(-STORICO_MAX);
+    const mp = {pcaf: S.pcaf, pcafConv: S.pcafConv, punti: S.punti, puntiConv: S.puntiConv, turni: S.turni, ultimo: S.ultimo, pspesa: S.pspesa};
+    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
     const arr = incl.map(compactMov);
     st.membri.forEach(m => {
       const q = {}, dv = {};
       for(const a in S.quote) if(S.quote[a][m.id]) q[a] = S.quote[a][m.id];
       for(const a in S.dovute) if(S.dovute[a][m.id]) dv[a] = S.dovute[a][m.id];
-      b.set(C('estratti').doc(m.id), {saldo: S.saldi[m.id] || 0, pcaf: S.pcaf[m.id] || 0, pcafConv: S.pcafConv[m.id] || 0, saldi: S.saldi, cassa: S.cassa, quote: q, dovute: dv, fino, chiusura: id});
+      b.set(C('estratti').doc(m.id), {saldo: S.saldi[m.id] || 0, pcaf: S.pcaf[m.id] || 0, pcafConv: S.pcafConv[m.id] || 0, mp, storico, saldi: S.saldi, cassa: S.cassa, quote: q, dovute: dv, fino, chiusura: id});
     });
     for(let i = 0; i * ARCHIVIO_CHUNK < arr.length; i++) b.set(C('archivio').doc(id + '_' + i), {movimenti: arr.slice(i*ARCHIVIO_CHUNK, (i+1)*ARCHIVIO_CHUNK)});
     await b.commit();
@@ -3217,9 +3398,15 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'stat-periodo'){ st.statPeriodo = el.value; render(); }
   if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
+  if(el && el.dataset.chg === 'clper'){ st.clPer = Number(el.value); st.scSel = null; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
+  if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
+});
+document.addEventListener('input', e => {
+  const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
+  if(el) rgAggiorna();
 });
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){ closeSheet(); A['drawer-close'](); }
