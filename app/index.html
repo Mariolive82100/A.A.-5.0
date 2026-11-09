@@ -319,7 +319,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.11.0';
+const VERSION = '1.11.1';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -682,6 +682,8 @@ const ptBenFatto = () => cfgN('ptBenFatto', 2);
 const sogliaPunti = () => Math.max(1, cfgN('sogliaPunti', 30));
 const creditiSoglia = () => Math.max(1, cfgN('creditiSoglia', 1));
 const bfN = () => Math.max(1, cfgN('bfN', 1));
+const pulGruppoN = () => Math.min(20, Math.max(1, cfgN('pulGruppoN', 1)));
+const pulUtenteN = () => Math.min(20, Math.max(1, cfgN('pulUtenteN', 1)));
 const bfPeriodo = () => (st.gruppo && st.gruppo.bfPeriodo) === 'mese' ? 'mese' : 'settimana';
 const puntiPulizia = () => (st.gruppo && st.gruppo.puntiPulizia) || 10;
 const puntiPerCredito = () => (st.gruppo && st.gruppo.puntiPerCredito) || PUNTI_CREDITO_DEF;
@@ -1322,7 +1324,7 @@ function sincronizzaEstratti(){
   estrSent = last.id;
   const ls = last.stato, mp = {};
   ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa','pbf','pRisc'].forEach(k => { mp[k] = ls[k] || {}; });
-  mp.bf = last.bf || {};
+  mp.bf = last.bf || {}; mp.pulRec = last.pulRec || [];
   const dati = {saldi: ls.saldi || {}, cassa: ls.cassa || {contanti:0, revolut:0}, mp, storico: storicoDaChiusure()};
   st.membri.forEach(m => C('estratti').doc(m.id).update(dati).catch(() => {}));
 }
@@ -1484,6 +1486,7 @@ function pRegolamento(){
   ${sez('8. Pulizie e Punti Pulizia', [
     '<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata. In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.',
     `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori). Gli amministratori possono stornare registrazioni non veritiere.`,
+    `<b>Limiti anti-abuso:</b> si possono registrare al massimo <b>${pulGruppoN()}</b> ${pulGruppoN() === 1 ? 'pulizia' : 'pulizie'} di gruppo e <b>${pulUtenteN()}</b> ${pulUtenteN() === 1 ? 'turno' : 'turni'} per collega a settimana (da lunedì a domenica). Gli amministratori possono stornare una registrazione indebita: i punti si azzerano e il turno torna disponibile.`,
     `<b>Punti:</b> i punti pulizia confluiscono nella Tessera fedeltà insieme a quelli di caffè, spese convalidate e «Ben fatto» (vedi sezione 11).`])}
   ${sez('9. Busta del caffè e Tasso di Onestà', [
     `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
@@ -1506,10 +1509,14 @@ function ordinePulizie(d){
 }
 function pPulizie(d){
   const av = adminView(), me = st.mid;
+  const ps = pulStato();
+  const blocco = ps.bloccato ? `<div class="banner amber" id="pul-blocco">${ic('alert')}<div>${pulMsgBlocco(ps)}</div></div>` : '';
+  const ultima = ps.ult ? `<p class="hint" style="margin:8px 0 0" id="pul-ultima">Ultima pulizia: <b>${esc(nomeBreve(ps.ult.mid) || nomeM(ps.ult.mid))}</b> · ${quando(ps.ult.t)}${st.isAdmin && ps.ult.id ? ` · <button class="btn link" style="padding:0" id="btn-storna-ultima" data-act="storno" data-id="${ps.ult.id}">Storna</button>` : ''}</p>` : '';
   const reg = me ? `<div class="card" style="text-align:center;background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
       <b style="font-size:15px">✨ Hai pulito la saletta?</b>
       <p class="mut" style="font-size:13px;margin:6px 0 12px">Registra il tuo turno: +${puntiPulizia()} Punti Pulizia (anche con una data passata).</p>
-      <button class="btn violet block" id="btn-registra-pulizia" data-act="pulizia">${ic('check','s')} Registra pulizia</button></div>` : '';
+      ${blocco}
+      <button class="btn violet block" id="btn-registra-pulizia" data-act="pulizia" ${ps.bloccato ? 'disabled' : ''}>${ic('check','s')} Registra pulizia</button>${ultima}</div>` : '';
   const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || (d.S.turni[b.id]||0) - (d.S.turni[a.id]||0) || a.nome.localeCompare(b.nome));
   const top = ordinePulizie(d).slice(0,3);
   const prossimo = av ? `<div class="card" style="background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
@@ -2101,6 +2108,10 @@ const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti e Ricompense
       <label class="f"><span>Gettoni «Ben fatto»</span><input class="in mono" id="rp-bfn" inputmode="numeric" value="${bfN()}"></label>
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
+    <div class="grid2">
+      <label class="f"><span>Pulizie di gruppo a settimana</span><input class="in mono" id="rp-pulg" inputmode="numeric" value="${pulGruppoN()}"></label>
+      <label class="f"><span>Turni a settimana per utente</span><input class="in mono" id="rp-pulu" inputmode="numeric" value="${pulUtenteN()}"></label>
+    </div>
     <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti">Salva le regole</button>
   </div>
 `;
@@ -2614,7 +2625,22 @@ A['conferma-paga-spesa'] = ds => {
 };
 
 /* --- pulizie --- */
+/* limite anti-abuso sui turni di pulizia: calcolato sui movimenti già in memoria (e sull'estratto per la settimana a cavallo di una chiusura) */
+function pulInizioSettimana(){ const o = new Date(); o.setHours(0, 0, 0, 0); return new Date(o.getFullYear(), o.getMonth(), o.getDate() - ((o.getDay() + 6) % 7)).getTime(); }
+function pulRinnovo(){ const i = new Date(pulInizioSettimana()); return new Date(i.getFullYear(), i.getMonth(), i.getDate() + 7).toLocaleDateString('it-IT', {weekday: 'long', day: 'numeric', month: 'long'}); }
+function pulStato(){
+  const ini = pulInizioSettimana(), d = derived();
+  const live = tuttiMov().filter(m => m.tipo === 'pulizia' && m.t >= ini && !d.stornati.has(m.id)).map(m => ({mid: m.mid, t: m.t, id: m.id}));
+  const pre = (st.isAdmin ? ((ultimaChiusura() || {}).pulRec || []) : ((st.estratto && st.estratto.mp && st.estratto.mp.pulRec) || [])).filter(x => x.t >= ini).map(x => ({mid: x.m, t: x.t}));
+  const w = pre.concat(live).sort((a, b) => a.t - b.t), mie = w.filter(x => x.mid === st.mid).length, ult = w[w.length - 1] || null;
+  const gr = w.length >= pulGruppoN(), ut = mie >= pulUtenteN();
+  return {w, ult, bloccato: gr || ut, motivo: gr ? 'gruppo' : ut ? 'utente' : null};
+}
+const pulMsgBlocco = ps => ps.motivo === 'gruppo'
+  ? `La saletta è già stata pulita ${pulGruppoN() === 1 ? 'questa settimana' : 'il massimo di volte questa settimana'}${ps.ult ? ` da ${esc(nomeBreve(ps.ult.mid) || nomeM(ps.ult.mid))} (${quando(ps.ult.t)})` : ''}. Si potrà registrare un nuovo turno da ${pulRinnovo()}.`
+  : `Hai già registrato ${pulUtenteN() === 1 ? 'il tuo turno' : 'i tuoi turni'} di questa settimana. Il prossimo da ${pulRinnovo()}.`;
 A['pulizia'] = () => {
+  const ps = pulStato(); if(ps.bloccato) return toast(pulMsgBlocco(ps).replace(/<[^>]*>/g, ''), 'err');
   const oggi = oggiISO(), min = new Date(Date.now() - 30*864e5), mi = `${min.getFullYear()}-${pad(min.getMonth()+1)}-${pad(min.getDate())}`;
   openSheet(`<h3>${ic('sparkles')} Registra pulizia</h3><p class="sub">Hai pulito tu la saletta: ricevi +${puntiPulizia()} Punti Pulizia. Puoi registrare solo i tuoi turni.</p>
     <label class="f"><span>Quando?</span>${segOpts('pul-q', [['oggi','Oggi'],['altro','Data passata']], 'oggi')}</label>
@@ -2622,6 +2648,7 @@ A['pulizia'] = () => {
     <button class="btn violet block big" data-act="conferma-pulizia" style="margin-top:6px">Registra</button>`);
 };
 A['conferma-pulizia'] = () => {
+  const ps = pulStato(); if(ps.bloccato){ closeSheet(); return toast(pulMsgBlocco(ps).replace(/<[^>]*>/g, ''), 'err'); }
   const oggi = oggiISO(); let giorno = oggi;
   if(radio('pul-q') === 'altro'){ giorno = val('pul-data'); if(!/^\d{4}-\d{2}-\d{2}$/.test(giorno) || giorno > oggi) return toast('Data non valida', 'err'); }
   addMov({tipo:'pulizia', mid: st.mid, mids: [st.mid], punti: puntiPulizia(), giorno});
@@ -2691,7 +2718,7 @@ A['carica-archivio'] = async () => {
 
 /* --- storno ed esiti (admin) --- */
 function compactMov(m){
-  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, kind:m.kind, giorno:m.giorno, t:m.t, id:m.id});
+  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, t:m.t, id:m.id});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -3055,9 +3082,9 @@ A['bf-invia'] = () => {
   closeSheet(); toast(`👏 Ben fatto a ${nomeBreve(dest)}! +${ptBenFatto()} punti`);
 };
 A['salva-punti'] = () => {
-  const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSpesa: n('rp-spesa'), puntiPulizia: n('rp-pulizia'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn')};
+  const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSpesa: n('rp-spesa'), puntiPulizia: n('rp-pulizia'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn'), pulGruppoN: n('rp-pulg'), pulUtenteN: n('rp-pulu')};
   const ok = v.sogliaPunti >= 1 && v.sogliaPunti <= 1000 && v.creditiSoglia >= 1 && v.creditiSoglia <= 100 && v.ptCaffe >= 0 && v.ptCaffe <= 100 && v.ptSpesa >= 0 && v.ptSpesa <= 100
-    && v.puntiPulizia >= 1 && v.puntiPulizia <= 500 && v.ptBenFatto >= 0 && v.ptBenFatto <= 100 && v.bfN >= 1 && v.bfN <= 20;
+    && v.puntiPulizia >= 1 && v.puntiPulizia <= 500 && v.ptBenFatto >= 0 && v.ptBenFatto <= 100 && v.bfN >= 1 && v.bfN <= 20 && v.pulGruppoN >= 1 && v.pulGruppoN <= 20 && v.pulUtenteN >= 1 && v.pulUtenteN <= 20;
   if(!ok) return toast('Valori non validi', 'err');
   G().set({...v, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
@@ -3236,8 +3263,9 @@ A['chiudi-periodo'] = async () => {
     if(prev && prev.bf) Object.keys(prev.bf).forEach(k => { bf[k] = (prev.bf[k] || []).slice(); });
     incl.filter(m => m.tipo === 'ben_fatto' && !stor.has(m.id)).forEach(m => { (bf[m.mid] = bf[m.mid] || []).push(m.t); });
     Object.keys(bf).forEach(k => { bf[k] = bf[k].filter(t => t >= lim).slice(-10); if(!bf[k].length) delete bf[k]; });   // ultimi invii di "Ben fatto": servono al gettone a cavallo di una chiusura
-    const mp = {pcaf: S.pcaf, pcafConv: S.pcafConv, punti: S.punti, puntiConv: S.puntiConv, turni: S.turni, ultimo: S.ultimo, pspesa: S.pspesa, pbf: S.pbf, pRisc: S.pRisc, bf};
-    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, bf, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
+    const limP = Date.now() - 14 * 864e5, pulRec = ((prev && prev.pulRec) || []).concat(incl.filter(m => m.tipo === 'pulizia' && !stor.has(m.id)).map(m => ({m: m.mid, t: m.t}))).filter(x => x.t >= limP).slice(-20);   // pulizie recenti: servono al limite settimanale a cavallo di una chiusura
+    const mp = {pulRec, pcaf: S.pcaf, pcafConv: S.pcafConv, punti: S.punti, puntiConv: S.puntiConv, turni: S.turni, ultimo: S.ultimo, pspesa: S.pspesa, pbf: S.pbf, pRisc: S.pRisc, bf};
+    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, bf, pulRec, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
     const arr = incl.map(compactMov);
     st.membri.forEach(m => {
       const q = {}, dv = {};
