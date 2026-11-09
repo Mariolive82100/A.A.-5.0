@@ -308,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -377,7 +377,7 @@ const st = {
   gruppo: null, membri: [], prodotti: [], eventi: [], chiusure: [], movimenti: [], pending: {},
   admins: [], utenti: [], isAdmin: false,
   ready: {}, sync: 'conn', syncErr: '', entry: null, busy: false,
-  caffeQta: 1, riscSel: {}, riscMet: 'contanti', invSort: {k:'nome', asc:true}, feedFiltro: 'tutti', statPeriodo: 'corrente',
+  caffeQta: 1, riscSel: {}, riscMet: 'contanti', invSort: {k:'nome', asc:true}, feedFiltro: 'tutti', statPeriodo: 'corrente', salPer: 'mese', salDa: '', salA: '', arcMov: null, arcLoading: false,
   archivio: null, skipInstall: false, installata: false
 };
 
@@ -471,7 +471,7 @@ function syncMode(){
   modeKey = key;
   if(key === 'admin' || key.startsWith('user')) setTimeout(() => { if(modeKey === key) retryN = 0; }, 20000);
   stopData();
-  Object.assign(st, {chiusure:[], estratto:null, movimenti:[], movD:[], riscatti:[], acquisti:[], buste:[], admins:[], utenti:[], richieste:[], richAdmin:[], archivio:null});
+  Object.assign(st, {chiusure:[], estratto:null, movimenti:[], movD:[], riscatti:[], acquisti:[], buste:[], admins:[], utenti:[], richieste:[], richAdmin:[], archivio:null, arcMov:null, arcLoading:false});
   st.ready.mv = false; _derCache = null;
   if(key === 'none'){ Object.assign(st, {membri:[], prodotti:[], eventi:[]}); st.ready.m = false; return; }
   // dati comuni, leggibili solo da chi è già stato accettato nel gruppo
@@ -691,7 +691,7 @@ function segOpts(name, opts, sel){
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], gioco:['Gioco caffè','dice'], registro:['Registro movimenti','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], statsal:['Statistiche','chart'], gioco:['Gioco caffè','dice'], registro:['Registro movimenti','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings']
 };
@@ -749,7 +749,7 @@ function doRender(){
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, statsal:pStatSal, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
@@ -772,8 +772,8 @@ function renderDrawer(){
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
 }
 
-const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco'];
-const PAGINE_COLLEGA = ['bar','saletta','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
+const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco','statsal'];
+const PAGINE_COLLEGA = ['bar','saletta','statsal','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
 const PAGINE_ADMIN = ['bar','registro','notifiche','admin','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
@@ -947,12 +947,8 @@ function pBar(d){
       <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
     </div>
-    <div class="grid3" style="margin-top:12px">
-      <div class="stat"><small>Saldo Contabile</small><b class="mono ${s < 0 ? 'red' : 'green'}" id="r-cont">${eurS(s)}</b></div>
-      <div class="stat"><small>Saldo Disponibile</small><b class="mono ${saldoDisp(d) < 0 ? 'red' : 'green'}" id="r-disp">${eurS(saldoDisp(d))}</b></div>
-      <div class="stat"><small>Totale Fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
-    </div>
-    <p class="hint" style="margin:6px 0 0">Il saldo disponibile esclude i crediti già impegnati in riscatti o scambi in corso. Il Totale Fondo è la cassa (contanti + conto).</p>
+    <div class="stat" style="margin-top:12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
+    <p class="hint" style="margin:6px 0 0">Il saldo disponibile del fondo è la cassa comune (contanti + conto).</p>
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
@@ -1337,17 +1333,14 @@ function cardPunti(d){
     <button class="btn violet block" data-act="converti" ${cr > 0 ? '' : 'disabled'}>Converti in crediti</button></div>`;
 }
 function pPulizie(d){
-  const comp = st.eventi.filter(e => e.tipo === 'compleanno').map(e => ({...e, prossima: prossimaData(e)})).sort((a, b) => a.prossima.localeCompare(b.prossima)).slice(0, 5);
-  const scad = `<div class="card"><h3><span>🎂 Scadenzario compleanni</span><button class="btn link" data-act="go" data-p="eventi">Tutti</button></h3>
-    ${comp.length ? `<div class="list">${comp.map(e => { const g = giorniA(e.prossima); return `<div class="li"><div class="av" style="background:rgba(244,114,182,.12)">${ic('cake','s')}</div><div class="grow"><div class="t">${esc(e.titolo)}</div><div class="d mono">${e.prossima.split('-').reverse().join('/')}</div></div><span class="pill ${g === 0 ? 'amber' : g <= 7 ? 'violet' : 'mut'}">${g === 0 ? 'oggi!' : g === 1 ? 'domani' : 'tra ' + g + ' gg'}</span></div>`; }).join('')}</div>` : '<div class="empty">Nessun compleanno in agenda.</div>'}</div>`;
   const reg = `<div class="card" style="text-align:center;background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
       <b style="font-size:15px">✨ Hai pulito la saletta?</b>
       <p class="mut" style="font-size:13px;margin:6px 0 12px">Registra il tuo turno: +${puntiPulizia()} Punti Pulizia (anche con una data passata).</p>
       <button class="btn violet block" data-act="pulizia">${ic('check','s')} Registra pulizia</button></div>`;
-  if(!adminView()) return `${backSaletta()}<h2>${ic('sparkles')} Pulizie sala</h2><p class="sub">Turni di pulizia e punti.</p>${reg}${cardPunti(d)}${scad}`;
+  if(!adminView()) return `${backSaletta()}<h2>${ic('sparkles')} Pulizie sala</h2><p class="sub">Turni di pulizia e punti.</p>${reg}${cardPunti(d)}`;
   const ord = ordinePulizie(d), top = ord.slice(0,3);
   const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || a.nome.localeCompare(b.nome));
-  return `<h2>${ic('sparkles')} Scheda Saletta</h2><p class="sub">Turni pulizie e compleanni.</p>
+  return `<h2>${ic('sparkles')} Scheda Saletta</h2><p class="sub">Turni pulizie.</p>
   <div class="card" style="background:linear-gradient(135deg,var(--card),rgba(124,58,237,.12));border-color:rgba(167,139,250,.3)">
     <h3><span>Prossimo turno consigliato</span></h3>
     <div class="grid3" style="margin-bottom:6px">${top.map((m,i) => `<div class="stat" style="border-color:rgba(167,139,250,.3)"><small class="violet">#${i+1}</small><b style="font-size:14px">${esc(m.nome)}</b><div class="mut mono" style="font-size:11px">${d.S.punti[m.id]||0} punti</div></div>`).join('')}</div>
@@ -1356,7 +1349,7 @@ function pPulizie(d){
   <div class="card"><h3>Classifica Punti Pulizia</h3>
     <table><thead><tr><th>#</th><th>Collega</th><th class="c">Punti</th><th class="c">Turni</th></tr></thead><tbody>
     ${classifica.map((m,i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(m.nome)}</b>${top.some(t => t.id === m.id) ? ' <span class="pill violet">tocca a lui/lei</span>' : ''}</td><td class="c mono violet"><b>${d.S.punti[m.id]||0}</b></td><td class="c mono">${d.S.turni[m.id]||0}</td></tr>`).join('')}
-    </tbody></table></div>${scad}`;
+    </tbody></table></div>`;
 }
 
 
@@ -1378,7 +1371,50 @@ function pSaletta(d){
     <button class="gbtn" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi</button>
     <button class="gbtn" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
     <button class="gbtn" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Gioco caffè</button>
+    <button class="gbtn" id="sal-stats" data-act="go" data-p="statsal"><span class="em">📊</span>Statistiche</button>
   </div>`;
+}
+
+
+/* ---------- Statistiche saletta (colleghi): classifica caffè per periodo ---------- */
+const isoDi = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+function rangeSal(){
+  const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = st.salPer;
+  const ini = dt => { dt.setHours(0,0,0,0); return dt.getTime(); }, fine = dt => { dt.setHours(23,59,59,999); return dt.getTime(); };
+  if(p === 'mese') return {da: ini(new Date(y, m, 1)), a: Infinity, label: 'Questo mese'};
+  if(p === 'mesep') return {da: ini(new Date(y, m-1, 1)), a: fine(new Date(y, m, 0)), label: 'Mese scorso'};
+  if(p === '30') return {da: ini(new Date(Date.now() - 29*86400000)), a: Infinity, label: 'Ultimi 30 giorni'};
+  if(p === 'anno') return {da: ini(new Date(y, 0, 1)), a: Infinity, label: 'Quest\'anno'};
+  if(p === 'custom'){
+    const da = st.salDa ? ini(new Date(st.salDa + 'T00:00:00')) : 0, a = st.salA ? fine(new Date(st.salA + 'T00:00:00')) : Infinity;
+    return {da, a, label: (st.salDa ? st.salDa.split('-').reverse().join('/') : 'inizio') + ' → ' + (st.salA ? st.salA.split('-').reverse().join('/') : 'oggi')};
+  }
+  return {da: 0, a: Infinity, label: 'Da sempre'};
+}
+async function caricaArcMov(){
+  st.arcLoading = true;
+  try { const s = await C('archivio').get(); st.arcMov = []; s.docs.forEach(d => st.arcMov.push(...(d.data().movimenti || []))); }
+  catch(e){ st.arcMov = []; }
+  st.arcLoading = false; render();
+}
+function pStatSal(d){
+  if(st.isAdmin && st.arcMov === null && !st.arcLoading) caricaArcMov();
+  const r = rangeSal();
+  const tutti = (st.arcMov || []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
+  const T = emptyStats(); tutti.forEach(m => applyStat(T, m));
+  const righe = st.membri.filter(m => m.attivo !== false || (T.caffe[m.id] || 0) > 0).map(m => ({m, n: Math.max(0, T.caffe[m.id] || 0)})).sort((a, b) => b.n - a.n || a.m.nome.localeCompare(b.m.nome));
+  const tot = righe.reduce((s, x) => s + x.n, 0), max = Math.max(1, ...righe.map(x => x.n));
+  const opt = (v, l) => `<option value="${v}" ${st.salPer === v ? 'selected' : ''}>${l}</option>`;
+  const storico = st.isAdmin ? !!st.arcMov : false;
+  return `${backSaletta()}<h2>${ic('chart')} Statistiche</h2><p class="sub">${esc(r.label)}</p>
+  <div class="card"><label class="f" style="margin:0"><span>Periodo</span>
+    <select class="in" data-chg="salper">${opt('mese','Questo mese')}${opt('mesep','Mese scorso')}${opt('30','Ultimi 30 giorni')}${opt('anno','Quest\'anno')}${opt('tutto','Da sempre')}${opt('custom','Personalizzato…')}</select></label>
+    ${st.salPer === 'custom' ? `<div class="grid2" style="margin-top:8px"><label class="f" style="margin:0"><span>Dal</span><input class="in" type="date" id="sal-da" data-chg="saldate" value="${esc(st.salDa)}"></label><label class="f" style="margin:0"><span>Al</span><input class="in" type="date" id="sal-a" data-chg="saldate" value="${esc(st.salA)}"></label></div>` : ''}
+  </div>
+  <div class="card"><h3><span>☕ Chi ha preso più caffè</span><b class="mono amber">${tot}</b></h3>
+    ${tot ? righe.map((x, i) => `<div style="margin-bottom:9px"><div class="between" style="font-size:13px"><span><span class="mut mono">${i+1}.</span> ${esc(nomeM(x.m.id))}${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</span><b class="mono">${x.n}</b></div><div class="bar"><i style="width:${Math.round(x.n/max*100)}%"></i></div></div>`).join('') : '<div class="empty">Nessun caffè in questo periodo.</div>'}
+  </div>
+  ${storico || st.isAdmin ? '' : `<p class="hint">I dati partono dall'ultima chiusura di periodo: i caffè più vecchi sono archiviati e visibili solo agli amministratori.</p>`}`;
 }
 
 /* ---------- Gioco caffè: chi indovina il numero paga il caffè (si gioca passandosi il telefono) ---------- */
@@ -2663,6 +2699,8 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target.closest('[data-chg]');
   if(el && el.dataset.chg === 'stat-periodo'){ st.statPeriodo = el.value; render(); }
+  if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; render(); }
+  if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
