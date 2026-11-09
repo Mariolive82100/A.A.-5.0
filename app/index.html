@@ -139,6 +139,10 @@ main.wide{max-width:980px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .chips button{padding:7px 12px;border-radius:99px;border:1px solid var(--line2);font-size:12.5px;font-weight:700;color:var(--tx2)}
 .chips button.on{background:var(--amber);border-color:var(--amber);color:#1a1205}
+.tessera{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left;background:transparent;color:inherit;cursor:pointer}
+.tessera.ok{border-color:var(--green);background:rgba(52,211,153,.10)}
+.tessera.ok .bar i{background:var(--green)}
+.tess-ok{margin-top:8px;font-weight:800;color:var(--green);font-size:13.5px;text-align:center}
 .bar{height:8px;border-radius:5px;background:var(--card2);overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),#818cf8);border-radius:5px}
 .cols{display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:6px}
@@ -315,7 +319,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.10.0';
+const VERSION = '1.11.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -571,19 +575,19 @@ function tuttiMov(){
   const extra = st.movD.filter(m => !ids.has(m.id)); extra.forEach(m => ids.add(m.id));
   return st.movimenti.concat(extra, Object.values(st.pending).filter(p => !ids.has(p.id))).sort((a,b) => a.t - b.t);
 }
-function emptyState(){ return {saldi:{}, cassa:{contanti:0, revolut:0}, stock:{}, turni:{}, ultimo:{}, punti:{}, puntiConv:{}, pcaf:{}, pcafConv:{}, pspesa:{}, quote:{}, dovute:{}}; }
+function emptyState(){ return {saldi:{}, cassa:{contanti:0, revolut:0}, stock:{}, turni:{}, ultimo:{}, punti:{}, puntiConv:{}, pcaf:{}, pcafConv:{}, pspesa:{}, pbf:{}, pRisc:{}, quote:{}, dovute:{}}; }
 const METODI_QUOTA = {contanti:'Contanti', revolut:'Revolut', credito:'Dal credito', esterno:'Già versata'};
 function emptyStats(){ return {caffe:{}, snack:{}, euroMid:{}, spese:0, ricariche:0, n:0}; }
 
 function applyMov(S, m, sg){
   sg = sg || 1;
   switch(m.tipo){
-    case 'caffe': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.pcaf, m.mid, sg*m.qta); } break;
+    case 'caffe': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.pcaf, m.mid, sg*(m.pt ?? m.qta)); } break;
     case 'snack': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.stock, m.pid, -sg*m.qta); } break;
     case 'ricarica': if(m.stato === 'confermata'){ add(S.saldi, m.mid, sg*m.importo); add(S.cassa, m.metodo, sg*m.importo); } break;
     case 'spesa':
       if(m.stato === 'confermata'){
-        S.pspesa = S.pspesa || {}; add(S.pspesa, m.mid, sg*PUNTI_SPESA);   // 2 punti per ogni richiesta convalidata, qualunque sia il numero di articoli
+        S.pspesa = S.pspesa || {}; add(S.pspesa, m.mid, sg*(m.pt ?? PUNTI_SPESA));   // 2 punti per ogni richiesta convalidata, qualunque sia il numero di articoli
         if(m.fonte === 'tasca') add(S.saldi, m.mid, sg*m.importo); else if(m.fonte === 'contanti' || m.fonte === 'revolut') add(S.cassa, m.fonte, -sg*m.importo);
       } break;
     case 'uscita': add(S.cassa, m.fonte, -sg*m.importo); break;
@@ -598,6 +602,8 @@ function applyMov(S, m, sg){
       break;   // 'credito': pagata scalando il credito gia' versato, nessun movimento di soldi
     case 'scambio': if(m.stato === 'confermata'){ add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); } break;
     case 'regalo': add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); break;
+    case 'ben_fatto': S.pbf = S.pbf || {}; add(S.pbf, m.aMid, sg*(m.pt ?? 2)); break;   // punti al destinatario; chi lo invia non perde nulla
+    case 'riscatto_punti': S.pRisc = S.pRisc || {}; add(S.pRisc, m.mid, sg*m.punti); add(S.saldi, m.mid, sg*m.importo); break;
     case 'riscatto': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
     case 'rettifica': case 'accredito': add(S.saldi, m.mid, sg*m.importo); break;
     case 'caffe_pagato': add(S.pcaf, m.mid, sg*m.qta); if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo); break;   // caffè pagati subito, fuori dall'app: nessun effetto sul saldo
@@ -626,7 +632,7 @@ function derived(){
   const movs = tuttiMov();
   const last = st.isAdmin ? ultimaChiusura() : null;
   const S = last && last.stato ? JSON.parse(JSON.stringify(last.stato)) : emptyState();
-  ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','quote','dovute'].forEach(k => S[k] = S[k] || {});
+  ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','pbf','pRisc','quote','dovute'].forEach(k => S[k] = S[k] || {});
   S.cassa = S.cassa || {contanti:0, revolut:0};
   if(!st.isAdmin && st.estratto){
     for(const a in (st.estratto.quote || {})) S.quote[a] = {[st.mid]: st.estratto.quote[a]};
@@ -639,7 +645,7 @@ function derived(){
     if(st.estratto.cassa) S.cassa = {contanti: st.estratto.cassa.contanti || 0, revolut: st.estratto.cassa.revolut || 0};
     S.saldi[st.mid] = st.estratto.saldo || 0;
     const mp = st.estratto.mp;   // mappe complete di tutti i colleghi all'ultima chiusura (punti e turni): la classifica resta "di sempre"
-    if(mp) ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa'].forEach(k => { S[k] = {...(mp[k] || {})}; });
+    if(mp) ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa','pbf','pRisc'].forEach(k => { S[k] = {...(mp[k] || {})}; });
     else { S.pcaf = {[st.mid]: st.estratto.pcaf || 0}; S.pcafConv = {[st.mid]: st.estratto.pcafConv || 0}; }
   }
   const T = emptyStats();
@@ -668,10 +674,22 @@ function debitoLibero(){
   return Math.max(0, -s - inCorso);
 }
 const PUNTI_SPESA = 2;
-const puntiPulizia = () => (st.gruppo && st.gruppo.puntiPulizia) || PUNTI_DEF;
+/* regole punti e ricompense (configurabili dagli admin, salvate nel documento del gruppo: nessuna lettura in più) */
+const cfgN = (k, def) => { const v = st.gruppo && st.gruppo[k]; return Number.isInteger(v) && v >= 0 ? v : def; };
+const ptCaffe = () => cfgN('ptCaffe', 1);
+const ptSpesa = () => cfgN('ptSpesa', PUNTI_SPESA);
+const ptBenFatto = () => cfgN('ptBenFatto', 2);
+const sogliaPunti = () => Math.max(1, cfgN('sogliaPunti', 30));
+const creditiSoglia = () => Math.max(1, cfgN('creditiSoglia', 1));
+const bfN = () => Math.max(1, cfgN('bfN', 1));
+const bfPeriodo = () => (st.gruppo && st.gruppo.bfPeriodo) === 'mese' ? 'mese' : 'settimana';
+const puntiPulizia = () => (st.gruppo && st.gruppo.puntiPulizia) || 10;
 const puntiPerCredito = () => (st.gruppo && st.gruppo.puntiPerCredito) || PUNTI_CREDITO_DEF;
 const puntiCaffeRate = () => (st.gruppo && st.gruppo.puntiCaffePerCredito) || 30;
 const puntiCaffeDisp = (d, mid) => Math.max(0, ((d.S.pcaf || {})[mid] || 0) - ((d.S.pcafConv || {})[mid] || 0));
+const ptLordi = (d, mid) => nz(d.S.pcaf, mid) + nz(d.S.punti, mid) + nz(d.S.pspesa, mid) + nz(d.S.pbf, mid);
+const ptUsati = (d, mid) => nz(d.S.pcafConv, mid) + nz(d.S.puntiConv, mid) + nz(d.S.pRisc, mid);
+const ptDisp = (d, mid) => Math.max(0, ptLordi(d, mid) - ptUsati(d, mid));
 const puntiDisp = (d, mid) => Math.max(0, (d.S.punti[mid] || 0) - (d.S.puntiConv[mid] || 0));
 function giorniLavorativi(da, a){
   const x = new Date(da), f = new Date(a || Date.now()); x.setHours(12,0,0,0); f.setHours(12,0,0,0);
@@ -1043,10 +1061,9 @@ function pBar(d){
       <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
     </div>
-    ${(() => { const r = puntiCaffeRate(), pt = puntiCaffeDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
-      return `<div id="tessera-caffe" style="margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left"><div class="between" style="font-size:13px;margin-bottom:8px"><b>☕ Tessera fedeltà</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
-      ${ok ? `<button class="btn green block" id="btn-converti-caffe" data-act="converti-caffe" style="margin-top:10px">🎁 Riscatta 1 credito (1,00 €)</button>` : `<p class="hint" style="margin:8px 0 0">Ogni caffè vale 1 punto: ogni ${r} punti ottieni 1 credito.</p>`}</div>`; })()}
+    ${(() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
+      return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Tessera fedeltà: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Tessera fedeltà</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
@@ -1058,7 +1075,7 @@ function pBar(d){
     <div class="grid">
       <button class="gbtn" data-act="caffe-menu"><span class="em">☕</span>Paga caffè<small>${eur(pc)} l'uno</small></button>
       <button class="gbtn" data-act="snack"><span class="em">🍫</span>Acquista snack</button>
-      <button class="gbtn" id="btn-regala" data-act="regala"><span class="em">🎁</span>Regala crediti<small>ai colleghi</small></button>
+      <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
       <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
     </div>
   </div>
@@ -1179,8 +1196,9 @@ function pRiscatto(d){
 function pCrediti(d){
   const tab = st.creditiTab || ((d.S.saldi[st.mid] || 0) > 0 || mieiRiscatti().length ? 'risc' : 'acq');
   const tabs = `<div class="chips" style="margin-bottom:12px">${[['acq','🛒 Acquista'],['risc','💰 Riscatta']].map(([v, l]) => `<button class="${tab === v ? 'on' : ''}" data-act="cred-tab" data-v="${v}">${l}</button>`).join('')}</div>`;
-  if(tab === 'risc') return tabs + pRiscatto(d);
-  return tabs + pAcquista(d);
+  const regala = `<button class="btn block ghost" id="btn-regala" data-act="regala" style="margin-top:12px">🎁 Regala crediti ai colleghi</button>`;
+  if(tab === 'risc') return tabs + pRiscatto(d) + regala;
+  return tabs + pAcquista(d) + regala;
 }
 function pAcquista(d){
   const deb = debitoLibero(), puo = true;
@@ -1241,7 +1259,7 @@ function pAdminHome(d){
 
   ${sh('👥', 'Soci & Riconoscimenti', 'Saldi, punti e ruoli')}
   <div class="card"><div class="list">${soci.map(m => `<button class="li" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
-      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">✨ ${puntiDisp(d, m.id)} · ☕ ${puntiCaffeDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
+      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">⭐ ${ptDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
       <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>
     <div class="grid3" style="margin-top:10px">
       <button class="btn sm" data-act="accredito" data-id="">${ic('plus','s')} Omaggio</button>
@@ -1283,6 +1301,8 @@ function notifiche(d){
     else if(m.tipo === 'conversione' && m.mid === me) out.push({t, e: '🔄', x: `Hai convertito ${m.punti} Punti Pulizia in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'riscatto' && m.mid === me) out.push({t, e: '🏦', x: `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
+    else if(m.tipo === 'ben_fatto' && m.aMid === me) out.push({t, e: '👏', x: `${esc(nomeM(m.daMid))} ti dice «Ben fatto!»: «${esc(m.msg || '')}» (+${m.pt ?? 2} punti)`});
+    else if(m.tipo === 'riscatto_punti' && m.mid === me) out.push({t, e: '⭐', x: `Hai riscattato ${m.punti} punti: +${eur(m.importo)} di crediti`});
     else if(m.tipo === 'regalo' && m.aMid === me) out.push({t, e: '🎁', x: `${esc(nomeM(m.daMid))} ti ha regalato ${eur(m.importo)} di crediti${m.msg ? ' · «' + esc(m.msg) + '»' : ''}`});
     else if(m.tipo === 'scambio'){
       if(m.stato === 'confermata' && m.daMid === me) out.push({t, e: '🤝', x: `${esc(nomeM(m.aMid))} ha comprato ${eur(m.importo)} dei tuoi crediti`});
@@ -1301,7 +1321,8 @@ function sincronizzaEstratti(){
   if(!st.isAdmin || st.sync !== 'ok' || modeKey !== 'admin' || !last || !last.stato || estrSent === last.id) return;
   estrSent = last.id;
   const ls = last.stato, mp = {};
-  ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa'].forEach(k => { mp[k] = ls[k] || {}; });
+  ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa','pbf','pRisc'].forEach(k => { mp[k] = ls[k] || {}; });
+  mp.bf = last.bf || {};
   const dati = {saldi: ls.saldi || {}, cassa: ls.cassa || {contanti:0, revolut:0}, mp, storico: storicoDaChiusure()};
   st.membri.forEach(m => C('estratti').doc(m.id).update(dati).catch(() => {}));
 }
@@ -1347,6 +1368,8 @@ function descMov(m){
       : {ic:'🔄', t: `${esc(nomeM(m.daMid))} vende ${eur(m.importo)} di crediti a ${esc(nomeM(m.aMid))}${m.causale ? ': ' + esc(m.causale) : ''}`, a: 0, neutro: m.importo};
     case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = !adminView();
       return {ic:'🎁', t: `${esc(nomeM(m.daMid))} ha regalato ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
+    case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» (+${m.pt ?? 2} punti)`, a: 0};
+    case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti} punti della tessera fedeltà`, a: m.importo};
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · pagato dalla cassa (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
     case 'spesa': return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: m.fonte !== 'tasca'};
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
@@ -1424,7 +1447,7 @@ function pFeed(d){
 
 /* ---------- REGOLAMENTO ---------- */
 function pRegolamento(){
-  const g = st.gruppo || {}, rate = puntiPerCredito(), pp = puntiPulizia();
+  const g = st.gruppo || {}, pp = puntiPulizia();
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3>${righe.map(r => `<p class="tx2" style="font-size:13.5px;line-height:1.5;margin:0 0 9px">${r}</p>`).join('')}</div>`;
   return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">Norme di gestione di ${esc(g.nome || 'Armieri 5.0')} · versione 3.3 · novembre 2026</p>
   ${sez('1. Finalità e principi', [
@@ -1461,11 +1484,16 @@ function pRegolamento(){
   ${sez('8. Pulizie e Punti Pulizia', [
     '<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata. In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.',
     `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori). Gli amministratori possono stornare registrazioni non veritiere.`,
-    `<b>Conversione:</b> ${rate} Punti Pulizia = 1 credito (1,00 €), in crediti interi. Il rapporto è modificabile solo dagli amministratori. I crediti ottenuti riducono i debiti, finanziano nuovi consumi o si vendono nel Mercato.`])}
+    `<b>Punti:</b> i punti pulizia confluiscono nella Tessera fedeltà insieme a quelli di caffè, spese convalidate e «Ben fatto» (vedi sezione 11).`])}
   ${sez('9. Busta del caffè e Tasso di Onestà', [
     `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
     '<b>Tasso di Onestà = caffè registrati ÷ 130 × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che qualcuno beve senza registrare.',
     'Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.'])}
+  ${sez('11. Tessera fedeltà e «Ben fatto!»', [
+    `<b>Come si guadagnano i punti:</b> ☕ ${ptCaffe()} per ogni caffè · 🧾 ${ptSpesa()} per ogni spesa convalidata (zero se in attesa o respinta) · ✨ ${pp} per ogni turno di pulizia · 👏 ${ptBenFatto()} per ogni «Ben fatto» ricevuto.`,
+    `<b>Tessera:</b> tutti i punti posseduti si sommano. Ogni <b>${sogliaPunti()} punti</b> si riscattano <b>${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'}</b> (${eur(creditiSoglia() * 100)}). I punti riscattati non fanno scendere la classifica, che conta i punti totali accumulati.`,
+    `<b>Ben fatto!</b> è un riconoscimento a un collega meritevole, con una motivazione obbligatoria (max 80 caratteri). Chi lo invia non perde punti; ognuno ha <b>${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}</b>. Gli amministratori possono stornare i riconoscimenti non veritieri.`,
+    'Valori, soglia e gettoni sono stabiliti dagli amministratori; un cambio vale per gli eventi futuri, quelli passati mantengono il valore con cui sono stati registrati.'])}
   ${sez('10. Chiusure, backup e trasparenza', [
     'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
     'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
@@ -1475,12 +1503,6 @@ function pRegolamento(){
 /* ---------- PULIZIE ---------- */
 function ordinePulizie(d){
   return membriAttivi().slice().sort((a,b) => (d.S.punti[a.id]||0) - (d.S.punti[b.id]||0) || (d.S.ultimo[a.id]||0) - (d.S.ultimo[b.id]||0) || a.nome.localeCompare(b.nome));
-}
-function cardPunti(d){
-  const pd = puntiDisp(d, st.mid), rate = puntiPerCredito(), cr = Math.floor(pd / rate);
-  return `<div class="card"><h3><span>${ic('sparkles','s')} I tuoi Punti Pulizia</span><b class="mono violet">${pd}</b></h3>
-    <p class="mut" style="font-size:13px;margin:0 0 10px">Ogni turno vale +${puntiPulizia()} punti a testa. ${rate} punti = 1 credito (1 €): ${cr > 0 ? `puoi convertirne fino a <b>${cr}</b>.` : `te ne servono ${rate} per il primo credito.`}</p>
-    <button class="btn violet block" data-act="converti" ${cr > 0 ? '' : 'disabled'}>Converti in crediti</button></div>`;
 }
 function pPulizie(d){
   const av = adminView(), me = st.mid;
@@ -1502,7 +1524,7 @@ function pPulizie(d){
     ${classifica.map((m,i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(m.nome)}</b>${m.id === me ? ' <span class="pill violet">tu</span>' : ''}${av && top.some(t => t.id === m.id) ? ' <span class="pill violet">tocca a lui/lei</span>' : ''}</td><td class="c mono violet"><b>${d.S.punti[m.id]||0}</b></td><td class="c mono">${d.S.turni[m.id]||0}</td></tr>`).join('')}
     </tbody></table></div>
   ${prossimo}
-  ${av ? '' : cardPunti(d)}`;
+  `;
 }
 
 
@@ -1634,7 +1656,7 @@ function graficoBarre(S, o){
 A['sc-pick'] = ds => { const i = Number(ds.i); st.scSel = (st.scSel && st.scSel.c === ds.c && st.scSel.i === i) ? null : {c: ds.c, i}; render(); };
 
 /* aggregazione di una lista di movimenti (periodo corrente, oppure movimenti da archiviare alla chiusura) */
-function nuovoAgg(){ return {caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
+function nuovoAgg(){ return {caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
 function aggMov(G, m, sg){
   sg = sg || 1; const t = G.tot;
   switch(m.tipo){
@@ -1645,6 +1667,7 @@ function aggMov(G, m, sg){
     case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
     case 'quota': if(m.metodo === 'contanti' || m.metodo === 'revolut') t.quote += sg*m.importo; break;
     case 'regalo': t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); break;
+    case 'ben_fatto': add(G.bfRic, m.aMid, sg); break;
     case 'riscatto': if(m.stato !== 'annullata') t.riscatti += sg*m.importo; break;
     case 'entrata': t.entrate += sg*m.importo; break;
     case 'uscita': t.uscite += sg*m.importo; break;
@@ -1717,6 +1740,7 @@ function viewPag(R, ch){
     <div class="between" style="padding:10px 0 0;font-size:14px"><b>Flusso netto di cassa</b><b class="mono ${netto < 0 ? 'red' : 'green'}">${eurS(netto)}</b></div>
     <p class="hint" style="margin:6px 0 0">Ricariche + quote + entrate − spese dalla cassa − riscatti − uscite. I giroconti non cambiano il totale.</p>`}
     ${R.legacy ? `<div class="hint" style="margin-top:6px">Per questo periodo è disponibile solo il totale delle ricariche.</div>` : ''}</div>
+  ${R.bfRic ? `<div class="card"><h3><span>👏 Ben fatto ricevuti</span><b class="mono violet">${sumo(R.bfRic)}</b></h3>${rankList(st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.bfRic, m.id))})), v => v, 'Nessun «Ben fatto» in questo periodo.')}</div>` : ''}
   ${R.legacy ? '' : `<div class="card"><h3><span>🎁 Chi ha regalato di più</span><b class="mono green">${eur(t.regali || 0)}</b></h3>${rankList(reg, eur, 'Nessun regalo in questo periodo.')}</div>`}
   ${ch ? `<div class="card"><h3><span>📈 Andamento ricariche</span></h3>${ch.pag}</div>` : ''}`;
 }
@@ -1745,15 +1769,15 @@ function clChiusi(tab){
 }
 function clClassifica(d){
   const k = (st.clSort && st.clSort.k) || 'tot', dir = (st.clSort && st.clSort.dir) || -1;
-  const righe = membriAttivi().map(m => { const c = nz(d.S.pcaf, m.id), p = nz(d.S.punti, m.id), s = nz(d.S.pspesa, m.id); return {m, nome: m.nome, c, p, s, tot: c + p + s}; });
+  const righe = membriAttivi().map(m => { const c = nz(d.S.pcaf, m.id), p = nz(d.S.punti, m.id), s = nz(d.S.pspesa, m.id), b = nz(d.S.pbf, m.id); return {m, nome: m.nome, c, p, s, b, tot: c + p + s + b}; });
   const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
   righe.sort((a, b) => k === 'nome' ? dir * a.nome.localeCompare(b.nome) : dir * (a[k] - b[k]) || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const th = (key, l, cls) => `<th class="${cls || 'c'}"><button class="btn link" style="padding:0;font-size:11.5px;font-weight:800" data-act="cl-sort" data-k="${key}">${l}${k === key ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
   return `<div class="card"><h3><span>🏆 La classifica</span></h3>
-    ${righe.length ? `<table><thead><tr><th>#</th>${th('nome', 'Nome', '')}${th('c', '☕ Caffè')}${th('p', '✨ Pulizie')}${th('s', '🧾 Spesa')}${th('tot', 'Totale')}</tr></thead><tbody>
-    ${righe.map(x => `<tr ${x.m.id === st.mid ? 'style="background:rgba(245,165,36,.10)"' : ''}><td class="mut mono">${pos[x.m.id]}</td><td><b>${esc(nomeBreve(x.m.id) || x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.p}</td><td class="c mono">${x.s}</td><td class="c mono amber"><b>${x.tot}</b></td></tr>`).join('')}
+    ${righe.length ? `<table><thead><tr><th>#</th>${th('nome', 'Nome', '')}${th('c', '☕ Caffè')}${th('p', '✨ Pulizie')}${th('s', '🧾 Spesa')}${th('b', '👏 Ben fatto')}${th('tot', 'Totale')}</tr></thead><tbody>
+    ${righe.map(x => `<tr ${x.m.id === st.mid ? 'style="background:rgba(245,165,36,.10)"' : ''}><td class="mut mono">${pos[x.m.id]}</td><td><b>${esc(nomeBreve(x.m.id) || x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.p}</td><td class="c mono">${x.s}</td><td class="c mono">${x.b}</td><td class="c mono amber"><b>${x.tot}</b></td></tr>`).join('')}
     </tbody></table>` : '<div class="empty">Nessun collega.</div>'}
-    <p class="hint" style="margin:8px 0 0">Tocca un'intestazione per ordinare. Caffè: 1 punto per ogni caffè registrato. Pulizie: ${puntiPulizia()} per turno. Spesa: ${PUNTI_SPESA} per ogni richiesta convalidata (nessun punto se in attesa o respinta). Sono punti totali accumulati: convertirli in crediti non ti fa scendere.</p></div>`;
+    <p class="hint" style="margin:8px 0 0">Tocca un'intestazione per ordinare. Caffè: ${ptCaffe()} per caffè. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono punti totali accumulati: riscattarli non ti fa scendere.</p></div>`;
 }
 function pClassifiche(d){
   const tab = st.clTab || 'class';
@@ -2053,17 +2077,31 @@ function pAdmin(d){
 const uidNome = uid => { const u = st.utenti.find(x => x.id === uid); return u ? nomeM(u.mid) : null; };
 const bannerBackup = () => { const b = LS.get('backup_' + st.gid); return (!b || Date.now() - b > 7 * 864e5) ? `<div class="banner amber">${ic('alert')}<div>${b ? 'L\'ultimo backup risale a più di una settimana fa.' : 'Non hai ancora fatto un backup dei dati.'} <a href="#" data-act="go" data-p="backup" style="color:inherit;font-weight:800">Vai al backup</a></div></div>` : ''; };
 const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
-    <div class="grid2">
-      <label class="f"><span>Quota annua €</span><input class="in mono" id="ad-quota" inputmode="decimal" value="${(st.gruppo.quotaAnnua/100).toFixed(2).replace('.',',')}"></label>
-      <label class="f"><span>Punti per turno pulizie</span><input class="in mono" id="ad-punti" inputmode="numeric" value="${puntiPulizia()}"></label>
-    </div>
-    <div class="grid2">
-      <label class="f"><span>Punti Pulizia per 1 credito</span><input class="in mono" id="ad-rate" inputmode="numeric" value="${puntiPerCredito()}"></label>
-      <label class="f"><span>Punti Caffè per 1 credito</span><input class="in mono" id="ad-pcaf" inputmode="numeric" value="${puntiCaffeRate()}"></label>
-    </div>
+    <label class="f"><span>Quota annua €</span><input class="in mono" id="ad-quota" inputmode="decimal" value="${(st.gruppo.quotaAnnua/100).toFixed(2).replace('.',',')}"></label>
     <label class="f"><span>Nome gruppo</span><input class="in" id="ad-nome" value="${esc(st.gruppo.nome||'')}" maxlength="40"></label>
     <button class="btn amber block" data-act="salva-gruppo">Salva</button>
     <p class="hint" style="margin:10px 0 0">Il prezzo del caffè e il listino si gestiscono dalla Home di Amministrazione, area Magazzino & Prezzi.</p>
+  </div>
+`;
+const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti e Ricompense</h3>
+    <p class="hint" style="margin:0 0 8px">Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.</p>
+    <div class="grid2">
+      <label class="f"><span>Soglia riscatto (punti)</span><input class="in mono" id="rp-soglia" inputmode="numeric" value="${sogliaPunti()}"></label>
+      <label class="f"><span>Crediti erogati</span><input class="in mono" id="rp-crediti" inputmode="numeric" value="${creditiSoglia()}"></label>
+    </div>
+    <div class="grid2">
+      <label class="f"><span>Punti per caffè</span><input class="in mono" id="rp-caffe" inputmode="numeric" value="${ptCaffe()}"></label>
+      <label class="f"><span>Punti per spesa verificata</span><input class="in mono" id="rp-spesa" inputmode="numeric" value="${ptSpesa()}"></label>
+    </div>
+    <div class="grid2">
+      <label class="f"><span>Punti per turno pulizia</span><input class="in mono" id="rp-pulizia" inputmode="numeric" value="${puntiPulizia()}"></label>
+      <label class="f"><span>Punti per «Ben fatto»</span><input class="in mono" id="rp-bf" inputmode="numeric" value="${ptBenFatto()}"></label>
+    </div>
+    <div class="grid2">
+      <label class="f"><span>Gettoni «Ben fatto»</span><input class="in mono" id="rp-bfn" inputmode="numeric" value="${bfN()}"></label>
+      <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
+    </div>
+    <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti">Salva le regole</button>
   </div>
 `;
 const cardAdmins = () => `
@@ -2108,7 +2146,7 @@ function pImpostazioni(){
     <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${st.isAdmin ? 'Amministratore' : 'Collega'}</div></div>
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
   ${st.mid ? `<div class="card"><div class="between"><div><b>PIN personale</b><div class="mut" style="font-size:12px">Serve a ritrovare il profilo se cambi telefono</div></div><button class="btn sm" data-act="pin-cambia">${ic('lock','s')} Cambia</button></div></div>` : ''}
-  ${st.isAdmin ? cardParametri() + cardAdmins() : ''}
+  ${st.isAdmin ? cardParametri() + cardRegolePunti() + cardAdmins() : ''}
   <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e pulizie</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
   ${!st.isAdmin ? `<div class="card"><h3>${ic('shield','s')} Amministratore</h3>
     ${st.reqAdmin && st.reqAdmin.stato === 'attesa' ? `<p class="tx2" style="font-size:13px;margin:0 0 10px">Richiesta inviata: un amministratore deve approvarla.</p><button class="btn block ghost" data-act="ritira-richiesta-admin">Ritira la richiesta</button>`
@@ -2397,7 +2435,7 @@ let lastTap = 0;
 A['caffe'] = () => {
   if(Date.now() - lastTap < 900) return; lastTap = Date.now();
   const q = st.caffeQta, pc = st.gruppo.prezzoCaffe;
-  const id = addMov({tipo:'caffe', mid: st.mid, qta: q, importo: pc * q});
+  const id = addMov({tipo:'caffe', mid: st.mid, qta: q, importo: pc * q, pt: ptCaffe() * q});
   bustaInc(q);
   st.caffeQta = 1; closeSheet(); render();
   toast(q > 1 ? `Giro di ${q} caffè registrato (−${eur(pc*q)})` : `Caffè registrato (−${eur(pc)})`, '', {label:'Annulla', fn: () => annullaConsumo(id)});
@@ -2571,7 +2609,7 @@ A['paga-spesa'] = ds => {
 };
 A['conferma-paga-spesa'] = ds => {
   const met = radio('ps-met') || 'contanti', mv = derived().movs.find(x => x.id === ds.id);
-  C('movimenti').doc(ds.id).update({stato: 'confermata', fonte: met, esitoDa: myName(), esitoTs: TS()})
+  C('movimenti').doc(ds.id).update({stato: 'confermata', fonte: met, esitoDa: myName(), esitoTs: TS(), pt: ptSpesa()})
     .then(() => { aggiornaArticoli(mv, true); closeSheet(); toast('Spesa pagata dalla cassa ✓'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
@@ -2624,21 +2662,6 @@ A['rg-invia'] = () => {
   ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {})}));
   closeSheet(); toast(`🎁 Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
 };
-A['converti'] = () => {
-  const d = derived(), rate = puntiPerCredito(), max = Math.floor(puntiDisp(d, st.mid) / rate);
-  if(max < 1) return toast(`Servono almeno ${rate} Punti Pulizia`, 'err');
-  openSheet(`<h3>${ic('sparkles')} Converti Punti Pulizia</h3>
-    <p class="sub">Hai <b class="mono violet">${puntiDisp(d, st.mid)}</b> punti. ${rate} punti = 1 credito (1 €). I crediti riducono i tuoi debiti, finanziano i consumi o si vendono nel Mercato.</p>
-    <label class="f"><span>Quanti crediti (€ interi, max ${max})</span><input class="in mono" id="cv-n" inputmode="numeric" value="${max}"></label>
-    <button class="btn violet block big" data-act="conferma-converti">Converti</button>`);
-};
-A['conferma-converti'] = () => {
-  const d = derived(), rate = puntiPerCredito(), n = Math.floor(Number(String(val('cv-n')).replace(',', '.')));
-  if(!(n >= 1) || n > 500) return toast('Numero non valido', 'err');
-  if(n * rate > puntiDisp(d, st.mid)) return toast('Non hai abbastanza punti', 'err');
-  addMov({tipo:'conversione', mid: st.mid, importo: n * 100, punti: n * rate});
-  closeSheet(); toast(`${n * rate} punti convertiti in ${eur(n * 100)}`);
-};
 
 /* --- eventi --- */
 A['evento'] = () => openSheet(`<h3>${ic('cake')} Nuovo evento</h3><p class="sub">Compleanni e feste della saletta.</p>
@@ -2683,7 +2706,7 @@ A['conferma-storno'] = ds => {
 };
 A['esito'] = ds => {
   const mv = derived().movs.find(x => x.id === ds.id);
-  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS()})
+  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesa()} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
@@ -2866,11 +2889,8 @@ A['conferma-pin'] = () => {
 };
 A['salva-gruppo'] = () => {
   const pc = $('ad-caffe') ? parseEuro(val('ad-caffe')) : (st.gruppo.prezzoCaffe || 0), qa = parseEuro(val('ad-quota')), nome = val('ad-nome');
-  const pcf = Math.floor(Number(val('ad-pcaf')));
-  const pp = Math.floor(Number(val('ad-punti'))), rt = Math.floor(Number(val('ad-rate')));
   if(!(pc >= 0) || !(qa >= 0) || !nome) return toast('Controlla i valori', 'err');
-  if(!(pp >= 1 && pp <= 500) || !(rt >= 1 && rt <= 100) || !(pcf >= 1 && pcf <= 500)) return toast('Punti non validi', 'err');
-  G().set({prezzoCaffe: pc, quotaAnnua: qa, puntiPulizia: pp, puntiPerCredito: rt, puntiCaffePerCredito: pcf, nome: nome.slice(0,40)}, {merge: true}).then(() => toast('Salvato')).catch(e => toast(errMsg(e), 'err'));
+  G().set({prezzoCaffe: pc, quotaAnnua: qa, nome: nome.slice(0,40)}, {merge: true}).then(() => toast('Salvato')).catch(e => toast(errMsg(e), 'err'));
 };
 A['membro'] = ds => {
   const m = ds.id ? membro(ds.id) : null;
@@ -2976,13 +2996,72 @@ A['conferma-caffe-fuori'] = () => {
   closeSheet(); toast(`${q} caffè registrati per ${nomeM(mid)}`);
 };
 /* --- punti caffè, punti (admin), spesa admin, prezzo caffè --- */
-A['converti-caffe'] = () => {
-  const d = derived(), r = puntiCaffeRate();
-  if(puntiCaffeDisp(d, st.mid) < r) return toast(`Servono ${r} Punti Caffè`, 'err');
-  if(!confirm(`Riscattare 1 credito (1,00 €) con ${r} Punti Caffè?`)) return;
-  addMov({tipo:'conversione_caffe', mid: st.mid, importo: 100, punti: r});
-  toast('+1,00 € di crediti ☕');
+/* --- tessera fedeltà: punti di tutte le categorie, riscatto a soglia --- */
+A['tessera'] = () => {
+  const d = derived(), r = sogliaPunti(), cr = creditiSoglia(), pt = ptDisp(d, st.mid), ok = pt >= r, me = st.mid;
+  const usati = ptUsati(d, me);
+  openSheet(`<h3>⭐ Tessera fedeltà</h3>
+    <div class="stat" style="margin-bottom:10px"><small>Punti posseduti</small><b class="mono ${ok ? 'green' : 'amber'}">${pt} / ${r}</b></div>
+    <p class="hint" style="margin:0 0 10px">☕ ${nz(d.S.pcaf, me)} · ✨ ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
+    <button class="btn green block big" id="btn-riscatta-punti" data-act="riscatta-punti" ${ok ? '' : 'disabled'}>🎉 Riscatta punti</button>
+    <div class="card" style="margin:12px 0 0;padding:12px"><b style="font-size:13px">Regolamento accredito punti</b>
+      <p class="tx2" style="font-size:12.5px;line-height:1.55;margin:6px 0 0">☕ Caffè: +${ptCaffe()} · 🧾 Spesa convalidata: +${ptSpesa()} · ✨ Turno pulizia: +${puntiPulizia()} · 👏 «Ben fatto» ricevuto: +${ptBenFatto()}<br>Ogni ${r} punti = ${cr} ${cr === 1 ? 'credito' : 'crediti'} (${eur(cr * 100)}). Riscattare non cambia la tua classifica.</p></div>`);
 };
+A['riscatta-punti'] = () => {
+  const d = derived(), r = sogliaPunti(), cr = creditiSoglia();
+  if(ptDisp(d, st.mid) < r) return toast(`Servono ${r} punti`, 'err');
+  addMov({tipo:'riscatto_punti', mid: st.mid, importo: cr * 100, punti: r});
+  closeSheet(); toast(`🎉 +${eur(cr * 100)} di crediti`);
+};
+/* --- Ben fatto: riconoscimento a un collega, con gettone periodico (controllo lato app sui movimenti già in memoria) --- */
+function bfInizioPeriodo(){
+  const o = new Date(); o.setHours(0, 0, 0, 0);
+  if(bfPeriodo() === 'mese') return new Date(o.getFullYear(), o.getMonth(), 1).getTime();
+  return new Date(o.getFullYear(), o.getMonth(), o.getDate() - ((o.getDay() + 6) % 7)).getTime();
+}
+function bfRinnovo(){
+  const i = new Date(bfInizioPeriodo());
+  return (bfPeriodo() === 'mese' ? new Date(i.getFullYear(), i.getMonth() + 1, 1) : new Date(i.getFullYear(), i.getMonth(), i.getDate() + 7)).toLocaleDateString('it-IT', {weekday: 'long', day: 'numeric', month: 'long'});
+}
+function bfUsati(){
+  const ini = bfInizioPeriodo(), d = derived();
+  const live = tuttiMov().filter(m => m.tipo === 'ben_fatto' && m.mid === st.mid && m.t >= ini && !d.stornati.has(m.id)).map(m => m.t);
+  const prima = ((st.estratto && st.estratto.mp && st.estratto.mp.bf && st.estratto.mp.bf[st.mid]) || []).filter(t => t >= ini);
+  return live.length + prima.length;
+}
+const bfRestanti = () => st.mid ? Math.max(0, bfN() - bfUsati()) : 0;
+function bfAggiorna(){
+  if(!$('bf-msg')) return;
+  const dest = radio('bf-dest'), msg = val('bf-msg'), ok = !!dest && msg.length >= 2 && msg.length <= 80 && bfRestanti() > 0;
+  const b = $('bf-send'); if(b) b.disabled = !ok;
+  const c = $('bf-cnt'); if(c) c.textContent = msg.length + '/80';
+}
+A['benfatto'] = () => {
+  const col = membriAttivi().filter(m => m.id !== st.mid).slice().sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
+  const left = bfRestanti(), n = bfN();
+  openSheet(`<h3>👏 Ben fatto!</h3>
+    <p class="sub">Riconosci un collega meritevole: lui riceve <b>+${ptBenFatto()} punti</b>, tu non perdi nulla.</p>
+    <div class="banner ${left > 0 ? 'sky' : 'amber'}">${ic(left > 0 ? 'info' : 'alert')}<div>${left > 0 ? `Gettoni disponibili: <b>${left}</b> su ${n} (${bfPeriodo() === 'mese' ? 'questo mese' : 'questa settimana'}).` : `Gettone già usato: si rinnova ${bfRinnovo()}.`}</div></div>
+    ${col.length ? `<label class="f" style="margin-bottom:6px"><span>A chi?</span></label><div style="max-height:30vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check"><input type="radio" name="bf-dest" value="${m.id}" data-chg="bf-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}</div>` : '<div class="empty">Non ci sono altri colleghi.</div>'}
+    <label class="f"><span>Perché? (obbligatorio) <small id="bf-cnt" class="mut">0/80</small></span><input class="in" id="bf-msg" maxlength="80" data-chg="bf-upd" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
+    <button class="btn green block big" id="bf-send" data-act="bf-invia" disabled>Invia 👏</button>`);
+};
+A['bf-invia'] = () => {
+  const dest = radio('bf-dest'), msg = val('bf-msg').replace(/\s+/g, ' ').slice(0, 80);
+  if(!dest || dest === st.mid || !membro(dest)) return toast('Scegli un collega', 'err');
+  if(msg.length < 2) return toast('Scrivi la motivazione', 'err');
+  if(bfRestanti() <= 0) return toast('Gettone già usato in questo periodo', 'err');
+  addMov({tipo:'ben_fatto', mid: st.mid, dest, daMid: st.mid, aMid: dest, msg, pt: ptBenFatto()});
+  closeSheet(); toast(`👏 Ben fatto a ${nomeBreve(dest)}! +${ptBenFatto()} punti`);
+};
+A['salva-punti'] = () => {
+  const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSpesa: n('rp-spesa'), puntiPulizia: n('rp-pulizia'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn')};
+  const ok = v.sogliaPunti >= 1 && v.sogliaPunti <= 1000 && v.creditiSoglia >= 1 && v.creditiSoglia <= 100 && v.ptCaffe >= 0 && v.ptCaffe <= 100 && v.ptSpesa >= 0 && v.ptSpesa <= 100
+    && v.puntiPulizia >= 1 && v.puntiPulizia <= 500 && v.ptBenFatto >= 0 && v.ptBenFatto <= 100 && v.bfN >= 1 && v.bfN <= 20;
+  if(!ok) return toast('Valori non validi', 'err');
+  G().set({...v, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
+};
+
 /* --- PIN personale: recupero profilo, impostazione, cambio, reset --- */
 A['recupero-apri'] = async () => {
   const code = st.joinCode || st.gid; if(!code) return;
@@ -3110,7 +3189,7 @@ A['spesa-admin'] = () => {
 A['conferma-spesa-admin'] = () => {
   const descr = val('sa-desc'), imp = parseEuro(val('sa-imp')), fonte = radio('sa-met') || 'contanti';
   if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi cosa è stato comprato e un importo valido', 'err');
-  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'confermata', esitoDa: myName()});
+  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'confermata', esitoDa: myName(), pt: ptSpesa()});
   closeSheet(); toast('Spesa registrata');
 };
 A['salva-prezzo-caffe'] = () => {
@@ -3144,17 +3223,21 @@ A['chiudi-periodo'] = async () => {
   try {
     const prev = ultimaChiusura();
     const S = prev && prev.stato ? JSON.parse(JSON.stringify(prev.stato)) : emptyState();
-    ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','quote','dovute'].forEach(k => S[k] = S[k] || {}); S.cassa = S.cassa || {contanti:0, revolut:0};
+    ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','pbf','pRisc','quote','dovute'].forEach(k => S[k] = S[k] || {}); S.cassa = S.cassa || {contanti:0, revolut:0};
     const T = emptyStats();
     incl.forEach(m => { applyMov(S, m); applyStat(T, m); });
     let fino = incl[0]._ts;
     incl.forEach(m => { if(m._ts.seconds > fino.seconds || (m._ts.seconds === fino.seconds && m._ts.nanoseconds > fino.nanoseconds)) fino = m._ts; });
     const id = 'c' + fino.toMillis();
     const b = db.batch();
-    const G = aggrega(incl), riep = {id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, tot: G.tot};
+    const G = aggrega(incl), riep = {id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, tot: G.tot};
     const storico = st.chiusure.map(riepDaChiusura).concat([riep]).sort((x, y) => x.fino - y.fino).slice(-STORICO_MAX);
-    const mp = {pcaf: S.pcaf, pcafConv: S.pcafConv, punti: S.punti, puntiConv: S.puntiConv, turni: S.turni, ultimo: S.ultimo, pspesa: S.pspesa};
-    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
+    const bf = {}, stor = new Set(incl.filter(m => m.tipo === 'storno').map(m => m.rif)), lim = Date.now() - 40 * 864e5;
+    if(prev && prev.bf) Object.keys(prev.bf).forEach(k => { bf[k] = (prev.bf[k] || []).slice(); });
+    incl.filter(m => m.tipo === 'ben_fatto' && !stor.has(m.id)).forEach(m => { (bf[m.mid] = bf[m.mid] || []).push(m.t); });
+    Object.keys(bf).forEach(k => { bf[k] = bf[k].filter(t => t >= lim).slice(-10); if(!bf[k].length) delete bf[k]; });   // ultimi invii di "Ben fatto": servono al gettone a cavallo di una chiusura
+    const mp = {pcaf: S.pcaf, pcafConv: S.pcafConv, punti: S.punti, puntiConv: S.puntiConv, turni: S.turni, ultimo: S.ultimo, pspesa: S.pspesa, pbf: S.pbf, pRisc: S.pRisc, bf};
+    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, bf, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
     const arr = incl.map(compactMov);
     st.membri.forEach(m => {
       const q = {}, dv = {};
@@ -3402,11 +3485,13 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
+  if(el && el.dataset.chg === 'bf-upd') bfAggiorna();
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
 document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
+  if(e.target.closest && e.target.closest('[data-chg="bf-upd"]')) bfAggiorna();
 });
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){ closeSheet(); A['drawer-close'](); }
