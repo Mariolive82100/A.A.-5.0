@@ -879,8 +879,12 @@ function pBar(d){
       <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
     </div>
-    <div class="stat" style="margin-top:12px"><small>SALDO FONDO</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
-    <p class="hint" style="margin:6px 0 0">Il Saldo Fondo è la cassa (contanti + conto).</p>
+    <div class="grid3" style="margin-top:12px">
+      <div class="stat"><small>Saldo Contabile</small><b class="mono ${s < 0 ? 'red' : 'green'}" id="r-cont">${eurS(s)}</b></div>
+      <div class="stat"><small>Saldo Disponibile</small><b class="mono ${saldoDisp(d) < 0 ? 'red' : 'green'}" id="r-disp">${eurS(saldoDisp(d))}</b></div>
+      <div class="stat"><small>Totale Fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
+    </div>
+    <p class="hint" style="margin:6px 0 0">Il saldo disponibile esclude i crediti già impegnati in riscatti o scambi in corso. Il Totale Fondo è la cassa (contanti + conto).</p>
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
@@ -1209,49 +1213,102 @@ function pFeed(d){
 /* ---------- REGOLAMENTO ---------- */
 function pRegolamento(){
   const g = st.gruppo || {}, rate = puntiPerCredito(), pp = puntiPulizia();
-  const sez = (t, righe) => `<div class="card"><h3>${t}</h3>${righe.map(r => `<p class="tx2" style="font-size:13.5px;line-height:1.5;margin:0 0 9px">${r}</p>`).join('')}</div>`;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">Norme di gestione di ${esc(g.nome || 'Armieri 5.0')} · versione 3.3 · novembre 2026</p>
+  const li = r => Array.isArray(r)
+    ? `<li>${r[0]}<ul style="margin:6px 0 2px;padding-left:18px;list-style:circle">${r[1].map(li).join('')}</ul></li>`
+    : `<li style="margin-bottom:6px">${r}</li>`;
+  const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="tx2" style="font-size:13.5px;line-height:1.5;margin:0;padding-left:18px">${righe.map(li).join('')}</ul></div>`;
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">Norme di gestione di ${esc(g.nome || 'Armieri 5.0')} · versione 3.4 · novembre 2026</p>
   ${sez('1. Finalità e principi', [
-    'Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.',
-    '<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.',
-    '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
-    '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
+    `Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.`,
+    `<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.`,
+    `<b>Contabilità, non denaro:</b> l'app non incassa nulla, registra solo crediti e debiti.`,
+    `I soldi veri passano in contanti o Revolut, fuori dall'app.`,
+    `<b>Trasparenza:</b> tutti i membri consultano il Registro movimenti completo del fondo (con filtri), il listino e le attività comuni.`,
+    `I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo.`,
+    `Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).`])}
   ${sez('2. Il saldo unico', [
-    'Ogni membro ha un solo saldo. <b>Positivo = credito</b> (il gruppo ti deve qualcosa), <b>negativo = debito</b> (devi qualcosa alla cassa o ai colleghi a credito).',
-    '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
-    '<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti. Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.'])}
+    `Ogni membro ha un solo saldo.`,
+    `<b>Positivo = credito:</b> il gruppo ti deve qualcosa.`,
+    `<b>Negativo = debito:</b> devi qualcosa alla cassa o ai colleghi a credito.`,
+    `<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.`,
+    `<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti.`,
+    `Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.`])}
   ${sez('3. Ruoli e poteri', [
-    '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
-    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
-    '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, la liquidazione sussidiaria dei crediti invenduti, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
-    '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
-    '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
+    `<b>Modifica delle regole:</b> regolamento e parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.`,
+    [`<b>Collega</b> — può:`, [
+      `registrare caffè e snack (annullabili entro ${ANNULLA_MIN} minuti);`,
+      `anticipare spese per la saletta (da convalidare);`,
+      `acquistare crediti nel Mercato e riscattarli dal Fondo;`,
+      `registrare le proprie pulizie e convertire i propri Punti Pulizia;`,
+      `aggiungere eventi e aprire le buste di caffè;`,
+      `cambiare il nickname e chiedere di diventare amministratore.`]],
+    `<b>Collega</b> — non vede cassa, statistiche né i saldi degli altri.`,
+    `<b>Collega</b> — riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).`,
+    [`<b>Amministratore:</b> due modalità, selezionabili dall'interruttore in alto:`, [
+      `<b>Profilo Utente:</b> si comporta come un normale collega, con saldo e notifiche personali;`,
+      `<b>Amministrazione Fondo:</b> cassa, fondo netto, spese in attesa, registro globale con storno.`]],
+    [`In amministrazione l'amministratore:`, [
+      `approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti);`,
+      `gestisce inventario e listino;`,
+      `gestisce la tesoreria (contanti, Revolut, giroconti);`,
+      `registra storni e rettifiche motivate;`,
+      `si occupa della liquidazione sussidiaria dei crediti invenduti;`,
+      `esegue chiusure di periodo, backup e rendiconti;`,
+      `nomina e rimuove altri amministratori.`]],
+    `<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database).`,
+    `Il creatore può lasciare il ruolo solo per sua scelta.`,
+    `<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall'app.`])}
   ${sez('4. Quota annuale', [
     `A inizio anno il sistema addebita a tutti la quota (${eur(g.quotaAnnua || 0)}): il saldo parte in negativo di quella cifra.`,
-    '<b>Versamento diretto</b> in contanti o Revolut (il debito scende e la cassa sale) · <b>Compensazione</b> sui crediti già maturati (la cassa non cambia) · <b>Già versata</b>, se il contributo è stato dato fuori dall\'app, convalidata da un amministratore.',
-    'La quota è già inclusa nel saldo (parte in negativo): si salda come ogni debito, comprando crediti dal Fondo Gruppo o da un collega nel Mercato.'])}
+    [`La quota si salda in uno di questi modi:`, [
+      `<b>Versamento diretto</b> in contanti o Revolut: il debito scende e la cassa sale;`,
+      `<b>Compensazione</b> sui crediti già maturati: la cassa non cambia;`,
+      `<b>Già versata</b>, se il contributo è stato dato fuori dall'app: la convalida un amministratore.`]],
+    `La quota è già inclusa nel saldo: si salda come ogni debito, comprando crediti dal Fondo Gruppo o da un collega nel Mercato.`])}
   ${sez('5. Mercato dei Crediti', [
-    '<b>Si acquistano, non si vendono:</b> chiunque può acquistare crediti dal <b>Fondo Gruppo</b> (versando contanti o Revolut: un amministratore conferma) oppure da un <b>collega a credito</b> (lo paga fuori dall\'app; il collega conferma dalla pagina Notifiche e i crediti passano a te). Il pulsante «Acquista crediti» è sempre attivo, anche con saldo positivo.',
-    '<b>Riscatto:</b> chi ha un saldo positivo preme «Riscatta crediti» e sceglie uno o più colleghi <b>con saldo negativo</b> (il contatore scende in tempo reale) e/o il <b>Fondo Gruppo</b> per la rimanenza. Il collega conferma dalle Notifiche dopo averti pagato fuori dall\'app; il Fondo ti liquida tramite un amministratore, nei limiti della cassa.',
-    '<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione. L\'elenco dei colleghi con crediti è ordinato dal credito maggiore al minore.'])}
+    `<b>Si acquistano, non si vendono:</b> chiunque può acquistare crediti.`,
+    [`Due modi per acquistare:`, [
+      `dal <b>Fondo Gruppo</b>, versando contanti o Revolut (un amministratore conferma);`,
+      `da un <b>collega a credito</b>, pagandolo fuori dall'app (il collega conferma dalla pagina Notifiche e i crediti passano a te).`]],
+    `Il pulsante «Acquista crediti» è sempre attivo, anche con saldo positivo.`,
+    [`<b>Riscatto:</b> chi ha un saldo positivo preme «Riscatta crediti» e sceglie:`, [
+      `uno o più colleghi <b>con saldo negativo</b> (il contatore scende in tempo reale);`,
+      `e/o il <b>Fondo Gruppo</b> per la rimanenza.`]],
+    `Il collega conferma dalle Notifiche dopo averti pagato fuori dall'app.`,
+    `Il Fondo ti liquida tramite un amministratore, nei limiti della cassa.`,
+    `<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione.`,
+    `L'elenco dei colleghi con crediti è ordinato dal credito maggiore al minore.`])}
   ${sez('6. Spese e rimborsi', [
-    'Chi acquista prodotti per la saletta (caffè, bibite, snack, detergenti) inserisce la spesa (<b>Acquisto per il fondo</b>) e sceglie il rimborso: <b>in crediti</b> (dopo la convalida l\'importo diventa credito personale, la cassa non cambia) oppure <b>in denaro reale</b> (l\'amministratore usa «Convalida e Paga»: il denaro esce dalla cassa, contanti o Revolut, e il saldo del collega non cambia).','Anche le spese degli amministratori restano in attesa finché non sono convalidate. Gli omaggi e i regali si accreditano a un solo beneficiario, senza toccare la cassa.',
-    'Acquisti istituzionali, macchinari e manutenzioni straordinarie sono registrati direttamente dall\'amministratore come uscita di cassa.'])}
+    `Chi acquista prodotti per la saletta (caffè, bibite, snack, detergenti) inserisce la spesa con <b>Acquisto per il fondo</b> e sceglie il rimborso.`,
+    [`Due tipi di rimborso:`, [
+      `<b>In crediti:</b> dopo la convalida l'importo diventa credito personale e la cassa non cambia;`,
+      `<b>In denaro reale:</b> l'amministratore usa «Convalida e Paga»; il denaro esce dalla cassa (contanti o Revolut) e il saldo del collega non cambia.`]],
+    `Anche le spese degli amministratori restano in attesa finché non sono convalidate.`,
+    `Gli omaggi e i regali si accreditano a un solo beneficiario, senza toccare la cassa.`,
+    `Acquisti istituzionali, macchinari e manutenzioni straordinarie sono registrati direttamente dall'amministratore come uscita di cassa.`])}
   ${sez('7. Inventario e listino', [
-    'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità. Per il caffè l\'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.',
-    'Gli amministratori fanno verifiche fisiche periodiche: sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.'])}
+    `Snack e bevande hanno prezzo e scorta nell'inventario; ogni prelievo riduce subito la disponibilità.`,
+    `Per il caffè l'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.`,
+    `Gli amministratori fanno verifiche fisiche periodiche.`,
+    `Sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.`])}
   ${sez('8. Pulizie e Punti Pulizia', [
-    '<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata. In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.',
-    `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori). Gli amministratori possono stornare registrazioni non veritiere.`,
-    `<b>Conversione:</b> ${rate} Punti Pulizia = 1 credito (1,00 €), in crediti interi. Il rapporto è modificabile solo dagli amministratori. I crediti ottenuti riducono i debiti, finanziano nuovi consumi o si vendono nel Mercato.`])}
+    `<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata.`,
+    `In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.`,
+    `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori).`,
+    `Gli amministratori possono stornare registrazioni non veritiere.`,
+    `<b>Conversione:</b> ${rate} Punti Pulizia = 1 credito (1,00 €), in crediti interi; il rapporto è modificabile solo dagli amministratori.`,
+    `I crediti ottenuti riducono i debiti, finanziano nuovi consumi o si vendono nel Mercato.`])}
   ${sez('9. Busta del caffè e Tasso di Onestà', [
-    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
-    '<b>Tasso di Onestà = caffè registrati ÷ 130 × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che qualcuno beve senza registrare.',
-    'Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.'])}
+    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>.`,
+    `Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune.`,
+    `Ogni caffè registrato incrementa il contatore; la busta aperta viene scalata dalle buste disponibili.`,
+    `<b>Tasso di Onestà = caffè registrati ÷ ${BUSTA_CAFFE} × 100.</b>`,
+    `Verde da 85% in su, rosso sotto il 70%: un tasso basso significa che qualcuno beve senza registrare.`,
+    `Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.`])}
   ${sez('10. Chiusure, backup e trasparenza', [
-    'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
-    'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
-    'A fine esercizio l\'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.'])}`;
+    `L'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.`,
+    `Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.`,
+    `A fine esercizio l'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.`])}`;
 }
 
 /* ---------- PULIZIE ---------- */
