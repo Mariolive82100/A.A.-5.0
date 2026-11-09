@@ -308,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -537,14 +537,14 @@ function tuttiMov(){
   const extra = st.movD.filter(m => !ids.has(m.id)); extra.forEach(m => ids.add(m.id));
   return st.movimenti.concat(extra, Object.values(st.pending).filter(p => !ids.has(p.id))).sort((a,b) => a.t - b.t);
 }
-function emptyState(){ return {saldi:{}, cassa:{contanti:0, revolut:0}, stock:{}, turni:{}, ultimo:{}, punti:{}, puntiConv:{}, quote:{}, dovute:{}}; }
+function emptyState(){ return {saldi:{}, cassa:{contanti:0, revolut:0}, stock:{}, turni:{}, ultimo:{}, punti:{}, puntiConv:{}, pcaf:{}, pcafConv:{}, quote:{}, dovute:{}}; }
 const METODI_QUOTA = {contanti:'Contanti', revolut:'Revolut', credito:'Dal credito', esterno:'Già versata'};
 function emptyStats(){ return {caffe:{}, snack:{}, euroMid:{}, spese:0, ricariche:0, n:0}; }
 
 function applyMov(S, m, sg){
   sg = sg || 1;
   switch(m.tipo){
-    case 'caffe': if(m.stato !== 'annullata') add(S.saldi, m.mid, -sg*m.importo); break;
+    case 'caffe': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.pcaf, m.mid, sg*m.qta); } break;
     case 'snack': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.stock, m.pid, -sg*m.qta); } break;
     case 'ricarica': if(m.stato === 'confermata'){ add(S.saldi, m.mid, sg*m.importo); add(S.cassa, m.metodo, sg*m.importo); } break;
     case 'spesa':
@@ -564,9 +564,11 @@ function applyMov(S, m, sg){
     case 'scambio': if(m.stato === 'confermata'){ add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); } break;
     case 'riscatto': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
     case 'rettifica': case 'accredito': add(S.saldi, m.mid, sg*m.importo); break;
-    case 'caffe_pagato': if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo); break;   // caffè pagati subito, fuori dall'app: nessun effetto sul saldo
+    case 'caffe_pagato': add(S.pcaf, m.mid, sg*m.qta); if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo); break;   // caffè pagati subito, fuori dall'app: nessun effetto sul saldo
     case 'carico': add(S.stock, m.pid, sg*m.qta); break;
     case 'conversione': add(S.saldi, m.mid, sg*m.importo); add(S.puntiConv, m.mid, sg*m.punti); break;
+    case 'conversione_caffe': add(S.saldi, m.mid, sg*m.importo); add(S.pcafConv, m.mid, sg*m.punti); break;
+    case 'punti_adj': add(m.kind === 'caffe' ? S.pcaf : S.punti, m.mid, sg*m.punti); break;
     case 'pulizia': (m.mids || []).forEach(x => { add(S.turni, x, sg); add(S.punti, x, sg*(m.punti ?? PUNTI_DEF)); if(sg > 0) S.ultimo[x] = Math.max(S.ultimo[x] || 0, m.giorno ? new Date(m.giorno + 'T12:00:00').getTime() : (m.t || 0)); }); break;
     case 'storno': if(m.orig) applyMov(S, m.orig, -sg); break;
   }
@@ -588,7 +590,7 @@ function derived(){
   const movs = tuttiMov();
   const last = st.isAdmin ? ultimaChiusura() : null;
   const S = last && last.stato ? JSON.parse(JSON.stringify(last.stato)) : emptyState();
-  ['saldi','stock','turni','ultimo','punti','puntiConv','quote','dovute'].forEach(k => S[k] = S[k] || {});
+  ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','quote','dovute'].forEach(k => S[k] = S[k] || {});
   S.cassa = S.cassa || {contanti:0, revolut:0};
   if(!st.isAdmin && st.estratto){
     for(const a in (st.estratto.quote || {})) S.quote[a] = {[st.mid]: st.estratto.quote[a]};
@@ -600,6 +602,7 @@ function derived(){
     if(st.estratto.saldi) S.saldi = {...st.estratto.saldi};
     if(st.estratto.cassa) S.cassa = {contanti: st.estratto.cassa.contanti || 0, revolut: st.estratto.cassa.revolut || 0};
     S.saldi[st.mid] = st.estratto.saldo || 0;
+    S.pcaf = {[st.mid]: st.estratto.pcaf || 0}; S.pcafConv = {[st.mid]: st.estratto.pcafConv || 0};
   }
   const T = emptyStats();
   const stornati = new Set();
@@ -628,6 +631,8 @@ function debitoLibero(){
 }
 const puntiPulizia = () => (st.gruppo && st.gruppo.puntiPulizia) || PUNTI_DEF;
 const puntiPerCredito = () => (st.gruppo && st.gruppo.puntiPerCredito) || PUNTI_CREDITO_DEF;
+const puntiCaffeRate = () => (st.gruppo && st.gruppo.puntiCaffePerCredito) || 30;
+const puntiCaffeDisp = (d, mid) => Math.max(0, ((d.S.pcaf || {})[mid] || 0) - ((d.S.pcafConv || {})[mid] || 0));
 const puntiDisp = (d, mid) => Math.max(0, (d.S.punti[mid] || 0) - (d.S.puntiConv[mid] || 0));
 function giorniLavorativi(da, a){
   const x = new Date(da), f = new Date(a || Date.now()); x.setHours(12,0,0,0); f.setHours(12,0,0,0);
@@ -695,7 +700,7 @@ function segOpts(name, opts, sel){
 const PAGES = {
   bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], statsal:['Statistiche','chart'], gioco:['Gioco caffè','dice'], registro:['Registro movimenti','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
-  regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings']
+  regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
 
 // Ogni anno, il primo telefono amministratore che apre l'app addebita la quota a ogni collega attivo.
@@ -744,14 +749,14 @@ function doRender(){
   $('hdr-menu').classList.remove('hidden');
   const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = av ? cn.fondo : cn.pers;
-  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Registro','receipt'],['notifiche','Notifiche','bell'],['admin','Gestione','shield']);
+  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, statsal:pStatSal, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, statsal:pStatSal, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
@@ -766,7 +771,9 @@ function renderDrawer(){
       <div class="grow" style="flex:1"><b>${esc(st.gruppo.nome || 'Saletta')}</b><div class="mut" style="font-size:12px">${esc(myName())}${st.isAdmin ? ' · amministratore' : ''}</div></div>
       <button class="iconbtn" data-act="drawer-close">${ic('x')}</button>
     </div>
-    <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}Impostazioni</button>
+    <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}${adminView() ? 'Impostazioni Gruppo &amp; PIN' : 'Impostazioni'}</button>
+    ${adminView() ? `<button class="nb ${st.page==='backup'?'on':''}" data-act="go" data-p="backup">${ic('download')}Backup &amp; Ripristino</button>
+    <button class="nb ${st.page==='chiusura'?'on':''}" data-act="go" data-p="chiusura">${ic('archive')}Chiusura Periodo</button>` : ''}
     <button class="nb ${st.page==='regolamento'?'on':''}" data-act="go" data-p="regolamento">${ic('receipt')}Regolamento</button>
     <button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>
     <button class="nb" data-act="info">${ic('info')}Info</button>
@@ -777,7 +784,7 @@ function renderDrawer(){
 const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco','statsal'];
 const PAGINE_COLLEGA = ['bar','saletta','statsal','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADMIN = ['bar','registro','notifiche','admin','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
+const PAGINE_ADMIN = ['bar','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
 const pagineConsentite = () => !st.isAdmin ? PAGINE_COLLEGA : adminView() ? PAGINE_ADMIN : PAGINE_UTENTE;
 
@@ -949,6 +956,10 @@ function pBar(d){
       <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
     </div>
+    ${(() => { const r = puntiCaffeRate(), pt = puntiCaffeDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
+      return `<div id="tessera-caffe" style="margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left"><div class="between" style="font-size:13px;margin-bottom:8px"><b>☕ Tessera fedeltà</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      ${ok ? `<button class="btn green block" id="btn-converti-caffe" data-act="converti-caffe" style="margin-top:10px">🎁 Riscatta 1 credito (1,00 €)</button>` : `<p class="hint" style="margin:8px 0 0">Ogni caffè vale 1 punto: ogni ${r} punti ottieni 1 credito.</p>`}</div>`; })()}
     <div class="stat" style="margin-top:12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
     <p class="hint" style="margin:6px 0 0">Il saldo disponibile del fondo è la cassa comune (contanti + conto).</p>
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
@@ -1020,9 +1031,7 @@ function contatori(d){
 }
 function pNotifiche(d){
   if(adminView()){
-    const n = contatori(d).fondo;
-    return `<h2>${ic('bell')} Notifiche del Fondo</h2><p class="sub">Richieste da accettare o rifiutare.</p>
-    ${n ? '' : '<div class="card"><div class="empty">Nessuna richiesta in sospeso.</div></div>'}${richiesteFondo(d)}`;
+    return `<h2>${ic('bell')} Inbox del Fondo</h2><p class="sub">Tutte le richieste da gestire, in un solo posto.</p>${inboxAdmin(d)}`;
   }
   const list = notifiche(d), seen = notifSeen();
   const att = d.scambiAttesa.filter(m => (m.conf || m.dest) === st.mid).length;
@@ -1030,6 +1039,25 @@ function pNotifiche(d){
   ${richiesteUtente(d) || ''}
   <div class="card"><h3><span>Esiti e accrediti</span><button class="btn link" data-act="notif-letti">Segna tutte come lette</button></h3>
     ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>`;
+}
+function inboxAdmin(d){
+  const it = [];
+  const bt = (act, id, cls, lab, v) => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}"${v ? ` data-v="${v}"` : ''}>${lab}</button>`;
+  const card = (t, tag, cls, titolo, sub, azioni) => it.push({t, h: `<div class="card" style="margin-bottom:10px"><div class="between" style="margin-bottom:6px"><span class="pill ${cls}">${tag}</span><span class="mut" style="font-size:11.5px">${t ? quando(t) : ''}</span></div>
+    <div style="font-size:14.5px;font-weight:700">${titolo}</div>${sub ? `<div class="tx2" style="font-size:13px;margin-top:2px">${sub}</div>` : ''}
+    <div style="display:grid;grid-template-columns:repeat(${azioni.length},1fr);gap:8px;margin-top:10px">${azioni.join('')}</div></div>`});
+  st.richieste.forEach(r => card(r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now(), 'Accesso', 'sky', esc(r.nome), (r.nick ? '“' + esc(r.nick) + '” · ' : '') + 'chiede di entrare nel gruppo', [bt('approva', r.id, 'green', 'Valuta')]));
+  d.pendenti.forEach(m => {
+    if(m.tipo === 'spesa') card(m.t, 'Spesa', 'violet', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro reale' : 'rimborso in crediti'}`,
+      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), m.fonte === 'denaro' ? bt('paga-spesa', m.id, 'green', 'Convalida e Paga') : bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
+    else if(m.tipo === 'ricarica') card(m.t, 'Versamento', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.fondo ? 'Quota fondo' : 'Pagamento in cassa'} · ${esc(FONTI[m.metodo] || m.metodo || '')}`,
+      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma', 'confermata')]);
+    else card(m.t, 'Richiesta', 'mut', descMov(m).t, '', [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma', 'confermata')]);
+  });
+  riscattiAperti().forEach(r => card(msDoc(r), 'Riscatto', 'green', `${esc(nomeM(r.mid))} · ${eur(resEff(r))}`, `vende al Fondo Gruppo · ${esc(FONTI[r.metodo] || r.metodo)}`, [bt('riscatto-cassa', r.id, 'green', 'Paga dalla cassa')]));
+  st.richAdmin.forEach(r => card(msDoc(r), 'Admin', 'red', esc(r.nome || 'telefono'), 'chiede di diventare amministratore', [bt('rifiuta-admin', r.id, 'ghost', 'Rifiuta'), bt('approva-admin', r.id, 'green', 'Nomina')]));
+  it.sort((a, b) => b.t - a.t);
+  return it.length ? `<div class="mut" style="font-size:12.5px;margin:0 2px 10px">${it.length} ${it.length === 1 ? 'richiesta' : 'richieste'} in sospeso</div>${it.map(x => x.h).join('')}` : '<div class="card"><div class="empty">Nessuna richiesta in sospeso. 🎉</div></div>';
 }
 function debitori(d){ return membriAttivi().filter(m => m.id !== st.mid).map(m => ({m, s: d.S.saldi[m.id] || 0})).filter(x => x.s < 0).map(x => ({m: x.m, deb: -x.s})).sort((a, b) => b.deb - a.deb || a.m.nome.localeCompare(b.m.nome)); }
 /* assegna il credito disponibile ai debitori selezionati, in ordine di debito decrescente */
@@ -1090,9 +1118,14 @@ function tesoro(d){
 function pAdminHome(d){
   const t = tesoro(d);
   const sp = d.pendenti.filter(m => m.tipo === 'spesa').slice().reverse();
-  const altre = d.pendenti.length - sp.length + st.richieste.length + st.richAdmin.length + riscattiAperti().length;
-  return `<div class="card tesoro">
-    <div class="between"><small class="mut">Saldo Disponibile del Fondo (Cassa Totale)</small>${d.pendenti.length ? `<span class="pill red">${d.pendenti.length} in attesa</span>` : ''}</div>
+  const sh = (e, titolo, sub) => `<div style="margin:24px 2px 10px"><div style="font-size:17px;font-weight:800">${e} ${titolo}</div><div class="mut" style="font-size:12px">${sub}</div></div>`;
+  const prods = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
+  const bd = busteDisp(d), pcf = st.gruppo.prezzoCaffe || 0;
+  const soci = membriAttivi().slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  return `${bannerBackup()}
+  ${sh('🏦', 'Tesoreria & Cassa', 'Liquidità del fondo e movimenti')}
+  <div class="card tesoro">
+    <div class="between"><small class="mut">Saldo Disponibile del Fondo (Cassa Totale)</small>${d.pendenti.length ? `<button class="pill red" style="border:0" data-act="go" data-p="notifiche">${d.pendenti.length} in attesa</button>` : ''}</div>
     <div class="big mono amber" id="t-cassa">${eur(t.cassa)}</div>
     <div class="list" style="margin:6px 0 12px">
       <div class="between" style="font-size:14px;padding:4px 0"><span>Saldo in contanti</span><b class="mono" id="t-cont">${eur(t.cont)}</b></div>
@@ -1101,24 +1134,14 @@ function pAdminHome(d){
     <div class="between"><small class="mut">Fondo Netto</small><b class="mono ${t.netto < 0 ? 'red' : 'green'}" id="t-netto" style="font-size:20px">${eurS(t.netto)}</b></div>
     <div class="mut" style="font-size:11.5px;margin-top:4px">cassa ${eur(t.cassa)} − crediti dei colleghi ${eur(t.cred)} + debiti dei colleghi ${eur(t.deb)}</div>
   </div>
-  <div class="home" style="min-height:0;padding:0 0 4px">
-    <div class="blob" style="width:200px;height:200px;background:#7c3aed;top:0;left:-40px"></div>
-    <div class="blob" style="width:200px;height:200px;background:#f5a524;bottom:0;right:-50px"></div>
-    <div class="grid" style="padding:4px">
-      <button class="gbtn adm" style="min-height:130px" data-act="cassa-op" data-v="entrata"><span class="em">📥</span>Registra entrata</button>
-      <button class="gbtn adm" style="min-height:130px" data-act="cassa-op" data-v="uscita"><span class="em">💸</span>Registra uscita</button>
-      <button class="gbtn adm" style="min-height:130px" data-act="cassa-op" data-v="giroconto"><span class="em">🔁</span>Giroconto</button>
-      <button class="gbtn adm" style="min-height:130px" data-act="accredito" data-id=""><span class="em">🎁</span>Accredita omaggio / regalo</button>
-    </div>
+  <div class="grid2" style="margin-bottom:8px">
+    <button class="btn green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Registra entrata</button>
+    <button class="btn red" data-act="cassa-op" data-v="uscita">${ic('out','s')} Registra uscita</button>
+    <button class="btn" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button>
+    <button class="btn amber" data-act="spesa-admin">${ic('receipt','s')} Registra spesa</button>
   </div>
-  <div class="card" style="margin-top:14px"><h3>Operazioni rapide</h3>
-    <div class="grid2">
-      <button class="btn sm" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button>
-      <button class="btn sm" data-act="accredito" data-id="">${ic('plus','s')} Accredita crediti</button>
-      <button class="btn sm" data-act="rettifica" data-id="">${ic('edit','s')} Rettifica saldo</button>
-    </div>
-  </div>
-  <div class="card"><h3><span>Gestione spese in attesa</span>${sp.length ? `<span class="pill red">${sp.length}</span>` : ''}</h3>
+  <button class="btn sm block ghost" style="margin-bottom:12px" data-act="cassa-corr">${ic('edit','s')} Correggi saldo (contanti / Revolut)</button>
+  <div class="card"><h3><span>Spese in attesa di convalida</span>${sp.length ? `<span class="pill red">${sp.length}</span>` : ''}</h3>
     ${sp.length ? `<div class="list">${sp.map(m => `<div class="li" style="display:block">
       <div class="between"><b style="font-size:13.5px">${esc(nomeM(m.mid))}</b><b class="mono">${eur(m.importo)}</b></div>
       <div class="tx2" style="font-size:13px;margin:2px 0 6px">${esc(m.descr || '')} <span class="pill ${m.fonte === 'denaro' ? 'amber' : 'violet'}">${m.fonte === 'denaro' ? 'Denaro reale' : 'In crediti'}</span></div>
@@ -1126,9 +1149,32 @@ function pAdminHome(d){
       ${m.fonte === 'denaro' ? `<button class="btn sm green" data-act="paga-spesa" data-id="${m.id}">Convalida e Paga</button>` : `<button class="btn sm green" data-act="esito" data-id="${m.id}" data-v="confermata">Convalida</button>`}</div></div>`).join('')}</div>`
       : '<div class="empty">Nessuna spesa da convalidare.</div>'}
   </div>
-  <div class="card"><h3>Sezioni amministrazione</h3><div class="grid2">
-    ${[['membri','Colleghi','users'],['quote','Quote fondo','wallet'],['inventario','Inventario','package'],['statistiche','Statistiche','chart'],['cassa','Registro cassa','banknote'],['pulizie','Saletta','sparkles'],['admin','Amministrazione','shield']].map(([p, l, i]) => `<button class="btn sm" data-act="go" data-p="${p}">${ic(i,'s')} ${l}</button>`).join('')}
-  </div></div>`;
+
+  ${sh('👥', 'Soci & Riconoscimenti', 'Saldi, punti e ruoli')}
+  <div class="card"><div class="list">${soci.map(m => `<button class="li" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
+      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">✨ ${puntiDisp(d, m.id)} · ☕ ${puntiCaffeDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
+      <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>
+    <div class="grid3" style="margin-top:10px">
+      <button class="btn sm" data-act="accredito" data-id="">${ic('plus','s')} Omaggio</button>
+      <button class="btn sm" data-act="punti-adm" data-id="">${ic('sparkles','s')} Punti</button>
+      <button class="btn sm" data-act="rettifica" data-id="">${ic('edit','s')} Rettifica</button>
+    </div>
+    <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button><button class="btn sm ghost" data-act="go" data-p="membri">${ic('users','s')} Tutti i colleghi</button></div>
+  </div>
+
+  ${sh('📦', 'Magazzino & Prezzi', 'Caffè, buste e listino snack')}
+  <div class="card"><h3>${ic('bean','s')} Caffè</h3>
+    <div class="row" style="align-items:flex-end;gap:8px"><label class="f" style="flex:1;margin:0"><span>Prezzo tazzina €</span><input class="in mono" id="mg-caffe" inputmode="decimal" value="${(pcf/100).toFixed(2).replace('.',',')}"></label><button class="btn amber" data-act="salva-prezzo-caffe">Salva</button></div>
+    <div class="between" style="font-size:13px;margin:12px 0 8px"><span class="tx2">Buste disponibili</span><b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b></div>
+    <div class="grid2"><button class="btn sm" data-act="busta-apri">${ic('plus','s')} Apri nuova busta</button><button class="btn sm" data-act="carico-caffe-n">${ic('package','s')} Carico buste…</button></div>
+  </div>
+  <div class="card"><h3><span>Listino snack e bevande</span><button class="btn link" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button></h3>
+    ${prods.length ? `<div class="list">${prods.map(p => { const sk = giacenza(d, p); return `<div class="li"><button class="grow" style="text-align:left" data-act="prodotto" data-id="${p.id}"><div class="t">${esc(p.emoji || '')} ${esc(p.nome)}</div><div class="d mono">${eur(p.prezzo)}</div></button>
+      <span class="stepper"><button data-act="carico" data-id="${p.id}" data-v="-1">−</button><b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b><button data-act="carico" data-id="${p.id}" data-v="1">+</button></span></div>`; }).join('')}</div>`
+      : '<div class="empty">Nessun articolo in listino.</div>'}
+    <p class="hint" style="margin:8px 0 0">Palette, zucchero, bicchieri e detersivi non si contano: registrali con «Registra spesa».</p>
+  </div>
+  <div class="grid2" style="margin-top:6px"><button class="btn sm ghost" data-act="go" data-p="quote">${ic('wallet','s')} Quote fondo</button><button class="btn sm ghost" data-act="go" data-p="statistiche">${ic('chart','s')} Statistiche</button><button class="btn sm ghost" data-act="go" data-p="cassa">${ic('banknote','s')} Registro cassa</button><button class="btn sm ghost" data-act="go" data-p="pulizie">${ic('sparkles','s')} Saletta</button></div>`;
 }
 
 /* ---------- registro movimenti, notifiche ---------- */
@@ -1145,6 +1191,7 @@ function notifiche(d){
     else if(m.tipo === 'ricarica' && m.mid === me && m.esitoDa && (ok || m.stato === 'rifiutata')) out.push({t, e: ok ? '✅' : '❌', x: `Il tuo pagamento di ${eur(m.importo)} è stato ${ok ? 'approvato' : 'rifiutato'}`});
     else if(m.tipo === 'accredito' && m.mid === me) out.push({t, e: '🎁', x: `Accredito ricevuto: ${eur(m.importo)} di crediti${m.causale ? ' · ' + esc(m.causale) : ''}`});
     else if(m.tipo === 'conversione' && m.mid === me) out.push({t, e: '🔄', x: `Hai convertito ${m.punti} Punti Pulizia in ${eur(m.importo)} di crediti`});
+    else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'riscatto' && m.mid === me) out.push({t, e: '🏦', x: `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
     else if(m.tipo === 'scambio'){
       if(m.stato === 'confermata' && m.daMid === me) out.push({t, e: '🤝', x: `${esc(nomeM(m.aMid))} ha comprato ${eur(m.importo)} dei tuoi crediti`});
@@ -1219,6 +1266,8 @@ function descMov(m){
       return {ic:'📦', t: `Giacenza ${esc((p && p.nome) || m.nome || '')} ${m.qta > 0 ? '+' : ''}${m.qta} pz`, a: 0}; }
     case 'pulizia': return {ic:'✨', t: `Pulizie: ${(m.mids||[]).map(x => esc(nomeM(x))).join(', ')} (+${m.punti ?? PUNTI_DEF} punti a testa)`, a: 0};
     case 'conversione': return {ic:'🔄', t: `${n} converte ${m.punti} Punti Pulizia in crediti`, a: m.importo};
+    case 'conversione_caffe': return {ic:'☕', t: `${n} converte ${m.punti} Punti Caffè in crediti`, a: m.importo};
+    case 'punti_adj': return {ic:'🏅', t: `Punti ${m.kind === 'caffe' ? 'Caffè' : 'Pulizia'} di ${n}: ${m.punti > 0 ? '+' : ''}${m.punti}${m.causale ? ' · ' + esc(m.causale) : ''}`, a: 0};
     case 'storno': { const o = m.orig ? descMov(m.orig) : {t:''}; return {ic:'↩️', t: `Storno di: ${o.t}`, a: o.a ? -o.a : 0, cassa: o.cassa}; }
   }
   return {ic:'•', t: m.tipo, a: 0};
@@ -1501,7 +1550,7 @@ function pCassa(d){
 function pInventario(d){
   const k = st.invSort.k, asc = st.invSort.asc ? 1 : -1;
   const v = p => k === 'stock' ? giacenza(d, p) : k === 'prezzo' ? p.prezzo : k === 'categoria' ? p.categoria : (p.nome||'').toLowerCase();
-  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && (adminView() || p.attivo !== false)).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
+  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && (adminView() || p.attivo !== false)).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
   const th = (key, l, cls='') => `<th class="s ${cls}" data-act="inv-sort" data-k="${key}">${l}${k === key ? (st.invSort.asc ? ' ↑' : ' ↓') : ''}</th>`;
   const bd = busteDisp(d), pcf = (st.gruppo && st.gruppo.prezzoCaffe) || 0;
   const rigaCaffe = `<tr>
@@ -1514,6 +1563,7 @@ function pInventario(d){
   return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
     ${adminView() ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
   ${cardBusta()}
+  <div class="banner sky">${ic('info')}<div>Materiali di consumo (palette, zucchero, bicchieri, detersivi…) non si contano: sono spese generali, registrale da «Acquisto per il fondo».</div></div>
   ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Tutti possono aprire una nuova busta del caffè; prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
   <div class="card" style="padding:6px 8px;overflow-x:auto">
   <table><thead><tr>${th('nome','Articolo')}${th('prezzo','Prezzo','r')}${th('stock','Giacenza','c')}</tr></thead><tbody>
@@ -1604,52 +1654,57 @@ function pAdmin(d){
     <div class="card"><label class="f"><span>PIN amministratore</span><input class="in mono" id="a-pin" type="password" autocomplete="current-password" placeholder="PIN"></label>
     <button class="btn amber block" data-act="diventa-admin" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Accedi come amministratore'}</button>
     <p class="hint" style="margin:10px 0 0">Il PIN te lo dà chi gestisce la saletta. Vale per questo telefono finché non esci dal ruolo.</p></div>`;
-  const pend = d.pendenti;
-  const vecchi = d.movs.filter(m => m.t < Date.now() - CHIUSURA_MARGINE && !m._pending).length;
-  const last = ultimaChiusura();
-  const uidNome = uid => { const u = st.utenti.find(x => x.id === uid); return u ? nomeM(u.mid) : null; };
-  return `<h2>${ic('shield')} Amministrazione</h2><p class="sub">Solo gli amministratori vedono questa pagina.</p>
-  ${(() => { const b = LS.get('backup_' + st.gid); return (!b || Date.now() - b > 7 * 864e5) ? `<div class="banner amber">${ic('alert')}<div>${b ? 'L\'ultimo backup risale a più di una settimana fa.' : 'Non hai ancora fatto un backup dei dati.'} <a href="#" data-act="backup" style="color:inherit;font-weight:800">Scaricalo ora</a></div></div>` : ''; })()}
+  return pImpostazioni();
+}
 
-  ${richiesteFondo(d)}
-
-  <div class="card"><h3>Prezzi e gruppo</h3>
+/* ---------- strumenti amministratore (menù a panino) ---------- */
+const uidNome = uid => { const u = st.utenti.find(x => x.id === uid); return u ? nomeM(u.mid) : null; };
+const bannerBackup = () => { const b = LS.get('backup_' + st.gid); return (!b || Date.now() - b > 7 * 864e5) ? `<div class="banner amber">${ic('alert')}<div>${b ? 'L\'ultimo backup risale a più di una settimana fa.' : 'Non hai ancora fatto un backup dei dati.'} <a href="#" data-act="go" data-p="backup" style="color:inherit;font-weight:800">Vai al backup</a></div></div>` : ''; };
+const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
     <div class="grid2">
-      <label class="f"><span>Prezzo caffè €</span><input class="in mono" id="ad-caffe" inputmode="decimal" value="${(st.gruppo.prezzoCaffe/100).toFixed(2).replace('.',',')}"></label>
       <label class="f"><span>Quota annua €</span><input class="in mono" id="ad-quota" inputmode="decimal" value="${(st.gruppo.quotaAnnua/100).toFixed(2).replace('.',',')}"></label>
+      <label class="f"><span>Punti per turno pulizie</span><input class="in mono" id="ad-punti" inputmode="numeric" value="${puntiPulizia()}"></label>
     </div>
     <div class="grid2">
-      <label class="f"><span>Punti per turno pulizie</span><input class="in mono" id="ad-punti" inputmode="numeric" value="${puntiPulizia()}"></label>
-      <label class="f"><span>Punti per 1 credito</span><input class="in mono" id="ad-rate" inputmode="numeric" value="${puntiPerCredito()}"></label>
+      <label class="f"><span>Punti Pulizia per 1 credito</span><input class="in mono" id="ad-rate" inputmode="numeric" value="${puntiPerCredito()}"></label>
+      <label class="f"><span>Punti Caffè per 1 credito</span><input class="in mono" id="ad-pcaf" inputmode="numeric" value="${puntiCaffeRate()}"></label>
     </div>
     <label class="f"><span>Nome gruppo</span><input class="in" id="ad-nome" value="${esc(st.gruppo.nome||'')}" maxlength="40"></label>
     <button class="btn amber block" data-act="salva-gruppo">Salva</button>
-    <p class="hint" style="margin:10px 0 0">Prezzi e giacenze degli snack si modificano dalla pagina <button class="btn link" style="padding:0" data-act="go" data-p="inventario">Inventario</button>.</p>
+    <p class="hint" style="margin:10px 0 0">Il prezzo del caffè e il listino si gestiscono dalla Home di Amministrazione, area Magazzino & Prezzi.</p>
   </div>
-
-  <div class="card"><h3>Chiusura periodo</h3>
-    <p class="tx2" style="font-size:13px;margin:0 0 10px">Fissa saldi, cassa e giacenze e archivia i movimenti. Ogni telefono poi scarica solo i movimenti nuovi: tienilo leggero chiudendo una volta al mese.</p>
-    <div class="between" style="font-size:13px;margin-bottom:10px"><span class="mut">Ultima chiusura</span><b>${last ? dataOra(last.fino.toMillis()) : 'mai'}</b></div>
-    <div class="between" style="font-size:13px;margin-bottom:12px"><span class="mut">Movimenti nel periodo aperto</span><b class="mono ${d.movs.length > 800 ? 'red' : ''}">${d.movs.length}</b></div>
-    <button class="btn block" data-act="chiudi-periodo" ${!vecchi || st.busy ? 'disabled' : ''}>${ic('archive','s')} Chiudi il periodo</button>
-  </div>
-
+`;
+const cardAdmins = () => `
   <div class="card"><h3>Amministratori</h3>
     <div class="list">${st.admins.map(a => `<div class="li"><div class="av">${ic('shield','s')}</div><div class="grow"><div class="t">${esc(uidNome(a.id) || a.nome || 'telefono')}${protettoUid(a.id) ? ' <span class="pill amber">creatore</span>' : ''}</div><div class="d">${a.id === st.uid ? 'questo telefono' : 'dal ' + (a.ts && a.ts.toMillis ? dataOra(a.ts.toMillis()).slice(0,10) : '')}</div></div>
       ${a.id !== st.uid && !protettoUid(a.id) ? `<button class="btn sm ghost" data-act="revoca" data-id="${a.id}">Rimuovi</button>` : ''}</div>`).join('')}</div>
-    <p class="hint" style="margin:8px 0 0">Per nominare un nuovo amministratore apri il collega dalla pagina <button class="btn link" style="padding:0" data-act="go" data-p="membri">Colleghi</button>, oppure approva qui sopra la sua richiesta. Il creatore del gruppo non può essere rimosso.</p>
+    <p class="hint" style="margin:8px 0 0">Per nominare un nuovo amministratore apri il collega dalla pagina <button class="btn link" style="padding:0" data-act="go" data-p="membri">Colleghi</button>, oppure approva la sua richiesta dalle Notifiche. Il creatore del gruppo non può essere rimosso.</p>
     <div class="grid2" style="margin-top:10px">
       <button class="btn sm" data-act="cambia-pin">${ic('lock','s')} Cambia PIN</button>
       <button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia ruolo</button>
     </div>
   </div>
+`;
 
+function pBackup(d){
+  return `<h2>${ic('download')} Backup & Ripristino</h2><p class="sub">Copia dei dati fuori dall'app.</p>
   <div class="card"><h3>Backup e ripristino</h3>
     <p class="tx2" style="font-size:13px;margin:0 0 10px">Copia completa di saldi, cassa, movimenti e periodi chiusi. Conservala fuori dall'app (Drive, email, WhatsApp a te stesso).${LS.get('backup_'+st.gid) ? ' Ultimo backup: ' + dataOra(LS.get('backup_'+st.gid)) + '.' : ' Non hai ancora fatto un backup.'}</p>
     <button class="btn block" data-act="backup">${ic('download','s')} Scarica backup (JSON)</button>
     <div class="grid2" style="margin-top:8px"><button class="btn" data-act="backup-invia">${ic('share','s')} Invia / salva</button><button class="btn" data-act="backup-csv">Excel (CSV)</button></div>
     <button class="btn block ghost" style="margin-top:8px" data-act="ripristina-backup">Ripristina da file…</button>
     <input type="file" id="bk-file" accept=".json,application/json" hidden>
+  </div>`;
+}
+function pChiusura(d){
+  const vecchi = d.movs.filter(m => m.t < Date.now() - CHIUSURA_MARGINE && !m._pending).length;
+  const last = ultimaChiusura();
+  return `<h2>${ic('archive')} Chiusura periodo</h2><p class="sub">Consolida e archivia i movimenti.</p>
+  <div class="card"><h3>Chiusura periodo</h3>
+    <p class="tx2" style="font-size:13px;margin:0 0 10px">Fissa saldi, cassa e giacenze e archivia i movimenti. Ogni telefono poi scarica solo i movimenti nuovi: tienilo leggero chiudendo una volta al mese.</p>
+    <div class="between" style="font-size:13px;margin-bottom:10px"><span class="mut">Ultima chiusura</span><b>${last ? dataOra(last.fino.toMillis()) : 'mai'}</b></div>
+    <div class="between" style="font-size:13px;margin-bottom:12px"><span class="mut">Movimenti nel periodo aperto</span><b class="mono ${d.movs.length > 800 ? 'red' : ''}">${d.movs.length}</b></div>
+    <button class="btn block" data-act="chiudi-periodo" ${!vecchi || st.busy ? 'disabled' : ''}>${ic('archive','s')} Chiudi il periodo</button>
   </div>`;
 }
 
@@ -1660,6 +1715,7 @@ function pImpostazioni(){
   <div class="card"><h3>Tu</h3>
     <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${st.isAdmin ? 'Amministratore' : 'Collega'}</div></div>
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
+  ${st.isAdmin ? cardParametri() + cardAdmins() : ''}
   <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e pulizie</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
   ${!st.isAdmin ? `<div class="card"><h3>${ic('shield','s')} Amministratore</h3>
     ${st.reqAdmin && st.reqAdmin.stato === 'attesa' ? `<p class="tx2" style="font-size:13px;margin:0 0 10px">Richiesta inviata: un amministratore deve approvarla.</p><button class="btn block ghost" data-act="ritira-richiesta-admin">Ritira la richiesta</button>`
@@ -2169,7 +2225,7 @@ A['carica-archivio'] = async () => {
 
 /* --- storno ed esiti (admin) --- */
 function compactMov(m){
-  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, t:m.t, id:m.id});
+  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, kind:m.kind, giorno:m.giorno, t:m.t, id:m.id});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -2260,14 +2316,13 @@ A['prodotto'] = ds => {
   openSheet(`<h3>${ic('package')} ${p ? 'Modifica articolo' : 'Nuovo articolo'}</h3><p class="sub">${p ? 'Il nuovo prezzo vale dai prossimi acquisti.' : 'Aggiungi un articolo al listino.'}</p>
     <div class="row" style="align-items:flex-end"><label class="f" style="width:74px"><span>Icona</span><input class="in" id="p-emoji" value="${esc(p ? p.emoji || '' : '🍫')}" maxlength="4" style="text-align:center;font-size:20px;padding:8px"></label>
     <label class="f" style="flex:1"><span>Nome</span><input class="in" id="p-nome" maxlength="40" value="${esc(p ? p.nome : '')}" placeholder="es. Patatine"></label></div>
-    <label class="f"><span>Categoria</span>${segOpts('p-cat', [['consumo','A consumo (si paga)'],['fondo','Dotazione fondo']], p ? p.categoria : 'consumo')}</label>
     <label class="f"><span>Prezzo €</span><input class="in mono" id="p-prezzo" inputmode="decimal" value="${p ? (p.prezzo/100).toFixed(2).replace('.',',') : '1,00'}"></label>
     ${!p ? `<label class="f"><span>Giacenza iniziale</span><input class="in mono" id="p-stock" inputmode="numeric" value="0"></label>` : ''}
     ${p ? `<label class="check"><input type="checkbox" id="p-attivo" ${p.attivo !== false ? 'checked' : ''}><b style="font-size:14px">Attivo in listino</b></label>` : ''}
     <button class="btn amber block big" data-act="salva-prodotto" data-id="${p ? p.id : ''}" style="margin-top:6px">Salva</button>`);
 };
 A['salva-prodotto'] = ds => {
-  const nome = val('p-nome'), emoji = val('p-emoji'), categoria = radio('p-cat');
+  const nome = val('p-nome'), emoji = val('p-emoji'), categoria = (ds.id && prodotto(ds.id) && prodotto(ds.id).categoria) || 'consumo';
   let prezzo = parseEuro(val('p-prezzo'));
   if(!nome) return toast('Scrivi il nome', 'err');
   if(categoria === 'fondo') prezzo = 0;
@@ -2365,11 +2420,12 @@ A['conferma-pin'] = () => {
   closeSheet();
 };
 A['salva-gruppo'] = () => {
-  const pc = parseEuro(val('ad-caffe')), qa = parseEuro(val('ad-quota')), nome = val('ad-nome');
+  const pc = $('ad-caffe') ? parseEuro(val('ad-caffe')) : (st.gruppo.prezzoCaffe || 0), qa = parseEuro(val('ad-quota')), nome = val('ad-nome');
+  const pcf = Math.floor(Number(val('ad-pcaf')));
   const pp = Math.floor(Number(val('ad-punti'))), rt = Math.floor(Number(val('ad-rate')));
   if(!(pc >= 0) || !(qa >= 0) || !nome) return toast('Controlla i valori', 'err');
-  if(!(pp >= 1 && pp <= 500) || !(rt >= 1 && rt <= 100)) return toast('Punti non validi', 'err');
-  G().set({prezzoCaffe: pc, quotaAnnua: qa, puntiPulizia: pp, puntiPerCredito: rt, nome: nome.slice(0,40)}, {merge: true}).then(() => toast('Salvato')).catch(e => toast(errMsg(e), 'err'));
+  if(!(pp >= 1 && pp <= 500) || !(rt >= 1 && rt <= 100) || !(pcf >= 1 && pcf <= 500)) return toast('Punti non validi', 'err');
+  G().set({prezzoCaffe: pc, quotaAnnua: qa, puntiPulizia: pp, puntiPerCredito: rt, puntiCaffePerCredito: pcf, nome: nome.slice(0,40)}, {merge: true}).then(() => toast('Salvato')).catch(e => toast(errMsg(e), 'err'));
 };
 A['membro'] = ds => {
   const m = ds.id ? membro(ds.id) : null;
@@ -2382,6 +2438,7 @@ A['membro'] = ds => {
       : m && m.attivo === false ? `<div class="banner amber">${ic('archive')}<div>Archiviato: non fa più parte della saletta, ma saldo e storico restano.</div></div>` : ''}
     <button class="btn amber block big" data-act="salva-membro" data-id="${m ? m.id : ''}" style="margin-top:6px">Salva</button>
     ${m && m.attivo !== false ? `<div class="grid3" style="margin-top:10px"><button class="btn sm" data-act="accredito" data-id="${m.id}">${ic('plus','s')} Accredita</button><button class="btn sm" data-act="ricarica-per" data-id="${m.id}">${ic('banknote','s')} Ricarica</button><button class="btn sm" data-act="rettifica" data-id="${m.id}">${ic('edit','s')} Rettifica</button></div>
+    <button class="btn sm block" style="margin-top:8px" data-act="punti-adm" data-id="${m.id}">${ic('sparkles','s')} Modifica punti (pulizie / caffè)</button>
     <button class="btn sm block" style="margin-top:8px" data-act="caffe-fuori" data-id="${m.id}">${ic('coffee','s')} Caffè pagati subito (fuori app)</button>` : ''}
     ${m && m.attivo !== false && st.utenti.some(u => u.mid === m.id) ? (isCreatore(m.id) ? `<div class="banner amber">${ic('shield')}<div>Creatore del gruppo: è amministratore e non può essere rimosso.</div></div>`
       : adminDiMembro(m.id).length ? `<button class="btn sm ghost block" style="margin-top:10px" data-act="rimuovi-admin" data-id="${m.id}">${ic('shield','s')} Rimuovi da amministratore</button>`
@@ -2472,6 +2529,45 @@ A['conferma-caffe-fuori'] = () => {
   addMov({tipo:'caffe_pagato', mid, qta: q, importo: pc * q, metodo: radio('cf-met')});
   closeSheet(); toast(`${q} caffè registrati per ${nomeM(mid)}`);
 };
+/* --- punti caffè, punti (admin), spesa admin, prezzo caffè --- */
+A['converti-caffe'] = () => {
+  const d = derived(), r = puntiCaffeRate();
+  if(puntiCaffeDisp(d, st.mid) < r) return toast(`Servono ${r} Punti Caffè`, 'err');
+  if(!confirm(`Riscattare 1 credito (1,00 €) con ${r} Punti Caffè?`)) return;
+  addMov({tipo:'conversione_caffe', mid: st.mid, importo: 100, punti: r});
+  toast('+1,00 € di crediti ☕');
+};
+A['punti-adm'] = ds => openSheet(`<h3>${ic('sparkles')} Modifica punti</h3><p class="sub">Aggiunge o toglie punti a un collega (es. correzioni, premi). Usa il meno per togliere.</p>
+  <label class="f"><span>Collega</span>${selMembro('pa-m', ds.id)}</label>
+  <label class="f"><span>Punti da modificare</span>${segOpts('pa-k', [['pulizia','✨ Pulizia'],['caffe','☕ Caffè']], 'pulizia')}</label>
+  <label class="f"><span>Variazione (+ / −)</span><input class="in mono" id="pa-n" inputmode="numeric" placeholder="es. 3 oppure -2"></label>
+  <label class="f"><span>Motivo</span><input class="in" id="pa-caus" maxlength="60" placeholder="facoltativo"></label>
+  <button class="btn amber block big" data-act="conferma-punti-adm">Registra</button>`);
+A['conferma-punti-adm'] = () => {
+  const mid = val('pa-m'), n = parseInt(String(val('pa-n')).replace('−', '-'), 10);
+  if(!mid || !n || Math.abs(n) > 1000) return toast('Variazione non valida', 'err');
+  addMov({tipo:'punti_adj', mid, kind: radio('pa-k') === 'caffe' ? 'caffe' : 'pulizia', punti: n, causale: val('pa-caus').slice(0,60)});
+  closeSheet(); toast('Punti aggiornati');
+};
+A['spesa-admin'] = () => {
+  const c = derived().S.cassa;
+  openSheet(`<h3>${ic('receipt')} Registra spesa</h3><p class="sub">Acquisto per il fondo già fatto (caffè, palette, zucchero, detersivi…).</p>
+    <label class="f"><span>Descrizione</span><input class="in" id="sa-desc" maxlength="80" placeholder="es. Palette e bicchierini" autofocus></label>
+    <label class="f"><span>Importo €</span><input class="in mono" id="sa-imp" inputmode="decimal" placeholder="12,50"></label>
+    <label class="f"><span>Pagata da</span>${segOpts('sa-met', [['contanti','💶 Contanti (' + eur(c.contanti || 0) + ')'],['revolut','📱 Revolut (' + eur(c.revolut || 0) + ')'],['tasca','🙋 Mia, in crediti']], 'contanti')}</label>
+    <button class="btn amber block big" data-act="conferma-spesa-admin">Registra</button>`);
+};
+A['conferma-spesa-admin'] = () => {
+  const descr = val('sa-desc'), imp = parseEuro(val('sa-imp')), fonte = radio('sa-met') || 'contanti';
+  if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi cosa è stato comprato e un importo valido', 'err');
+  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'confermata', esitoDa: myName()});
+  closeSheet(); toast('Spesa registrata');
+};
+A['salva-prezzo-caffe'] = () => {
+  const pc = parseEuro(val('mg-caffe'));
+  if(!(pc >= 0)) return toast('Prezzo non valido', 'err');
+  G().set({prezzoCaffe: pc}, {merge: true}).then(() => toast('Prezzo caffè aggiornato')).catch(e => toast(errMsg(e), 'err'));
+};
 A['rettifica'] = ds => openSheet(`<h3>${ic('edit')} Rettifica saldo</h3><p class="sub">Corregge il saldo di un collega senza toccare la cassa (es. saldo iniziale, errori). Usa il meno per addebitare.</p>
   <label class="f"><span>Collega</span>${selMembro('rt-m', ds.id)}</label>
   <label class="f"><span>Importo € (+ accredita, − addebita)</span><input class="in mono" id="rt-imp" inputmode="decimal" placeholder="-2,50"></label>
@@ -2498,7 +2594,7 @@ A['chiudi-periodo'] = async () => {
   try {
     const prev = ultimaChiusura();
     const S = prev && prev.stato ? JSON.parse(JSON.stringify(prev.stato)) : emptyState();
-    ['saldi','stock','turni','ultimo','punti','puntiConv','quote','dovute'].forEach(k => S[k] = S[k] || {}); S.cassa = S.cassa || {contanti:0, revolut:0};
+    ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','quote','dovute'].forEach(k => S[k] = S[k] || {}); S.cassa = S.cassa || {contanti:0, revolut:0};
     const T = emptyStats();
     incl.forEach(m => { applyMov(S, m); applyStat(T, m); });
     let fino = incl[0]._ts;
@@ -2511,7 +2607,7 @@ A['chiudi-periodo'] = async () => {
       const q = {}, dv = {};
       for(const a in S.quote) if(S.quote[a][m.id]) q[a] = S.quote[a][m.id];
       for(const a in S.dovute) if(S.dovute[a][m.id]) dv[a] = S.dovute[a][m.id];
-      b.set(C('estratti').doc(m.id), {saldo: S.saldi[m.id] || 0, saldi: S.saldi, cassa: S.cassa, quote: q, dovute: dv, fino, chiusura: id});
+      b.set(C('estratti').doc(m.id), {saldo: S.saldi[m.id] || 0, pcaf: S.pcaf[m.id] || 0, pcafConv: S.pcafConv[m.id] || 0, saldi: S.saldi, cassa: S.cassa, quote: q, dovute: dv, fino, chiusura: id});
     });
     for(let i = 0; i * ARCHIVIO_CHUNK < arr.length; i++) b.set(C('archivio').doc(id + '_' + i), {movimenti: arr.slice(i*ARCHIVIO_CHUNK, (i+1)*ARCHIVIO_CHUNK)});
     await b.commit();
