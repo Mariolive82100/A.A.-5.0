@@ -308,7 +308,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -327,6 +327,16 @@ const LS = {
   set(k, v){ try{ localStorage.setItem('ps_'+k, JSON.stringify(v)); }catch(e){} },
   del(k){ try{ localStorage.removeItem('ps_'+k); }catch(e){} }
 };
+/* PIN personale: nell'app e nel database c'è solo l'hash (PBKDF2-SHA256, salato con codice gruppo + collega), mai il PIN in chiaro */
+async function hashPin(pin, gid, mid){
+  if(!(window.crypto && crypto.subtle)) throw new Error('crypto-assente');
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(String(pin)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('armieri:' + gid + ':' + mid), iterations: 100000}, key, 256);
+  return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const pinOk = v => /^\d{6}$/.test(String(v || ''));
+const pinErr = e => e && e.message === 'crypto-assente' ? 'Apri l\'app da https o da localhost per usare il PIN' : /permission/i.test((e && (e.code || e.message)) || '') ? 'PIN non accettato' : 'Errore (' + errMsg(e) + ')';
 const eur = c => (c < 0 ? '-' : '') + (Math.abs(c||0)/100).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
 const eurS = c => (c > 0 ? '+' : '') + eur(c);
 function parseEuro(v){
@@ -412,7 +422,7 @@ function disconnect(){
   stopData();
   modeKey = null;
   _derCache = null;
-  Object.assign(st, {gruppo:null, membri:[], prodotti:[], eventi:[], chiusure:[], estratto:null, movimenti:[], pending:{}, admins:[], utenti:[], richiesta:null, richieste:[], reqAdmin:null, richAdmin:[], riscatti:[], acquisti:[], buste:[], movD:[], fab:false, isAdmin:false, ready:{}, archivio:null});
+  Object.assign(st, {pinDoc:undefined, gruppo:null, membri:[], prodotti:[], eventi:[], chiusure:[], estratto:null, movimenti:[], pending:{}, admins:[], utenti:[], richiesta:null, richieste:[], reqAdmin:null, richAdmin:[], riscatti:[], acquisti:[], buste:[], movD:[], fab:false, isAdmin:false, ready:{}, archivio:null});
 }
 
 function connect(gid){
@@ -471,12 +481,17 @@ function syncMode(){
   modeKey = key;
   if(key === 'admin' || key.startsWith('user')) setTimeout(() => { if(modeKey === key) retryN = 0; }, 20000);
   stopData();
-  Object.assign(st, {chiusure:[], estratto:null, movimenti:[], movD:[], riscatti:[], acquisti:[], buste:[], admins:[], utenti:[], richieste:[], richAdmin:[], archivio:null, arcMov:null, arcLoading:false});
+  Object.assign(st, {pinDoc:undefined, chiusure:[], estratto:null, movimenti:[], movD:[], riscatti:[], acquisti:[], buste:[], admins:[], utenti:[], richieste:[], richAdmin:[], archivio:null, arcMov:null, arcLoading:false});
   st.ready.mv = false; _derCache = null;
   if(key === 'none'){ Object.assign(st, {membri:[], prodotti:[], eventi:[]}); st.ready.m = false; return; }
   // dati comuni, leggibili solo da chi è già stato accettato nel gruppo
   const docs = s => s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps:'estimate'})}));
   dataUnsubs.push(C('membri').onSnapshot(s => { st.membri = docs(s).sort((a,b) => a.nome.localeCompare(b.nome, 'it')); st.ready.m = true; render(); }, onDataErr));
+  if(st.mid) dataUnsubs.push(C('segretiMembri').doc(st.mid).onSnapshot(s => {   // PIN personale: serve solo sapere se esiste ed è temporaneo
+    if(s.exists) st.pinDoc = {temporaneo: s.data().temporaneo === true};
+    else if(!s.metadata.fromCache) st.pinDoc = null;
+    render();
+  }, () => {}));
   dataUnsubs.push(C('prodotti').onSnapshot(s => { st.prodotti = docs(s); render(); }, onDataErr));
   dataUnsubs.push(C('eventi').onSnapshot(s => { st.eventi = docs(s); render(); }, onDataErr));
   dataUnsubs.push(C('riscatti').onSnapshot(s => { st.riscatti = docs(s); render(); }, onDataErr));
@@ -732,6 +747,10 @@ function doRender(){
     if(foc && $(foc)) $(foc).focus();
   };
   if(!inApp){ main.innerHTML = renderEntry(); restore(); return; }
+  if(st.pinDoc === null || (st.pinDoc && st.pinDoc.temporaneo)){   // schermata bloccante: PIN personale da scegliere
+    $('hdr').classList.add('hidden'); $('dock').classList.add('hidden'); closeSheet(); A['drawer-close']();
+    main.classList.remove('wide'); main.innerHTML = entryPinGate(); restore(); return;
+  }
 
   let d = derived();
   assicuraQuote(d); d = derived();
@@ -818,6 +837,7 @@ function renderEntry(){
   if(!st.uid) return st.sync === 'err'
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
+  if(st.entry === 'recupero') return entryRecupero();
   if(!st.gid) return st.entry === 'crea' ? entryCrea() : st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
@@ -885,7 +905,8 @@ function entryCreatore(){
     <p class="mut" style="font-size:13px;margin:0 0 10px">Se hai creato tu il gruppo, inserisci il PIN amministratore per ritrovare il tuo profilo su questo telefono.</p>
     <label class="f"><span>PIN amministratore</span><input class="in" id="jc-pin" type="password" autocomplete="off" autocapitalize="off"></label>
     <button class="btn amber block big" data-act="join-creatore" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Sì, sono il creatore'}</button>
-    <button class="btn block ghost" style="margin-top:8px" data-act="join-collega">No, sono un collega</button>
+    <button class="btn block ghost" style="margin-top:8px" data-act="recupero-apri">Ho già un profilo (recupero con PIN)</button>
+    <button class="btn block ghost" style="margin-top:8px" data-act="join-collega">Sono un nuovo collega</button>
   </div>
   <button class="btn link" data-act="entry" data-v="join">← Cambia codice</button>`;
 }
@@ -936,7 +957,35 @@ function entryRichiesta(){
     <p class="hint">Dopo l'approvazione il nome non si potrà più cambiare, il nickname sì.</p>
     <button class="btn amber block big" data-act="invia-richiesta" ${st.busy?'disabled':''}>${st.busy ? 'Invio…' : 'Invia richiesta'}</button>
   </div>
+  <button class="btn block ghost" style="margin-bottom:8px" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo (recupero con PIN)</button>
   <button class="btn link" data-act="esci-gruppo">Usa un altro codice</button>`;
+}
+
+function entryRecupero(){
+  const l = st.recLista;
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('lock','l')}</div><h1>Ho già un profilo</h1><p>Scegli il tuo nome e digita il PIN personale a 6 cifre</p></div>
+  <div class="card">
+    ${l === null || l === undefined ? '<div class="spin"></div>' : l.length ? `
+    <label class="f"><span>Il tuo nome</span><select class="in" id="rc-mid">${l.map(m => `<option value="${m.id}">${esc(m.nome)}${m.nick ? ' (' + esc(m.nick) + ')' : ''}</option>`).join('')}</select></label>
+    <label class="f"><span>PIN personale (6 cifre)</span><input class="in mono" id="rc-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••"></label>
+    <button class="btn amber block big" data-act="recupera" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Recupera il mio profilo'}</button>
+    <p class="hint" style="margin:10px 0 0">Non ricordi il PIN? Chiedi a un amministratore un PIN temporaneo: ti permette di rientrare e poi ne scegli uno nuovo.</p>` : '<div class="empty">Nessun profilo trovato in questo gruppo.</div>'}
+  </div>
+  <button class="btn link" data-act="recupero-indietro">← Indietro</button>`;
+}
+
+function entryPinGate(){
+  const m = membro(st.mid), temp = st.pinDoc && st.pinDoc.temporaneo;
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('lock','l')}</div><h1>Ciao${m ? ' ' + esc(m.nome) : ''}!</h1><p>${temp ? 'Scegli un nuovo PIN personale' : 'Imposta il tuo PIN personale'}</p></div>
+  ${temp ? `<div class="banner sky">${ic('info')}<div>Un amministratore ha impostato per te un PIN temporaneo: scegline uno nuovo, solo tuo.</div></div>` : ''}
+  <div class="banner amber">${ic('alert')}<div>Il PIN ti serve per ritrovare il tuo profilo (saldo, crediti e storico) se cambi telefono o svuoti i dati. Ricordalo e non darlo a nessuno.</div></div>
+  <div class="card">
+    <label class="f"><span>PIN (6 cifre)</span><input class="in mono" id="pg-1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••"></label>
+    <label class="f"><span>Ripeti il PIN</span><input class="in mono" id="pg-2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••"></label>
+    <button class="btn amber block big" data-act="pin-salva" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Salvo…' : 'Salva il PIN'}</button>
+  </div>
+  <p class="hint" style="text-align:center">Questa schermata scompare appena salvi il PIN.</p>
+`;
 }
 
 /* ---------- pagina BAR ---------- */
@@ -1022,11 +1071,13 @@ function richiesteFondo(d){
 
 `;
 }
+const recVisti = () => LS.get('recVisti_' + st.gid, []);
+const recuperiNuovi = () => { const v = recVisti(); return st.utenti.filter(u => u.recuperato && u.id !== st.uid && !v.includes(u.id) && (tms(u.ts) || Date.now()) > Date.now() - 7 * 864e5); };
 function contatori(d){
   const att = d.scambiAttesa.filter(m => (m.conf || m.dest) === st.mid).length;
   const seen = notifSeen();
   const pers = notifiche(d).filter(n => n.t > seen).length + att;
-  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + riscattiAperti().length : 0;
+  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + riscattiAperti().length + recuperiNuovi().length : 0;
   return {pers, fondo};
 }
 function pNotifiche(d){
@@ -1056,6 +1107,7 @@ function inboxAdmin(d){
   });
   riscattiAperti().forEach(r => card(msDoc(r), 'Riscatto', 'green', `${esc(nomeM(r.mid))} · ${eur(resEff(r))}`, `vende al Fondo Gruppo · ${esc(FONTI[r.metodo] || r.metodo)}`, [bt('riscatto-cassa', r.id, 'green', 'Paga dalla cassa')]));
   st.richAdmin.forEach(r => card(msDoc(r), 'Admin', 'red', esc(r.nome || 'telefono'), 'chiede di diventare amministratore', [bt('rifiuta-admin', r.id, 'ghost', 'Rifiuta'), bt('approva-admin', r.id, 'green', 'Nomina')]));
+  recuperiNuovi().forEach(u => card(tms(u.ts) || Date.now(), 'Profilo recuperato', 'amber', `${esc(nomeM(u.mid))} è rientrato da un nuovo telefono`, 'Ha usato il PIN personale. Se non è stato lui, scollega il telefono: il PIN viene azzerato.', [bt('rec-ok', u.id, 'ghost', 'Va bene'), bt('rec-scollega', u.id, 'red', 'Scollega')]));
   it.sort((a, b) => b.t - a.t);
   return it.length ? `<div class="mut" style="font-size:12.5px;margin:0 2px 10px">${it.length} ${it.length === 1 ? 'richiesta' : 'richieste'} in sospeso</div>${it.map(x => x.h).join('')}` : '<div class="card"><div class="empty">Nessuna richiesta in sospeso. 🎉</div></div>';
 }
@@ -1715,6 +1767,7 @@ function pImpostazioni(){
   <div class="card"><h3>Tu</h3>
     <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${st.isAdmin ? 'Amministratore' : 'Collega'}</div></div>
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
+  ${st.mid ? `<div class="card"><div class="between"><div><b>PIN personale</b><div class="mut" style="font-size:12px">Serve a ritrovare il profilo se cambi telefono</div></div><button class="btn sm" data-act="pin-cambia">${ic('lock','s')} Cambia</button></div></div>` : ''}
   ${st.isAdmin ? cardParametri() + cardAdmins() : ''}
   <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e pulizie</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
   ${!st.isAdmin ? `<div class="card"><h3>${ic('shield','s')} Amministratore</h3>
@@ -1959,6 +2012,7 @@ A['conferma-elimina-gruppo'] = async () => {
     const snaps = await Promise.all(cols.map(n => g.collection(n).get()));
     const ownUtente = g.collection('utenti').doc(me);
     const refs = [g.collection('segreti').doc('pin')];
+    snaps[cols.indexOf('membri')].docs.forEach(d => refs.push(g.collection('segretiMembri').doc(d.id)));
     cols.forEach((n, i) => snaps[i].docs.forEach(d => { if(!(n === 'utenti' && d.id === me)) refs.push(d.ref); }));
     disconnect();
     for(let i = 0; i < refs.length; i += 400){
@@ -2439,6 +2493,7 @@ A['membro'] = ds => {
     <button class="btn amber block big" data-act="salva-membro" data-id="${m ? m.id : ''}" style="margin-top:6px">Salva</button>
     ${m && m.attivo !== false ? `<div class="grid3" style="margin-top:10px"><button class="btn sm" data-act="accredito" data-id="${m.id}">${ic('plus','s')} Accredita</button><button class="btn sm" data-act="ricarica-per" data-id="${m.id}">${ic('banknote','s')} Ricarica</button><button class="btn sm" data-act="rettifica" data-id="${m.id}">${ic('edit','s')} Rettifica</button></div>
     <button class="btn sm block" style="margin-top:8px" data-act="punti-adm" data-id="${m.id}">${ic('sparkles','s')} Modifica punti (pulizie / caffè)</button>
+    <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="pin-reset" data-id="${m.id}">${ic('lock','s')} Reset PIN</button><button class="btn sm ghost" data-act="pin-temp" data-id="${m.id}">${ic('lock','s')} PIN temporaneo</button></div>
     <button class="btn sm block" style="margin-top:8px" data-act="caffe-fuori" data-id="${m.id}">${ic('coffee','s')} Caffè pagati subito (fuori app)</button>` : ''}
     ${m && m.attivo !== false && st.utenti.some(u => u.mid === m.id) ? (isCreatore(m.id) ? `<div class="banner amber">${ic('shield')}<div>Creatore del gruppo: è amministratore e non può essere rimosso.</div></div>`
       : adminDiMembro(m.id).length ? `<button class="btn sm ghost block" style="margin-top:10px" data-act="rimuovi-admin" data-id="${m.id}">${ic('shield','s')} Rimuovi da amministratore</button>`
@@ -2536,6 +2591,92 @@ A['converti-caffe'] = () => {
   if(!confirm(`Riscattare 1 credito (1,00 €) con ${r} Punti Caffè?`)) return;
   addMov({tipo:'conversione_caffe', mid: st.mid, importo: 100, punti: r});
   toast('+1,00 € di crediti ☕');
+};
+/* --- PIN personale: recupero profilo, impostazione, cambio, reset --- */
+A['recupero-apri'] = async () => {
+  const code = st.joinCode || st.gid; if(!code) return;
+  st.recCode = code; st.recLista = null; st.entry = 'recupero'; render();
+  try {
+    const sn = await db.collection('saletta').doc(code).collection('membri').get({source:'server'});
+    st.recLista = sn.docs.map(d => ({id: d.id, ...d.data()})).filter(m => m.attivo !== false && !m.espulso).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+  } catch(e){ st.recLista = []; toast('Impossibile caricare i nomi (' + errMsg(e) + ')', 'err'); }
+  render();
+};
+A['recupero-indietro'] = () => { st.entry = st.gid ? null : 'creatore'; render(); };
+A['recupera'] = async () => {
+  const code = st.recCode, mid = val('rc-mid'), pin = val('rc-pin');
+  if(!code || !mid) return toast('Scegli il tuo nome', 'err');
+  if(!pinOk(pin)) return toast('Il PIN ha esattamente 6 cifre', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione', 'err');
+  st.busy = true; render();
+  try {
+    const h = await hashPin(pin, code, mid), m = (st.recLista || []).find(x => x.id === mid);
+    await db.collection('saletta').doc(code).collection('utenti').doc(st.uid).set({mid, nome: m ? m.nome : '', recuperato: true, pinHash: h, ts: TS()});
+    st.gid = code; LS.set('gid', code); LS.set('mid', mid); LS.del('invito'); st.entry = null; st.joinCode = null; st.recLista = null;
+    connect(code); toast('Profilo recuperato ✓');
+  } catch(e){ toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'PIN errato, oppure nessun PIN impostato (chiedi un PIN temporaneo a un amministratore)' : pinErr(e), 'err'); }
+  finally { st.busy = false; render(); }
+};
+A['pin-salva'] = async () => {
+  const a = val('pg-1'), b = val('pg-2');
+  if(!pinOk(a)) return toast('Il PIN ha esattamente 6 cifre', 'err');
+  if(a !== b) return toast('I due PIN non coincidono', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione', 'err');
+  st.busy = true; render();
+  try {
+    const h = await hashPin(a, st.gid, st.mid);
+    await C('segretiMembri').doc(st.mid).set({pinHash: h, temporaneo: false, ts: TS()});
+    st.pinDoc = {temporaneo: false}; toast('PIN salvato ✓');
+  } catch(e){ toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'Non riesco a salvare il PIN: chiedi all\'amministratore di aggiornare le regole del database' : pinErr(e), 'err'); }
+  finally { st.busy = false; render(); }
+};
+A['pin-cambia'] = () => openSheet(`<h3>${ic('lock')} Cambia il tuo PIN</h3><p class="sub">Serve il PIN attuale. Il nuovo ha 6 cifre.</p>
+  <label class="f"><span>PIN attuale</span><input class="in mono" id="pc-old" type="password" inputmode="numeric" maxlength="6" autocomplete="off" autofocus></label>
+  <label class="f"><span>Nuovo PIN</span><input class="in mono" id="pc-1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
+  <label class="f"><span>Ripeti il nuovo PIN</span><input class="in mono" id="pc-2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
+  <button class="btn amber block big" data-act="pin-cambia-conferma">Cambia PIN</button>`);
+A['pin-cambia-conferma'] = async () => {
+  const o = val('pc-old'), a = val('pc-1'), b = val('pc-2');
+  if(!pinOk(o) || !pinOk(a)) return toast('Il PIN ha esattamente 6 cifre', 'err');
+  if(a !== b) return toast('I due nuovi PIN non coincidono', 'err');
+  if(a === o) return toast('Il nuovo PIN è uguale a quello attuale', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione', 'err');
+  try {
+    const ho = await hashPin(o, st.gid, st.mid), hn = await hashPin(a, st.gid, st.mid);
+    await C('segretiMembri').doc(st.mid).set({pinHash: hn, prova: ho, temporaneo: false, ts: TS()});
+    closeSheet(); toast('PIN cambiato ✓');
+  } catch(e){ toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'PIN attuale errato' : pinErr(e), 'err'); }
+};
+const pinGestibile = mid => !(isCreatore(mid) && mid !== st.mid && !(st.gruppo && st.gruppo.creatoDa === st.uid));
+A['pin-reset'] = ds => {
+  const m = membro(ds.id); if(!m) return;
+  if(!pinGestibile(m.id)) return toast('Il PIN del creatore lo può resettare solo il creatore', 'err');
+  if(!confirm(`Resettare il PIN di ${m.nome}? Al prossimo avvio dovrà sceglierne uno nuovo. Se ha perso il telefono, dagli invece un PIN temporaneo.`)) return;
+  C('segretiMembri').doc(m.id).delete().then(() => { closeSheet(); toast('PIN resettato'); }).catch(e => toast(errMsg(e), 'err'));
+};
+A['pin-temp'] = ds => {
+  const m = membro(ds.id); if(!m) return;
+  if(!pinGestibile(m.id)) return toast('Il PIN del creatore lo può resettare solo il creatore', 'err');
+  const r = new Uint32Array(1); crypto.getRandomValues(r);
+  openSheet(`<h3>${ic('lock')} PIN temporaneo</h3><p class="sub">Per <b>${esc(m.nome)}</b>. Comunicaglielo di persona: gli permette di rientrare da un nuovo telefono, poi dovrà sceglierne uno suo.</p>
+    <label class="f"><span>PIN temporaneo (6 cifre)</span><input class="in mono" id="pt-pin" inputmode="numeric" maxlength="6" value="${String(r[0] % 1000000).padStart(6, '0')}"></label>
+    <button class="btn amber block big" data-act="pin-temp-conferma" data-id="${m.id}">Imposta</button>`);
+};
+A['pin-temp-conferma'] = async ds => {
+  const p = val('pt-pin'); if(!pinOk(p)) return toast('Il PIN ha esattamente 6 cifre', 'err');
+  try {
+    const h = await hashPin(p, st.gid, ds.id);
+    await C('segretiMembri').doc(ds.id).set({pinHash: h, temporaneo: true, da: myName(), ts: TS()});
+    closeSheet(); toast(`PIN temporaneo impostato: ${p}`);
+  } catch(e){ toast(pinErr(e), 'err'); }
+};
+A['rec-ok'] = ds => { LS.set('recVisti_' + st.gid, recVisti().concat(ds.id)); render(); };
+A['rec-scollega'] = ds => {
+  const u = st.utenti.find(x => x.id === ds.id); if(!u) return;
+  if(protettoUid(u.id)) return toast('Il creatore del gruppo non può essere scollegato', 'err');
+  if(!confirm(`Scollegare il telefono che ha recuperato il profilo di ${nomeM(u.mid)}? Il suo PIN verrà azzerato: il collega dovrà scegliere un nuovo PIN (se non ha un altro telefono, dagli un PIN temporaneo).`)) return;
+  const b = db.batch(); b.delete(C('utenti').doc(u.id)); if(st.admins.some(a => a.id === u.id)) b.delete(C('admin').doc(u.id)); b.delete(C('segretiMembri').doc(u.mid));
+  b.commit().then(() => { LS.set('recVisti_' + st.gid, recVisti().concat(u.id)); toast('Telefono scollegato e PIN azzerato'); }).catch(e => toast(errMsg(e), 'err'));
 };
 A['punti-adm'] = ds => openSheet(`<h3>${ic('sparkles')} Modifica punti</h3><p class="sub">Aggiunge o toglie punti a un collega (es. correzioni, premi). Usa il meno per togliere.</p>
   <label class="f"><span>Collega</span>${selMembro('pa-m', ds.id)}</label>
