@@ -879,12 +879,8 @@ function pBar(d){
       <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
     </div>
-    <div class="grid3" style="margin-top:12px">
-      <div class="stat"><small>Saldo Contabile</small><b class="mono ${s < 0 ? 'red' : 'green'}" id="r-cont">${eurS(s)}</b></div>
-      <div class="stat"><small>Saldo Disponibile</small><b class="mono ${saldoDisp(d) < 0 ? 'red' : 'green'}" id="r-disp">${eurS(saldoDisp(d))}</b></div>
-      <div class="stat"><small>Totale Fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
-    </div>
-    <p class="hint" style="margin:6px 0 0">Il saldo disponibile esclude i crediti già impegnati in riscatti o scambi in corso. Il Totale Fondo è la cassa (contanti + conto).</p>
+    <div class="stat" style="margin-top:12px"><small>SALDO FONDO</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
+    <p class="hint" style="margin:6px 0 0">Il Saldo Fondo è la cassa (contanti + conto).</p>
     ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
