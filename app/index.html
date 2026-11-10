@@ -150,6 +150,27 @@ main.wide{max-width:980px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .chips button{padding:7px 12px;border-radius:99px;border:1px solid var(--line2);font-size:12.5px;font-weight:700;color:var(--tx2)}
 .chips button.on{background:var(--amber);border-color:var(--amber);color:#1a1205}
+.hero{background:linear-gradient(135deg,var(--card),rgba(245,165,36,.14));border-color:rgba(245,165,36,.35)}
+.herotag{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+.hero-main{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:8px 0 10px}
+.hero-pos{font-size:34px;font-weight:800;line-height:1.05}.hero-pos small{font-size:14px;font-weight:700;color:var(--mut)}
+.hero-tot{text-align:right}.hero-tot b{display:block;font-size:30px;font-weight:800;color:var(--amber);line-height:1}.hero-tot small{font-size:11.5px;color:var(--mut)}
+.hero-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.hero-grid div{background:var(--card2);border-radius:12px;padding:8px 2px;text-align:center;min-width:0}
+.hero-grid span{display:block;font-size:16px}.hero-grid b{display:block;font-size:17px;font-weight:800}.hero-grid small{display:block;font-size:10.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hero-msg{margin:10px 0 0;font-size:13.5px;font-weight:600}.hero-tit{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.pod{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;margin:6px 0 14px}
+.pc{text-align:center;min-width:0}.pc .md{font-size:26px;line-height:1.1}.pc .pn{font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc .pb{min-height:20px;display:flex;justify-content:center;align-items:center;gap:4px;font-size:13px}.pc .pv{font-size:20px;font-weight:800;color:var(--amber)}
+.pc .ps{margin-top:6px;border-radius:12px 12px 0 0;background:var(--card2);border:1px solid var(--line2);border-bottom:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--mut)}
+.pc.me .ps{background:rgba(245,165,36,.18);border-color:rgba(245,165,36,.5);color:var(--amber)}
+.rk{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--card2);margin-bottom:8px}
+.rk.me{border-color:rgba(245,165,36,.5);background:rgba(245,165,36,.10)}.rk.z{opacity:.6}
+.rk .n{width:24px;text-align:center;font-weight:800;color:var(--mut);flex:none}.rk .nm{flex:1;min-width:0}
+.rk .nt{display:flex;align-items:center;gap:6px;min-width:0}.rk .nn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.rk .nt .pill,.rk-bdg{flex:none}
+.rk .mi{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:var(--mut);margin-top:3px}
+.rk .v{flex:none;text-align:right;font-size:20px;font-weight:800;color:var(--amber)}.rk .v small{display:block;font-size:10.5px;font-weight:600;color:var(--mut)}
+
 .tessera{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left;background:transparent;color:inherit;cursor:pointer}
 .tessera.ok{border-color:var(--green);background:rgba(52,211,153,.10)}
 .tessera.ok .bar i{background:var(--green)}
@@ -331,7 +352,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.13.0';
+const VERSION = '1.14.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1678,7 +1699,7 @@ function serieGen(tutti, r, f){
 }
 /* grafico a barre generico: una serie, un asse, tocca una barra per il dettaglio, tabella dati a scomparsa */
 function graficoBarre(S, o){
-  const buck = S.buck, N = buck.length, unita = {ora: 'ora', giorno: 'giorno', mese: 'mese', periodo: 'periodo'}[S.g];
+  const buck = S.buck, N = buck.length, unita = {ora: 'ora', giorno: 'giorno', mese: 'mese', periodo: 'periodo', weekday: 'giorno della settimana'}[S.g];
   const fmt = o.fmt || (v => String(v)), ax = o.ax || (v => v);
   const tot = buck.reduce((a, b) => a + b.n, 0), max = Math.max(0, ...buck.map(b => b.n));
   if(!tot) return `<div class="empty">${o.vuoto}</div>`;
@@ -1839,24 +1860,124 @@ function clChiusi(tab){
   const grafico = `<div class="card"><h3><span>📈 ${conf.nome} per periodo chiuso</span></h3>${graficoBarre({g: 'periodo', buck}, {c: 'per' + tab, nome: conf.nome, col: conf.col, fmt: conf.fmt, ax: conf.ax, vuoto: 'Nessun dato nei periodi chiusi.'})}</div>`;
   return grafico + (tab === 'acq' ? viewAcq(R, null) : tab === 'pul' ? viewPul(R, null) : viewPag(R, null));
 }
-function clClassifica(d){
-  const k = (st.clSort && st.clSort.k) || 'tot', dir = (st.clSort && st.clSort.dir) || -1;
+/* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
+   Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
+const CL_CAT = [['c', '☕', 'Consumi'], ['p', '✨', 'Pulizie'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
+const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
+function clRighe(d){
   const r = clRange(), G = r ? aggRange(d, r, 'cl').G : null;
-  const righe = membriAttivi().map(m => { const c = G ? nz(G.ptC, m.id) : nz(d.S.pcaf, m.id), p = G ? nz(G.ptP, m.id) : nz(d.S.punti, m.id), s = G ? nz(G.ptS, m.id) : nz(d.S.pspesa, m.id), b = G ? nz(G.ptB, m.id) : nz(d.S.pbf, m.id); return {m, nome: m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const righe = membriAttivi().map(m => { const c = G ? nz(G.ptC, m.id) : nz(d.S.pcaf, m.id), p = G ? nz(G.ptP, m.id) : nz(d.S.punti, m.id), s = G ? nz(G.ptS, m.id) : nz(d.S.pspesa, m.id), b = G ? nz(G.ptB, m.id) : nz(d.S.pbf, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
+  return {r, righe, pos};
+}
+/* conteggi per i titoli: periodo scelto, oppure "sempre" = ultimi periodi chiusi (estratto/chiusure) + periodo aperto */
+function clConteggi(d, r){
+  const sommaIn = (dst, src) => { Object.keys(src || {}).forEach(k => add(dst, k, src[k] || 0)); };
+  const out = {caffe: {}, turni: {}, speseN: {}, bf: {}};
+  const G = aggRange(d, r || {da: 0, a: Infinity}, 'cl').G;
+  sommaIn(out.caffe, G.caffe); sommaIn(out.turni, G.turni); sommaIn(out.speseN, G.speseN); sommaIn(out.bf, G.bfRic);
+  if(!r && !(st.isAdmin && st.arcMov)) storicoPeriodi().forEach(p => { sommaIn(out.caffe, p.caffe); sommaIn(out.turni, p.turni); sommaIn(out.speseN, p.speseN); sommaIn(out.bf, p.bfRic); });
+  return out;
+}
+function clTitoli(d, r){
+  const C = clConteggi(d, r), pc = st.clPerC || 'sempre';
+  const bfNome = pc === 'mese' ? 'Collega del Mese' : pc === 'anno' ? 'Collega dell\'Anno' : pc === 'sempre' ? 'Collega di sempre' : 'Collega del periodo';
+  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '✨', 'Mastro Lindo', 'turni'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
+  const att = membriAttivi();
+  return def.map(([k, e, nome, u]) => {
+    const vals = att.map(m => ({id: m.id, v: Math.max(0, nz(C[k], m.id))})), max = Math.max(0, ...vals.map(x => x.v));
+    return {k, e, nome, u, v: max, mids: max > 0 ? vals.filter(x => x.v === max).map(x => x.id) : []};
+  });
+}
+function clHero(righe, pos, T, r){
+  const me = righe.find(x => x.m.id === st.mid); if(!me) return '';
+  const byTot = righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)), rk = pos[me.m.id], n = righe.length;
+  let msg;
+  if(!me.tot) msg = '🚀 Registra un consumo, una pulizia o una spesa per entrare in classifica.';
+  else if(rk === 1){ const s = byTot[1]; msg = !s ? '🏆 Sei l\'unico in classifica!' : me.tot > s.tot ? `🏆 Sei in testa con ${me.tot - s.tot} ${me.tot - s.tot === 1 ? 'punto' : 'punti'} di vantaggio su ${esc(s.nome)}.` : `🏆 Sei in testa a pari punti con ${esc(s.nome)}: un punto in più e li stacchi.`; }
+  else if(rk <= 3){ const su = byTot[rk - 2], x = Math.max(1, su.tot - me.tot + 1); msg = `🎖️ Sei sul podio! Ti ${x === 1 ? 'manca 1 punto' : 'mancano ' + x + ' punti'} per superare ${esc(su.nome)}.`; }
+  else { const t3 = byTot[2], x = Math.max(1, t3.tot - me.tot + 1); msg = `🎯 Ti ${x === 1 ? 'manca 1 punto' : 'mancano ' + x + ' punti'} per entrare sul podio (superare ${esc(t3.nome)}).`; }
+  const miei = T.filter(t => t.mids.includes(me.m.id));
+  return `<div class="card hero" id="cl-hero">
+    <div class="between"><span class="herotag">La tua scheda</span><span class="pill mut">${esc(r ? r.label : 'Sempre')}</span></div>
+    <div class="hero-main"><div class="hero-pos">${rk <= 3 ? ['🥇', '🥈', '🥉'][rk - 1] + ' ' : ''}#${rk}<small> su ${n}</small></div><div class="hero-tot"><b>${me.tot}</b><small>punti</small></div></div>
+    <div class="hero-grid">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${me[k]}</b><small>${l}</small></div>`).join('')}</div>
+    <p class="hero-msg" id="cl-hero-msg">${msg}</p>
+    ${miei.length ? `<div class="hero-tit">${miei.map(t => `<span class="pill amber">${t.e} ${esc(t.nome)}</span>`).join(' ')}</div>` : ''}
+  </div>`;
+}
+function clClassifica(d){
+  const {r, righe, pos} = clRighe(d), T = clTitoli(d, r);
+  const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
+  const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const pc = st.clPerC || 'sempre', opt = (v, l) => `<option value="${v}" ${pc === v ? 'selected' : ''}>${l}</option>`;
   const cur = new Date().toISOString().slice(0, 7);
   const sel = `<label class="f" style="margin:0 0 8px"><span>Periodo</span><select class="in" data-chg="clpc">${opt('sempre', 'Sempre (totale accumulato)')}${opt('mese', 'Questo mese')}${opt('anno', 'Quest\'anno')}${opt('mesi', 'Per mesi…')}</select></label>
     ${pc === 'mesi' ? `<div class="grid2" style="margin:0 0 8px"><label class="f" style="margin:0"><span>Dal mese</span><input class="in" type="month" id="cl-m-da" data-chg="clmesi" max="${cur}" value="${esc(st.clMDa || cur)}"></label><label class="f" style="margin:0"><span>Al mese</span><input class="in" type="month" id="cl-m-a" data-chg="clmesi" max="${cur}" value="${esc(st.clMA || cur)}"></label></div>` : ''}
     ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}`;
-  const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
-  righe.sort((a, b) => k === 'nome' ? dir * a.nome.localeCompare(b.nome) : dir * (a[k] - b[k]) || b.tot - a.tot || a.nome.localeCompare(b.nome));
-  const th = (key, l, cls) => `<th class="${cls || 'c'}"><button class="btn link" style="padding:0;font-size:11.5px;font-weight:800" data-act="cl-sort" data-k="${key}">${l}${k === key ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
-  return `<div class="card"><h3><span>🏆 La classifica</span></h3>${sel}
-    ${righe.length ? `<table><thead><tr><th>#</th>${th('nome', 'Nome', '')}${th('c', '☕🍫 Consumi')}${th('p', '✨ Pulizie')}${th('s', '🧾 Spesa')}${th('b', '👏 Ben fatto')}${th('tot', 'Totale')}</tr></thead><tbody>
-    ${righe.map(x => `<tr ${x.m.id === st.mid ? 'style="background:rgba(245,165,36,.10)"' : ''}><td class="mut mono">${pos[x.m.id]}</td><td><b>${esc(nomeBreve(x.m.id) || x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.p}</td><td class="c mono">${x.s}</td><td class="c mono">${x.b}</td><td class="c mono amber"><b>${x.tot}</b></td></tr>`).join('')}
-    </tbody></table>` : '<div class="empty">Nessun collega.</div>'}
-    <p class="hint" style="margin:8px 0 0">Tocca un'intestazione per ordinare. Consumi: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. ${r ? 'Punti guadagnati nel periodo scelto (comprese eventuali rettifiche).' : 'Sono punti totali accumulati: riscattarli non ti fa scendere.'}</p>
-    ${r ? (st.isAdmin ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : '<p class="hint" style="margin:6px 0 0">Per i periodi scelti contano i movimenti dall\'ultima chiusura di periodo; "Sempre" include tutto lo storico.</p>') : ''}</div>`;
+  const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
+  const chips = [['tot', 'Tutti'], ['c', '☕ Consumi'], ['p', '✨ Pulizie'], ['s', '🧾 Spese'], ['b', '👏 Ben fatto']];
+  const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
+  const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
+  const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
+  const podioH = podio.length ? `<div class="pod" id="cl-podio">${col(podio[1], 1)}${col(podio[0], 0)}${col(podio[2], 2)}</div>` : `<div class="empty">Nessun punto in questa categoria${r ? ' nel periodo' : ''}.</div>`;
+  const riga = (x, i) => `<div class="rk ${x.m.id === st.mid ? 'me' : ''} ${x[key] ? '' : 'z'}"><div class="n">${podio.length + i + 1}</div><div class="nm"><div class="nt"><b class="nn">${esc(x.nome)}</b>${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}${bdg(x.m.id)}</div>
+      <div class="mi"><span>☕ ${x.c}</span><span>✨ ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
+      <div class="v">${x[key]}${key !== 'tot' ? `<small>tot ${x.tot}</small>` : ''}</div></div>`;
+  const albo = `<div class="card" id="cl-albo"><h3><span>🏅 Albo d'onore</span></h3>
+    ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
+      <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(m => esc(nomeBreve(m) || nomeM(m)) + (m === st.mid ? ' (tu)' : '')).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
+    <p class="hint" style="margin:8px 0 0">Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.${r ? '' : ' Con «Sempre» contano gli ultimi ' + STORICO_MAX + ' periodi chiusi più quello aperto.'}</p></div>`;
+  return `${clHero(righe, pos, T, r)}
+  <div class="card"><h3><span>🏆 La classifica</span></h3>${sel}${chipsH}
+    ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
+    <p class="hint" style="margin:8px 0 0">Tocca un filtro per ordinare. Consumi: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. ${r ? 'Punti guadagnati nel periodo scelto (comprese eventuali rettifiche).' : 'Sono punti totali accumulati: riscattarli non ti fa scendere.'}</p>
+    ${r ? (st.isAdmin ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : '<p class="hint" style="margin:6px 0 0">Per i periodi scelti contano i movimenti dall\'ultima chiusura di periodo; "Sempre" include tutto lo storico.</p>') : ''}</div>
+  ${albo}`;
+}
+
+/* ---------- Scheda Acquisti: "I miei consumi" / "Consumi saletta" + widget busta ---------- */
+const acqVista = () => st.acqVista || (adminView() ? 'saletta' : 'miei');
+function acqToggle(){
+  const v = acqVista();
+  return `<div class="chips" id="acq-toggle">${[['miei', '👤 I miei consumi'], ['saletta', '👥 Consumi saletta']].map(([k, l]) => `<button id="acq-v-${k}" class="${v === k ? 'on' : ''}" data-act="acq-vista" data-v="${k}">${l}</button>`).join('')}</div>`;
+}
+function bustaWidget(){
+  const b = bustaAperta(), l = ultimaBustaChiusa();
+  if(!b && !l) return '';
+  const aperta = b ? (() => { const n = b.n || 0, pct = Math.min(100, Math.round(n / BUSTA_CAFFE * 100)), mio = st.mid ? (b['c_' + st.mid] || 0) : 0;
+    return `<div class="between" style="font-size:13.5px"><span>☕ Busta aperta</span><b class="mono">${n} / ${BUSTA_CAFFE}</b></div><div class="bar"><i style="width:${pct}%"></i></div>${st.mid ? `<p class="hint" style="margin:6px 0 0">Caffè tuoi da questa busta: <b>${mio}</b></p>` : ''}`; })() : '<p class="hint" style="margin:0">Nessuna busta aperta al momento.</p>';
+  const tasso = l ? (() => { const t = tassoBusta(l), cls = t >= 85 ? 'green' : t < 70 ? 'red' : 'amber', dt = l.chiusaTs ? ' · chiusa il ' + dBreve(tms(l.chiusaTs)) : '';
+    return `<div class="between" style="font-size:13.5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)"><span>Tasso di Onestà <span class="mut" style="font-size:11.5px">ultima busta${dt}</span></span><b class="mono ${cls}" id="busta-tasso">${t}%</b></div>
+      <p class="hint" style="margin:4px 0 0">${l.n || 0} caffè registrati su ${BUSTA_CAFFE} attesi. Verde da 85%, rosso sotto il 70%.</p>`; })() : '';
+  return `<div class="card" id="busta-widget">${aperta}${tasso}</div>`;
+}
+/* "I miei consumi" nel periodo corrente: solo movimenti già in memoria */
+function viewMiei(c){
+  const me = st.mid; if(!me) return '<div class="card"><div class="empty">Profilo collega non disponibile.</div></div>';
+  const r = c.r, G = c.G, att = membriAttivi();
+  const mine = c.tutti.filter(m => m.tipo === 'storno' ? (m.orig && m.orig.mid === me) : m.mid === me);
+  const caffe = Math.max(0, nz(G.caffe, me)), snack = Math.max(0, nz(G.snack, me)), euro = nz(G.euro, me);
+  const tutti = att.reduce((a, m) => a + Math.max(0, nz(G.caffe, m.id) + nz(G.snack, m.id)), 0), media = att.length ? Math.round(tutti / att.length * 10) / 10 : 0;
+  const S = serieGen(mine, r, fCons), giorni = S.g === 'giorno' ? S.buck.filter(b => b.n > 0).length : null;
+  const gg = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'], gl = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+  const wd = gg.map((lab, i) => ({lab, full: gl[i], n: 0}));
+  mine.forEach(m => { let v, t = m.t; if(m.tipo === 'storno'){ if(!m.orig) return; v = -fCons(m.orig); if(m.orig.t >= r.da && m.orig.t <= r.a) t = m.orig.t; } else v = fCons(m); if(!v) return; wd[(new Date(t).getDay() + 6) % 7].n += v; });
+  wd.forEach(b => { b.n = Math.max(0, b.n); });
+  return `<div class="card" id="miei-consumi"><h3><span>👤 I miei consumi</span><b class="mono amber">${caffe + snack}</b></h3>
+    <div class="grid3"><div class="stat"><small>☕ Caffè</small><b class="mono">${caffe}</b></div><div class="stat"><small>🍫 Snack</small><b class="mono">${snack}</b></div><div class="stat"><small>💶 Spesi</small><b class="mono">${eur(euro)}</b></div></div>
+    <p class="hint" style="margin:8px 0 0">${giorni != null ? `Hai consumato in <b>${giorni}</b> ${giorni === 1 ? 'giorno' : 'giorni'} del periodo. ` : ''}Media del gruppo: <b>${media}</b> consumazioni a testa · tu: <b>${caffe + snack}</b>.</p></div>
+  <div class="card"><h3><span>📈 Quando consumo</span></h3>${graficoBarre(S, {c: 'miei', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo tuo in questo periodo.'})}</div>
+  <div class="card"><h3><span>📆 Nei giorni della settimana</span></h3>${graficoBarre({g: 'weekday', buck: wd}, {c: 'miei-wd', nome: 'Consumazioni', col: 'var(--sky)', vuoto: 'Nessun consumo tuo in questo periodo.'})}</div>`;
+}
+/* riepilogo personale per un periodo chiuso (R = riepilogo salvato) */
+function viewMieiChiuso(R){
+  const me = st.mid; if(!me) return '<div class="card"><div class="empty">Profilo collega non disponibile.</div></div>';
+  const att = membriAttivi(), caffe = Math.max(0, nz(R.caffe, me)), snack = Math.max(0, nz(R.snack, me));
+  const tutti = att.reduce((a, m) => a + Math.max(0, nz(R.caffe, m.id) + nz(R.snack, m.id)), 0), media = att.length ? Math.round(tutti / att.length * 10) / 10 : 0;
+  return `<div class="card" id="miei-consumi"><h3><span>👤 I miei consumi</span><b class="mono amber">${caffe + snack}</b></h3>
+    <div class="grid3"><div class="stat"><small>☕ Caffè</small><b class="mono">${caffe}</b></div><div class="stat"><small>🍫 Snack</small><b class="mono">${R.snack ? snack : '–'}</b></div><div class="stat"><small>💶 Spesi</small><b class="mono">${eur(nz(R.euro, me))}</b></div></div>
+    <p class="hint" style="margin:8px 0 0">Media del gruppo: <b>${media}</b> consumazioni a testa · tu: <b>${caffe + snack}</b>.${R.snack ? '' : ' Per questo periodo sono disponibili solo i caffè.'}</p></div>`;
 }
 function pClassifiche(d){
   const tab = st.clTab || 'class';
@@ -1864,16 +1985,24 @@ function pClassifiche(d){
   const head = `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button><h2>${ic('chart')} Classifiche e statistiche</h2>
     <div class="chips">${tabs.map(([v, l]) => `<button id="cl-tab-${v}" class="${tab === v ? 'on' : ''}" data-act="cl-tab" data-v="${v}">${l}</button>`).join('')}</div>`;
   if(tab === 'class') return head + clClassifica(d);
-  if(st.salPer === 'chiusi') return head + clPeriodo(d) + clChiusi(tab);
+  if(st.salPer === 'chiusi'){
+    if(tab === 'acq'){
+      const L = storicoPeriodi(), i = st.clPer != null && L[st.clPer] ? st.clPer : L.length - 1;
+      return head + clPeriodo(d) + acqToggle() + bustaWidget() + (acqVista() === 'saletta' ? clChiusi(tab) : L[i] ? viewMieiChiuso(L[i]) : '<div class="card"><div class="empty">Nessun periodo chiuso finora.</div></div>');
+    }
+    return head + clPeriodo(d) + clChiusi(tab);
+  }
   const c = aggPeriodo(d), r = c.r, T = c.tutti, G = c.G;
   const ch = tab === 'acq' ? {cons: graficoBarre(serieGen(T, r, fCons), {c: 'cons', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo in questo periodo.'}),
       spese: graficoBarre(serieGen(T, r, fSpese), {c: 'spese', nome: 'Spese', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna spesa convalidata in questo periodo.'})}
     : tab === 'pul' ? {pul: graficoBarre(serieGen(T, r, fTurni), {c: 'pul', nome: 'Turni', col: 'var(--violet)', vuoto: 'Nessun turno in questo periodo.'})}
     : {pag: graficoBarre(serieGen(T, r, fRic), {c: 'pag', nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna ricarica in questo periodo.'})};
-  return head + clPeriodo(d) + (tab === 'acq' ? viewAcq(G, ch) : tab === 'pul' ? viewPul(G, ch) : viewPag(G, ch));
+  if(tab === 'acq') return head + clPeriodo(d) + acqToggle() + bustaWidget() + (acqVista() === 'miei' ? viewMiei(c) : viewAcq(G, ch));
+  return head + clPeriodo(d) + (tab === 'pul' ? viewPul(G, ch) : viewPag(G, ch));
 }
 A['cl-tab'] = ds => { st.clTab = ds.v; st.scSel = null; render(); };
-A['cl-sort'] = ds => { const c = st.clSort || {k: 'tot', dir: -1}; st.clSort = c.k === ds.k ? {k: c.k, dir: -c.dir} : {k: ds.k, dir: ds.k === 'nome' ? 1 : -1}; render(); };
+A['cl-chip'] = ds => { st.clSort = {k: CL_KEYS.includes(ds.k) ? ds.k : 'tot', dir: -1}; render(); };
+A['acq-vista'] = ds => { st.acqVista = ds.v === 'saletta' ? 'saletta' : 'miei'; st.scSel = null; render(); };
 A['carica-arc-mov'] = () => { if(!st.arcLoading && !st.arcMov) caricaArcMov(); };
 
 /* ---------- Lista della spesa collaborativa ---------- */
