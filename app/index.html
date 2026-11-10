@@ -326,7 +326,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.12.4';
+const VERSION = '1.12.5';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1456,7 +1456,7 @@ function righeMov(list, d, opt){
         <div class="amt mono ${annullato ? 'strike' : ''}">${amt}</div>${pill}
         ${annullabile ? `<button class="btn link" style="padding:0" data-act="annulla-consumo" data-id="${m.id}">Annulla</button>` : ''}
         ${!opt.noAct && !opt.compact && puoStornare(m, d) ? `<button class="btn link mut" style="padding:0;color:var(--mut)" data-act="storno" data-id="${m.id}">${ic('undo','s')} Storna</button>` : ''}
-        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && m.fonte === 'denaro' ? 'paga-spesa' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
+        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && m.fonte === 'denaro' ? 'paga-spesa' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
       </div></div>`;
   }).join('')}</div>`;
 }
