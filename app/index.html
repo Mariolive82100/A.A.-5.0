@@ -325,7 +325,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.12.0';
+const VERSION = '1.12.1';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1086,7 +1086,7 @@ function pBar(d){
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
     return `<div class="banner red">${ic('alert')}<div class="grow">Tasso di Onestà dell'ultima busta: <b>${tassoBusta(l)}%</b> (${l.n || 0} caffè registrati su ${BUSTA_CAFFE}). Chi beve il caffè deve registrarlo ogni volta!</div><button class="iconbtn" data-act="busta-visto" data-id="${l.id}">${ic('x','s')}</button></div>`; })()}
-  ${noCaffe ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno a ${eur(pc)}` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
+  ${noCaffe || noSnack ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${noCaffe && noSnack ? ' (caffè e snack)' : noCaffe ? ' (caffè)' : ' (snack)'}${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno al prezzo del prodotto` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
   <div class="home" style="min-height:0;justify-content:flex-start;padding:0 0 4px">
     <div class="blob" style="width:200px;height:200px;background:#f5a524;top:4%;left:-40px"></div>
     <div class="blob" style="width:220px;height:220px;background:#7c3aed;top:38%;right:-60px"></div>
@@ -2519,7 +2519,7 @@ A['annulla-richiesta'] = ds => {
 A['snack'] = () => {
   const d = derived(), sd = saldo(st.mid);
   const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
-  openSheet(`<h3>${ic('cookie')} Acquista snack</h3><p class="sub">Tocca l'articolo che hai preso.</p>
+  openSheet(`<h3>${ic('cookie')} Acquista snack</h3><p class="sub">Tocca l'articolo che hai preso. Credito disponibile: <b class="mono ${sd < 0 ? 'red' : 'green'}">${eurS(sd)}</b>${list.some(p => p.prezzo > sd) ? ' · gli articoli oltre il tuo credito sono disabilitati: <b>' + MSG_CREDITO.toLowerCase() + '</b>' : ''}.</p>
     ${list.length ? `<div class="list">${list.map(p => { const sk = d.S.stock[p.id] || 0, fin = (st.isAdmin && sk <= 0) || p.prezzo > sd; return `<button class="li" style="width:100%;text-align:left;${fin ? 'opacity:.45' : ''}" data-act="prendi-snack" data-id="${p.id}" ${fin ? 'disabled' : ''}>
       <div class="av" style="font-size:22px">${esc(p.emoji || '🍫')}</div><div class="grow"><div class="t">${esc(p.nome)}</div>${p.prezzo > sd ? '<div class="d red">Credito insufficiente</div>' : st.isAdmin ? `<div class="d">${sk <= 0 ? 'Esaurito' : 'Giacenza ' + sk + ' pz'}</div>` : ''}</div><b class="mono amber">${eur(p.prezzo)}</b></button>`; }).join('')}</div>`
       : '<div class="empty">Nessuno snack disponibile al momento.</div>'}`);
