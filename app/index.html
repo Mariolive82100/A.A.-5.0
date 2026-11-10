@@ -326,7 +326,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.12.3';
+const VERSION = '1.12.4';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1156,12 +1156,13 @@ function contatori(d){
 }
 function pNotifiche(d){
   if(adminView()){
-    return `<h2>${ic('bell')} Inbox del Fondo</h2><p class="sub">Tutte le richieste da gestire, in un solo posto.</p>${inboxAdmin(d)}`;
+    return `<h2>${ic('bell')} Inbox del Fondo</h2><p class="sub">Tutte le richieste da gestire, in un solo posto.</p>${inboxAdmin(d)}${storicoRichieste(d)}`;
   }
   const list = notifiche(d), seen = notifSeen();
   const att = d.scambiAttesa.filter(m => (m.conf || m.dest) === st.mid).length;
   return `<h2>${ic('bell')} Notifiche</h2><p class="sub">Richieste da gestire ed esiti che ti riguardano.</p>
   ${richiesteUtente(d) || ''}
+  ${storicoRichieste(d)}
   <div class="card"><h3><span>Esiti e accrediti</span><button class="btn link" data-act="notif-letti">Segna tutte come lette</button></h3>
     ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>`;
 }
@@ -1309,6 +1310,21 @@ function pAdminHome(d){
 const tms = x => x && x.toMillis ? x.toMillis() : (typeof x === 'number' ? x : 0);
 function saldoDisp(d){ const s = d.S.saldi[st.mid] || 0; return s > 0 ? creditoLibero() : s; }
 function pRegistro(d){ return pFeed(d); }
+/* storico delle richieste gia' decise (accettate, rifiutate, annullate): solo dati gia' in memoria, nessuna lettura in piu' */
+function storicoRichieste(d){
+  const me = st.mid, adm = adminView(), N = st.storicoN || 30;
+  const src = (adm && st.arcMov ? st.arcMov : []).concat(d.movs);
+  const st_ = new Set(src.filter(m => m.tipo === 'storno').map(m => m.rif));
+  const list = src.filter(m => ['spesa', 'ricarica', 'scambio'].includes(m.tipo) && ['confermata', 'rifiutata', 'annullata'].includes(m.stato) && (adm || [m.mid, m.dest, m.daMid, m.aMid].includes(me)))
+    .map(m => ({m, t: tms(m.esitoTs) || m.t || 0})).sort((a, b) => b.t - a.t);
+  const righe = list.slice(0, N).map(({m, t}) => { const x = descMov(m);
+    const pill = m.stato === 'confermata' ? (st_.has(m.id) ? '<span class="pill red">stornata</span>' : '<span class="pill green">accettata</span>') : m.stato === 'rifiutata' ? '<span class="pill red">rifiutata</span>' : '<span class="pill mut">annullata</span>';
+    return `<div class="li"><div class="av">${x.ic}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${x.t}</div><div class="d">${quando(t)}${m.esitoDa ? ' · da ' + esc(m.esitoDa) : ''}</div></div>${pill}</div>`; }).join('');
+  return `<div class="card" id="storico-richieste"><h3><span>${ic('clock','s')} Storico richieste</span><span class="mut" style="font-size:11px;text-transform:none;letter-spacing:0">${list.length}</span></h3>
+    ${list.length ? `<div class="list">${righe}</div>` : '<div class="empty">Nessuna richiesta accettata o rifiutata.</div>'}
+    ${list.length > N ? `<button class="btn sm block ghost" style="margin-top:8px" data-act="storico-altre">Mostra altre ${Math.min(30, list.length - N)}</button>` : ''}
+    ${adm ? (st.arcMov ? '<p class="hint" style="margin:8px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi i periodi chiusi (legge l\'archivio)'}</button>`) : '<p class="hint" style="margin:8px 0 0">Mostra le richieste dall\'ultima chiusura di periodo.</p>'}</div>`;
+}
 const notifSeen = () => LS.get('notifSeen_' + st.mid, 0);
 function notifiche(d){
   const me = st.mid, out = [];
@@ -1446,7 +1462,8 @@ function righeMov(list, d, opt){
 }
 
 /* ---------- FEED ---------- */
-function pFeed(d){
+/* elenco del registro: filtro + ricerca per collega (nome o nickname) su tutti i colleghi coinvolti nel movimento */
+function feedLista(d){
   const f = st.feedFiltro, me = st.mid;
   const mio = m => m.mid === me || m.dest === me || m.daMid === me || m.aMid === me || (m.mids || []).includes(me);
   const cassaTipi = ['caffe_pagato','spesa','uscita','entrata','giroconto','ricarica','riscatto','quota','addebito_quota','accredito','rettifica'];
@@ -1455,12 +1472,22 @@ function pFeed(d){
   if(f === 'bar') list = list.filter(m => ['caffe','snack'].includes(m.tipo));
   if(f === 'cassa') list = list.filter(m => descMov(m).cassa || cassaTipi.includes(m.tipo));
   if(f === 'attesa') list = list.filter(m => m.stato === 'attesa');
+  const q = (st.feedQ || '').trim().toLowerCase();
+  if(q){
+    const hit = id => { const m = id && membro(id); return !!m && (m.nome + ' ' + (m.nick || '')).toLowerCase().includes(q); };
+    list = list.filter(m => [m.mid, m.dest, m.daMid, m.aMid, ...(m.mids || []), m.orig && m.orig.mid].some(hit));
+  }
+  return (q ? `<div class="mut" style="font-size:12px;margin:0 0 8px">${list.length} ${list.length === 1 ? 'movimento' : 'movimenti'} per «${esc(st.feedQ.trim())}»</div>` : '') + righeMov(list.slice(0, 300), d, {noAct: st.isAdmin && !adminView()});
+}
+function pFeed(d){
+  const f = st.feedFiltro;
   const last = ultimaChiusura(), av = adminView();
   return `<h2>${ic('receipt')} Cassa e registro</h2>
   <div class="stat" style="margin:0 0 12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
   <p class="sub">Il saldo è la cassa comune (contanti + conto). Qui sotto tutta la storia del fondo, visibile a tutti${last ? ' · dal ' + dataOra(last.fino.toMillis()) : ''}.</p>
   <div class="chips">${[['tutti','Tutti'],['miei','Miei'],['bar','Caffè & Snack'],['cassa','Cassa & Spese'],['attesa','In attesa']].map(([v,l]) => `<button class="${f===v?'on':''}" data-act="feed-filtro" data-v="${v}">${l}</button>`).join('')}</div>
-  <div class="card">${righeMov(list.slice(0, 300), d, {noAct: st.isAdmin && !av})}</div>
+  <label class="f" style="margin:0 0 10px"><span>Cerca per collega</span><div class="row" style="gap:6px"><input class="in" id="feed-q" type="search" inputmode="search" autocomplete="off" placeholder="Nome o nickname…" data-chg="feed-q" value="${esc(st.feedQ || '')}" style="flex:1"><button class="btn sm ghost" id="feed-q-x" data-act="feed-q-x" ${st.feedQ ? '' : 'hidden'}>✕</button></div></label>
+  <div class="card" id="feed-list">${feedLista(d)}</div>
   ${st.isAdmin && st.chiusure.length ? `<div class="card"><h3>${ic('archive','s')} Periodi chiusi</h3>
     ${st.archivio ? st.archivio.map(a => `<div style="margin-bottom:10px"><div class="mut" style="font-size:12px;margin:4px 0">${esc(a.label)}</div>${righeMov(a.movimenti.slice().reverse(), {stornati:new Set(a.movimenti.filter(m=>m.tipo==='storno').map(m=>m.rif))}, {noAct:true})}</div>`).join('')
       : `<button class="btn block" data-act="carica-archivio">${ic('archive','s')} Mostra lo storico dei periodi chiusi</button>`}
@@ -2773,6 +2800,8 @@ A['del-evento'] = ds => { if(!confirm('Eliminare questo evento?')) return; C('ev
 
 /* --- feed --- */
 A['feed-filtro'] = ds => { st.feedFiltro = ds.v; render(); };
+A['feed-q-x'] = () => { st.feedQ = ''; render(); };
+A['storico-altre'] = () => { st.storicoN = (st.storicoN || 30) + 30; render(); };
 A['carica-archivio'] = async () => {
   try {
     const s = await C('archivio').get();
@@ -3624,6 +3653,11 @@ document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="bf-upd"]')) bfAggiorna();
+  if(e.target && e.target.id === 'feed-q'){   // filtra la sola lista, senza ricostruire la pagina (la tastiera resta aperta)
+    st.feedQ = e.target.value; const l = $('feed-list'), x = $('feed-q-x');
+    if(l) l.innerHTML = feedLista(derived());
+    if(x) x.hidden = !st.feedQ;
+  }
 });
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){ closeSheet(); A['drawer-close'](); }
