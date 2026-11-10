@@ -352,7 +352,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.15.0';
+const VERSION = '1.15.1';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -3739,6 +3739,44 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Enter' && e.target.id === 'sp-nome') A['spesa-aggiungi']();
 });
 setInterval(() => { if(st.page === 'feed' || st.page === 'bar') render(); }, 60000);
+
+/* ---------- tasto / gesture "Indietro" (History API) ----------
+   Una sola voce "sentinella" sopra la base della cronologia: a ogni Indietro l'app decide cosa chiudere
+   (sheet, menu, pagina) leggendo lo stato esistente e riarma la sentinella. Dalla Home il primo Indietro avvisa,
+   il secondo (entro 2,5 s) esce davvero. Nessun URL cambia e nessun dato viene letto. */
+let backArmata = false, backTimer = null;
+const GUARD = {armieri: 'guard'};
+const inAppOra = () => st.sync !== 'nocfg' && st.gid && st.uid && st.ready.g && st.ready.u && st.mid && membro(st.mid);
+function backRiarma(){ clearTimeout(backTimer); backTimer = null; try { history.pushState(GUARD, ''); } catch(e){} }
+function backArma(){
+  if(backArmata) return;
+  try { if(!(history.state && history.state.armieri === 'guard')){ history.replaceState({armieri: 'base'}, ''); history.pushState(GUARD, ''); } backArmata = true; } catch(e){}
+}
+/* true se l'Indietro e' stato assorbito dall'app (qualcosa da chiudere o una pagina da cui tornare) */
+function indietro(){
+  if($('sheet').classList.contains('on')){ closeSheet(); return true; }
+  if($('drawer').classList.contains('on')){ A['drawer-close'](); return true; }
+  if(!inAppOra()){ if(st.entry){ st.entry = null; render(); return true; } return false; }
+  if(st.pinDoc === null || (st.pinDoc && st.pinDoc.temporaneo)) return false;   // schermata bloccante: nessuna navigazione
+  if(st.page !== 'bar'){ A['go']({p: !adminView() && SALETTA_SUB.includes(st.page) && st.page !== 'saletta' ? 'saletta' : 'bar'}); return true; }
+  return false;
+}
+window.addEventListener('popstate', () => {
+  if(!backArmata) return;
+  if(history.state && history.state.armieri === 'guard') return;   // avanti/indietro verso la sentinella: niente da fare
+  if(indietro()){ backRiarma(); return; }
+  toast('Premi ancora Indietro per uscire');
+  clearTimeout(backTimer);
+  backTimer = setTimeout(backRiarma, 2500);
+});
+/* se l'utente tocca qualcosa durante la finestra di uscita, la sentinella torna subito */
+document.addEventListener('click', () => { if(backTimer) backRiarma(); }, true);
+/* Chrome ignora le voci aggiunte senza gesto dell'utente: la sentinella si arma al primo tocco */
+(function(){
+  if(history.state && history.state.armieri === 'guard'){ backArmata = true; return; }
+  const arma = () => { document.removeEventListener('click', arma, true); document.removeEventListener('keydown', arma, true); backArma(); };
+  document.addEventListener('click', arma, true); document.addEventListener('keydown', arma, true);
+})();
 
 /* ---------- avvio ---------- */
 (function boot(){
