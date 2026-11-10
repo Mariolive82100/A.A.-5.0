@@ -352,7 +352,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.14.1';
+const VERSION = '1.15.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -545,8 +545,6 @@ function syncMode(){
   }, () => {}));
   dataUnsubs.push(C('prodotti').onSnapshot(s => { st.prodotti = docs(s); render(); }, onDataErr));
   dataUnsubs.push(C('eventi').onSnapshot(s => { st.eventi = docs(s); render(); }, onDataErr));
-  dataUnsubs.push(C('riscatti').onSnapshot(s => { st.riscatti = docs(s); render(); }, onDataErr));
-  dataUnsubs.push(C('acquisti').onSnapshot(s => { st.acquisti = docs(s); render(); }, onDataErr));
   dataUnsubs.push(C('buste').onSnapshot(s => { st.buste = docs(s); render(); }, onDataErr));
   // lista della spesa: articoli da comprare / in rimborso, più gli ultimi 30 acquistati (nessun indice composito)
   let lsAtt = [], lsSto = [];
@@ -641,7 +639,7 @@ function applyMov(S, m, sg){
     case 'regalo': add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); break;
     case 'ben_fatto': S.pbf = S.pbf || {}; add(S.pbf, m.aMid, sg*(m.pt ?? 2)); break;   // punti al destinatario; chi lo invia non perde nulla
     case 'riscatto_punti': S.pRisc = S.pRisc || {}; add(S.pRisc, m.mid, sg*m.punti); add(S.saldi, m.mid, sg*m.importo); break;
-    case 'riscatto': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
+    case 'riscatto': if(m.stato === 'confermata' || !m.stato){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
     case 'rettifica': add(S.saldi, m.mid, sg*m.importo); break;
     case 'accredito': add(S.saldi, m.mid, sg*m.importo);
       if(m.qmAnno){ S.dovute[m.qmAnno] = S.dovute[m.qmAnno] || {}; add(S.dovute[m.qmAnno], m.mid, -sg); }   // storno di un vecchio addebito di quota
@@ -708,13 +706,14 @@ const statoQuota = (d, mid, a) => ((d.S.quote[a] || {})[mid] || 0) > 0 ? 'pagata
 const saldo = mid => derived().S.saldi[mid] || 0;
 /* modello prepagato: nessuna uscita puo' portare il saldo sotto zero (controllo lato app, doppio sbarramento interfaccia + azione) */
 const MSG_CREDITO = 'Credito insufficiente: ricarica per consumare';
-const puoPagare = (imp, mid) => (saldo(mid || st.mid) || 0) >= imp;
-const maxCaffe = () => { const pc = st.gruppo.prezzoCaffe || 0, sd = saldo(st.mid); return pc > 0 ? Math.max(0, Math.min(30, Math.floor(sd / pc))) : (sd >= 0 ? 30 : 0); };
+/* riscatti in attesa: l'importo e' riservato e non si puo' spendere ne' regalare nel frattempo */
+const riservato = mid => derived().pendenti.filter(m => m.tipo === 'riscatto' && m.mid === (mid || st.mid)).reduce((a, m) => a + m.importo, 0);
+const puoPagare = (imp, mid) => ((saldo(mid || st.mid) || 0) - riservato(mid || st.mid)) >= imp;
+const maxCaffe = () => { const pc = st.gruppo.prezzoCaffe || 0, sd = saldo(st.mid) - riservato(st.mid); return pc > 0 ? Math.max(0, Math.min(30, Math.floor(sd / pc))) : (sd >= 0 ? 30 : 0); };
 // quanto posso ancora saldare / riscattare, tolte le operazioni gia' in corso
 function debitoLibero(){
   const d = derived(), s = d.S.saldi[st.mid] || 0;
-  const inCorso = d.pendenti.filter(m => m.tipo === 'ricarica' && m.mid === st.mid).reduce((a, m) => a + m.importo, 0)
-    + d.scambiAttesa.filter(m => m.aMid === st.mid && m.mid === st.mid).reduce((a, m) => a + m.importo, 0);
+  const inCorso = d.pendenti.filter(m => m.tipo === 'ricarica' && m.mid === st.mid).reduce((a, m) => a + m.importo, 0);
   return Math.max(0, -s - inCorso);
 }
 const PUNTI_SPESA = 2;
@@ -743,15 +742,7 @@ function giorniLavorativi(da, a){
   let n = 0; while(x < f){ x.setDate(x.getDate() + 1); const w = x.getDay(); if(w !== 0 && w !== 6) n++; } return n;
 }
 const msDoc = r => r && r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now();
-const resEff = r => Math.min(r.residuo, Math.max(0, saldo(r.mid) || 0));
-const riscattiAperti = () => st.riscatti.filter(r => r.fondo && r.stato === 'aperta' && resEff(r) > 0);
-const mieiRiscatti = () => st.riscatti.filter(r => r.mid === st.mid && r.stato === 'aperta' && resEff(r) > 0);
-function creditoLibero(){
-  const d = derived(), s = d.S.saldi[st.mid] || 0;
-  const inCorso = mieiRiscatti().reduce((a, r) => a + resEff(r), 0)
-    + d.scambiAttesa.filter(m => m.daMid === st.mid && m.mid === st.mid && !m.rif).reduce((a, m) => a + m.importo, 0);
-  return Math.max(0, s - inCorso);
-}
+function creditoLibero(){ return Math.max(0, (derived().S.saldi[st.mid] || 0) - riservato(st.mid)); }
 
 /* ---------- scritture ---------- */
 function addMov(data, id, silenzioso){
@@ -1105,13 +1096,14 @@ function pBar(d){
     <small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" id="home-saldo" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px">
-      <button class="btn amber block" id="btn-acquista" data-act="go" data-p="crediti" data-t="acq">🛒 Acquista crediti</button>
-      <button class="btn green block" id="btn-riscatta" data-act="riscatta-inizia" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta crediti</button>
+      <button class="btn amber block" id="btn-ricarica" data-act="ricarica-nuova">➕ Ricarica</button>
+      <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
     </div>
+    <button class="btn link" style="margin-top:6px" id="btn-regala-home" data-act="regala">🎁 Regala / Trasferisci crediti</button>
     ${(() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Tessera fedeltà: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Tessera fedeltà</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
-    ${mieiRiscatti().map(r => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di liquidazione: <b class="mono">${eur(resEff(r))}</b></span><button class="btn link" style="padding:0" data-act="annulla-riscatto" data-id="${r.id}">Annulla</button></div>`).join('')}
+    ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
     return `<div class="banner red">${ic('alert')}<div class="grow">Tasso di Onestà dell'ultima busta: <b>${tassoBusta(l)}%</b> (${l.n || 0} caffè registrati su ${BUSTA_CAFFE}). Chi beve il caffè deve registrarlo ogni volta!</div><button class="iconbtn" data-act="busta-visto" data-id="${l.id}">${ic('x','s')}</button></div>`; })()}
@@ -1134,29 +1126,16 @@ function pBar(d){
 }
 
 /* ---------- richieste, notifiche, crediti ---------- */
+const testoAttesa = m => m.tipo === 'ricarica' ? (m.fondo ? 'Quota fondo ' : 'Ricarica ') + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : m.tipo === 'riscatto' ? 'Riscatto ' + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : 'Spesa ' + eur(m.importo) + ' · ' + esc(m.descr || '');
 function richiesteUtente(d){
   const mie = d.pendenti.filter(m => m.mid === st.mid);
-  return `
-  ${(() => { const arr = d.scambiAttesa.filter(m => (m.conf || m.dest) === st.mid);
-    return arr.length ? `<div class="card" style="border-color:var(--amber)"><h3>${ic('bell','s')} Da confermare</h3><div class="list">${arr.map(m => { const ven = m.daMid === st.mid; return `<div class="li" style="display:block">
-      <div style="font-size:13.5px;margin-bottom:8px">${ven ? `<b>${esc(nomeM(m.aMid))}</b> compra <b>${eur(m.importo)}</b> di crediti da te${m.rif ? ' (la tua offerta)' : m.rifAcq ? ' (dalla sua richiesta d\'acquisto)' : ''} e ti paga ${eur(m.importo)} (${esc(FONTI[m.metodo] || m.metodo || 'fuori app')}) fuori dall'app. Hai ricevuto i soldi?` : `<b>${esc(nomeM(m.mid))}</b> ti vende <b>${eur(m.importo)}</b> di crediti${m.causale ? ' · ' + esc(m.causale) : ''}. Se accetti li compri e gli paghi <b>${eur(m.importo)}</b> (${esc(FONTI[m.metodo] || m.metodo || 'contanti o Revolut')}) fuori dall'app.`}</div>
-      <div class="grid2"><button class="btn sm green" data-act="scambio-esito" data-v="confermata" data-id="${m.id}">${ven ? 'Sì, ricevuti' : 'Compra'}</button><button class="btn sm ghost" data-act="scambio-esito" data-v="rifiutata" data-id="${m.id}">${ven ? 'No' : 'Rifiuta'}</button></div></div>`; }).join('')}</div></div>` : ''; })()}
-  ${(() => { const arr = d.scambiAttesa.filter(m => m.conf && m.conf !== st.mid && m.dest === st.mid);
-    return arr.length ? `<div class="card" style="border-color:var(--amber)"><h3>${ic('wallet','s')} Da pagare</h3><div class="list">${arr.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">Paga ${eur(m.importo)} a ${esc(nomeM(m.daMid))}</div><div class="d">${esc(FONTI[m.metodo] || m.metodo)} · fuori dall'app. Quando li riceve, lui conferma e ottieni i crediti.</div></div></div>`).join('')}</div></div>` : ''; })()}
-  ${(mie.length || d.scambiAttesa.some(m => m.mid === st.mid && (m.conf || m.dest) !== st.mid)) ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `
-      <div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${m.tipo === 'ricarica' ? (m.fondo ? 'Quota fondo ' : 'Pagamento in cassa ') + eur(m.importo) + ' · ' + FONTI[m.metodo] : 'Spesa ' + eur(m.importo) + ' · ' + esc(m.descr || '')}</div><div class="d">In attesa di conferma di un amministratore</div></div>
-      <button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
-      ${d.scambiAttesa.filter(m => m.mid === st.mid && (m.conf || m.dest) !== st.mid).map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${m.aMid === m.mid ? 'Acquisto da ' : 'Vendita a '}${esc(nomeM(m.dest))} · ${eur(m.importo)}</div><div class="d">In attesa che ${esc(nomeBreve(m.dest))} confermi</div></div>
-      <button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
-`;
+  return mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `
+      <div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div>
+      <button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : '';
 }
 function richiesteFondo(d){
   const pend = d.pendenti;
-  return `  <div class="card"><h3><span>Liquidazioni al Fondo</span>${riscattiAperti().length > 0 ? `<span class="pill amber">${riscattiAperti().length}</span>` : ''}</h3>
-    ${riscattiAperti().length > 0 ? `<div class="list">${riscattiAperti().map(r => `<div class="li"><div class="av">${ic('banknote','s')}</div><div class="grow"><div class="t">${esc(nomeM(r.mid))}</div><div class="d">vende al Fondo ${eur(resEff(r))} · ${esc(FONTI[r.metodo] || r.metodo)}</div></div><button class="btn sm" data-act="riscatto-cassa" data-id="${r.id}">Paga dalla cassa</button></div>`).join('')}</div><p class="hint" style="margin:8px 0 0">Il Fondo Gruppo compra i crediti in qualsiasi momento, nei limiti della liquidità di cassa.</p>` : '<div class="empty">Nessuna liquidazione in attesa.</div>'}
-  </div>
-
-  <div class="card"><h3><span>Richieste di accesso</span>${st.richieste.length ? `<span class="pill red">${st.richieste.length}</span>` : ''}</h3>
+  return `  <div class="card"><h3><span>Richieste di accesso</span>${st.richieste.length ? `<span class="pill red">${st.richieste.length}</span>` : ''}</h3>
     ${st.richieste.length ? `<div class="list">${st.richieste.map(r => `<div class="li"><div class="av">${esc(r.nome.slice(0,1))}</div>
       <div class="grow"><div class="t">${esc(r.nome)}</div><div class="d">${r.nick ? '“' + esc(r.nick) + '” · ' : ''}${quando(r.ts && r.ts.toMillis ? r.ts.toMillis() : 0)}</div></div>
       <button class="btn sm green" data-act="approva" data-id="${r.id}">Valuta</button></div>`).join('')}</div>` : '<div class="empty">Nessuna richiesta di accesso.</div>'}
@@ -1176,10 +1155,9 @@ function richiesteFondo(d){
 const recVisti = () => LS.get('recVisti_' + st.gid, []);
 const recuperiNuovi = () => { const v = recVisti(); return st.utenti.filter(u => u.recuperato && u.id !== st.uid && !v.includes(u.id) && (tms(u.ts) || Date.now()) > Date.now() - 7 * 864e5); };
 function contatori(d){
-  const att = d.scambiAttesa.filter(m => (m.conf || m.dest) === st.mid).length;
   const seen = notifSeen();
-  const pers = notifiche(d).filter(n => n.t > seen).length + att;
-  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + riscattiAperti().length + recuperiNuovi().length : 0;
+  const pers = notifiche(d).filter(n => n.t > seen).length;
+  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + recuperiNuovi().length : 0;
   return {pers, fondo};
 }
 function pNotifiche(d){
@@ -1187,7 +1165,6 @@ function pNotifiche(d){
     return pAdminHome(d, 'inbox');
   }
   const list = notifiche(d), seen = notifSeen();
-  const att = d.scambiAttesa.filter(m => (m.conf || m.dest) === st.mid).length;
   return `<h2>${ic('bell')} Notifiche</h2><p class="sub">Richieste da gestire ed esiti che ti riguardano.</p>
   ${richiesteUtente(d) || ''}
   ${storicoRichieste(d)}
@@ -1204,62 +1181,30 @@ function inboxAdmin(d){
   d.pendenti.forEach(m => {
     if(m.tipo === 'spesa') card(m.t, 'Spesa', 'violet', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.articoliNomi && m.articoliNomi.length ? '🛒 ' + m.articoliNomi.map(esc).join(', ') : esc(m.descr || '')}${m.note ? ' · «' + esc(m.note) + '»' : ''} · ${m.fonte === 'denaro' ? 'rimborso in denaro reale' : 'rimborso in crediti'}`,
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), m.fonte === 'denaro' ? bt('paga-spesa', m.id, 'green', 'Convalida e Paga') : bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
-    else if(m.tipo === 'ricarica') card(m.t, 'Versamento', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.fondo ? 'Quota fondo' : 'Pagamento in cassa'} · ${esc(FONTI[m.metodo] || m.metodo || '')}`,
-      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma', 'confermata')]);
+    else if(m.tipo === 'ricarica') card(m.t, 'Versamento', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.fondo ? 'Quota fondo' : 'Ricarica crediti'} · ${esc(FONTI[m.metodo] || m.metodo || '')}`,
+      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma incasso', 'confermata')]);
+    else if(m.tipo === 'riscatto') card(m.t, 'Riscatto', 'green', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `chiede al Fondo Gruppo · preferisce ${esc(FONTI[m.metodo] || m.metodo || '')} · saldo ${eurS(saldo(m.mid))}`,
+      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('riscatto-paga', m.id, 'green', 'Paga e conferma')]);
     else card(m.t, 'Richiesta', 'mut', descMov(m).t, '', [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma', 'confermata')]);
   });
-  riscattiAperti().forEach(r => card(msDoc(r), 'Riscatto', 'green', `${esc(nomeM(r.mid))} · ${eur(resEff(r))}`, `vende al Fondo Gruppo · ${esc(FONTI[r.metodo] || r.metodo)}`, [bt('riscatto-cassa', r.id, 'green', 'Paga dalla cassa')]));
+
   st.richAdmin.forEach(r => card(msDoc(r), 'Admin', 'red', esc(r.nome || 'telefono'), 'chiede di diventare amministratore', [bt('rifiuta-admin', r.id, 'ghost', 'Rifiuta'), bt('approva-admin', r.id, 'green', 'Nomina')]));
   recuperiNuovi().forEach(u => card(tms(u.ts) || Date.now(), 'Profilo recuperato', 'amber', `${esc(nomeM(u.mid))} è rientrato da un nuovo telefono`, 'Ha usato il PIN personale. Se non è stato lui, scollega il telefono: il PIN viene azzerato.', [bt('rec-ok', u.id, 'ghost', 'Va bene'), bt('rec-scollega', u.id, 'red', 'Scollega')]));
   it.sort((a, b) => b.t - a.t);
   return it.length ? `<div class="mut" style="font-size:12.5px;margin:0 2px 10px">${it.length} ${it.length === 1 ? 'richiesta' : 'richieste'} in sospeso</div>${it.map(x => x.h).join('')}` : '<div class="card"><div class="empty">Nessuna richiesta in sospeso. 🎉</div></div>';
 }
-function debitori(d){ return membriAttivi().filter(m => m.id !== st.mid).map(m => ({m, s: d.S.saldi[m.id] || 0})).filter(x => x.s < 0).map(x => ({m: x.m, deb: -x.s})).sort((a, b) => b.deb - a.deb || a.m.nome.localeCompare(b.m.nome)); }
-/* assegna il credito disponibile ai debitori selezionati, in ordine di debito decrescente */
-const richiestiRisc = d => new Set(d.scambiAttesa.filter(m => m.mid === st.mid && m.daMid === st.mid && !m.rif).map(m => m.aMid));
-function allocaRiscatto(d){
-  let resto = creditoLibero(); const out = []; const gia = richiestiRisc(d);
-  debitori(d).forEach(x => { if(st.riscSel[x.m.id] && resto > 0 && !gia.has(x.m.id)){ const q = Math.min(x.deb, resto); out.push({id: x.m.id, q}); resto -= q; } });
-  return {out, resto, tot: creditoLibero() - resto};
-}
-function pRiscatto(d){
-  const al = allocaRiscatto(d), lista = debitori(d), disp = creditoLibero();
-  const gia = richiestiRisc(d), selTot = al.tot, selMap = Object.fromEntries(al.out.map(x => [x.id, x.q]));
-  const met = st.riscMet || 'contanti';
-  return `<h2>${ic('wallet')} Riscatta crediti</h2><p class="sub">Puoi farti pagare da colleghi in debito (scegline uno o più) e riscattare il resto dal Fondo Gruppo. 1 credito = 1 €; i soldi passano fuori dall'app.</p>
-  <div class="card" style="text-align:center">
-    <small class="mut">Crediti ancora da riscattare</small>
-    <div class="mono green" id="risc-resto" style="font-size:30px;font-weight:800;line-height:1.15">${eur(al.resto)}</div>
-    <div class="mut" style="font-size:12px">disponibili ${eur(disp)} · selezionati dai colleghi ${eur(selTot)}</div>
-  </div>
-  <div class="card"><h3>Colleghi con saldo negativo</h3>
-    ${lista.length ? `<div class="list">${lista.map(x => { const inv = gia.has(x.m.id), on = !inv && !!selMap[x.m.id], bloc = inv || (!on && al.resto <= 0 && !st.riscSel[x.m.id]); return `<button class="li" data-act="risc-toggle" data-id="${x.m.id}" ${bloc ? 'disabled' : ''} style="width:100%;text-align:left;${on ? 'border-color:var(--green)' : ''}"><div class="av">${inv ? '⏳' : on ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(x.m.id))}</div><div class="d">debito <b class="mono red">${eur(x.deb)}</b>${inv ? ' · richiesta inviata, in attesa di conferma' : ''}${on ? ` · ti paga <b class="mono green">${eur(selMap[x.m.id])}</b>` : ''}</div></div></button>`; }).join('')}</div>` : '<div class="empty">Nessun collega è in debito in questo momento.</div>'}
-    <label class="f" style="margin-top:10px"><span>Come vuoi essere pagato?</span>${segOpts('rm-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut']], met)}</label>
-    <button class="btn amber block big" data-act="risc-invia" ${selTot > 0 ? '' : 'disabled'}>Invia richiesta ai colleghi selezionati</button>
-    <p class="hint">Ogni collega conferma dalla pagina Notifiche dopo averti pagato: solo allora i crediti passano a lui.</p>
-  </div>
-  <div class="card"><h3>Fondo Gruppo</h3>
-    <button class="btn green block" id="risc-fondo" data-act="vendi-fondo" data-v="${al.resto}" ${al.resto > 0 ? '' : 'disabled'}>Riscatta ${eur(al.resto)} dal Fondo Gruppo</button>
-    <p class="hint">Il Fondo ti liquida la rimanenza, nei limiti della liquidità di cassa.</p></div>`;
-}
 function pCrediti(d){
-  const tab = st.creditiTab || ((d.S.saldi[st.mid] || 0) > 0 || mieiRiscatti().length ? 'risc' : 'acq');
-  const tabs = `<div class="chips" style="margin-bottom:12px">${[['acq','🛒 Acquista'],['risc','💰 Riscatta']].map(([v, l]) => `<button class="${tab === v ? 'on' : ''}" data-act="cred-tab" data-v="${v}">${l}</button>`).join('')}</div>`;
-  const regala = `<button class="btn block ghost" id="btn-regala" data-act="regala" style="margin-top:12px">🎁 Regala crediti ai colleghi</button>`;
-  if(tab === 'risc') return tabs + pRiscatto(d) + regala;
-  return tabs + pAcquista(d) + regala;
-}
-function pAcquista(d){
-  const deb = debitoLibero(), puo = true;
-  const lista = membriAttivi().filter(m => m.id !== st.mid).map(m => ({m, s: d.S.saldi[m.id] || 0})).filter(x => x.s > 0).sort((a, b) => b.s - a.s || a.m.nome.localeCompare(b.m.nome));
-  return `<h2>${ic('wallet')} Mercato dei Crediti</h2><p class="sub">Acquista crediti: 1 credito = 1 €, senza commissioni; i soldi passano fuori dall'app.${deb > 0 ? ` Il tuo debito è <b class="mono red">${eur(deb)}</b>.` : ' Con i crediti puoi consumare caffè e snack.'}</p>
-  <div class="li" style="margin-bottom:12px;border:1px dashed var(--line2);border-radius:14px;padding:10px;display:block">
-    <div class="between"><b style="font-size:13px">🏦 Fondo Gruppo</b><span class="pill green">sempre disponibile</span></div>
-    <div class="mut" style="font-size:12px;margin:4px 0 8px">Versi contanti o Revolut e un amministratore conferma.</div>
-    <button class="btn amber block" data-act="compra-fondo" ${puo ? '' : 'disabled'}>Compra crediti dal Fondo Gruppo</button></div>
-  <div class="card"><h3>Colleghi con crediti</h3>
-    ${lista.length ? `<div class="list">${lista.map(x => `<div class="li"><div class="av">${esc(x.m.nome.slice(0,1))}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(x.m.id))}</div><div class="d"><b class="mono green">${eur(x.s)}</b> di crediti</div></div><button class="btn sm amber" data-act="salda" data-col="${x.m.id}" data-v="${deb > 0 ? Math.min(x.s, deb) : Math.min(x.s, 500)}">Compra</button></div>`).join('')}</div>` : '<div class="empty">Nessun collega ha crediti al momento.</div>'}
-    <p class="hint">Ordinati dal credito maggiore al minore. Il collega conferma di aver ricevuto i soldi (dalla pagina Notifiche) e i crediti passano a te.</p></div>`;
+  const s = saldo(st.mid) || 0, mie = d.pendenti.filter(m => m.mid === st.mid && ['ricarica', 'riscatto'].includes(m.tipo));
+  return `<h2>${ic('wallet')} Crediti</h2><p class="sub">1 credito = 1 €. I soldi passano fuori dall'app e un amministratore conferma.</p>
+  <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
+    <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
+    <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
+    <button class="btn block ghost" id="btn-regala" data-act="regala" style="margin-top:8px">🎁 Regala / Trasferisci crediti</button></div>
+  ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
+  <div class="card"><h3>Come funziona</h3>
+    <p class="hint" style="margin:0 0 6px"><b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l'amministratore conferma l'incasso, i crediti arrivano sul saldo.</p>
+    <p class="hint" style="margin:0 0 6px"><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l'importo resta riservato finché l'amministratore non ti paga.</p>
+    <p class="hint" style="margin:0"><b>Tra colleghi:</b> usa «Regala / Trasferisci crediti»; è immediato, senza approvazioni.</p></div>`;
 }
 
 /* ---------- tesoreria / home amministratore ---------- */
@@ -1340,7 +1285,7 @@ function storicoRichieste(d){
   const me = st.mid, adm = adminView(), N = st.storicoN || 30;
   const src = (adm && st.arcMov ? st.arcMov : []).concat(d.movs);
   const st_ = new Set(src.filter(m => m.tipo === 'storno').map(m => m.rif));
-  const list = src.filter(m => ['spesa', 'ricarica', 'scambio'].includes(m.tipo) && ['confermata', 'rifiutata', 'annullata'].includes(m.stato) && (adm || [m.mid, m.dest, m.daMid, m.aMid].includes(me)))
+  const list = src.filter(m => ['spesa', 'ricarica', 'riscatto', 'scambio'].includes(m.tipo) && ['confermata', 'rifiutata', 'annullata'].includes(m.stato) && (adm || [m.mid, m.dest, m.daMid, m.aMid].includes(me)))
     .map(m => ({m, t: tms(m.esitoTs) || m.t || 0})).sort((a, b) => b.t - a.t);
   const righe = list.slice(0, N).map(({m, t}) => { const x = descMov(m);
     const pill = m.stato === 'confermata' ? (st_.has(m.id) ? '<span class="pill red">stornata</span>' : '<span class="pill green">accettata</span>') : m.stato === 'rifiutata' ? '<span class="pill red">rifiutata</span>' : '<span class="pill mut">annullata</span>';
@@ -1361,10 +1306,10 @@ function notifiche(d){
     else if(m.tipo === 'accredito' && m.mid === me) out.push({t, e: '🎁', x: `Accredito ricevuto: ${eur(m.importo)} di crediti${m.causale ? ' · ' + esc(m.causale) : ''}`});
     else if(m.tipo === 'conversione' && m.mid === me) out.push({t, e: '🔄', x: `Hai convertito ${m.punti} Punti Pulizia in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
-    else if(m.tipo === 'riscatto' && m.mid === me) out.push({t, e: '🏦', x: `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
+    else if(m.tipo === 'riscatto' && m.mid === me && (ok || m.stato === 'rifiutata' || !m.stato)) out.push({t, e: m.stato === 'rifiutata' ? '❌' : '🏦', x: m.stato === 'rifiutata' ? `La tua richiesta di riscatto di ${eur(m.importo)} è stata rifiutata` : `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
     else if(m.tipo === 'ben_fatto' && m.aMid === me) out.push({t, e: '👏', x: `${esc(nomeM(m.daMid))} ti dice «Ben fatto!»: «${esc(m.msg || '')}» (+${m.pt ?? 2} punti)`});
     else if(m.tipo === 'riscatto_punti' && m.mid === me) out.push({t, e: '⭐', x: `Hai riscattato ${m.punti} punti: +${eur(m.importo)} di crediti`});
-    else if(m.tipo === 'regalo' && m.aMid === me) out.push({t, e: '🎁', x: `${esc(nomeM(m.daMid))} ti ha regalato ${eur(m.importo)} di crediti${m.msg ? ' · «' + esc(m.msg) + '»' : ''}`});
+    else if(m.tipo === 'regalo' && m.aMid === me) out.push({t, e: m.trasf ? '🤝' : '🎁', x: `${esc(nomeM(m.daMid))} ti ha ${m.trasf ? 'ceduto' : 'regalato'} ${eur(m.importo)} di crediti${m.msg ? ' · «' + esc(m.msg) + '»' : ''}`});
     else if(m.tipo === 'scambio'){
       if(m.stato === 'confermata' && m.daMid === me) out.push({t, e: '🤝', x: `${esc(nomeM(m.aMid))} ha comprato ${eur(m.importo)} dei tuoi crediti`});
       else if(m.stato === 'confermata' && m.aMid === me) out.push({t, e: '🤝', x: `Hai ricevuto ${eur(m.importo)} di crediti da ${esc(nomeM(m.daMid))}: ricezione confermata`});
@@ -1423,15 +1368,15 @@ function descMov(m){
     case 'caffe': return {ic:'☕', t: m.qta > 1 ? `${n} ha offerto un giro di ${m.qta} caffè` : `${n} ha preso un caffè`, a: -m.importo};
     case 'caffe_pagato': return {ic:'☕', t: `${n} ha pagato ${m.qta > 1 ? m.qta + ' caffè' : 'un caffè'} subito${m.metodo === 'contanti' || m.metodo === 'revolut' ? ' · ' + FONTI[m.metodo] : ''}`, a: 0, cassa: m.metodo === 'contanti' || m.metodo === 'revolut'};
     case 'snack': { const p = prodotto(m.pid); return {ic: esc((p && p.emoji) || m.emoji || '🍫'), t: `${n} ha preso ${m.qta > 1 ? m.qta + ' × ' : ''}${esc((p && p.nome) || m.nome || 'snack')}`, a: -m.importo}; }
-    case 'ricarica': return {ic:'💰', t: `${m.fondo ? 'Quota fondo' : 'Debito saldato'} da ${n} · ${FONTI[m.metodo] || m.metodo}`, a: m.importo, cassa: true};
+    case 'ricarica': return {ic:'💰', t: `${m.fondo ? 'Quota fondo' : 'Ricarica crediti'} da ${n} · ${FONTI[m.metodo] || m.metodo}`, a: m.importo, cassa: true};
     case 'scambio': return m.aMid === m.mid
       ? {ic:'🤝', t: `${esc(nomeM(m.aMid))} compra ${eur(m.importo)} di crediti da ${esc(nomeM(m.daMid))} (paga fuori dall'app)`, a: 0, neutro: m.importo}
       : {ic:'🔄', t: `${esc(nomeM(m.daMid))} vende ${eur(m.importo)} di crediti a ${esc(nomeM(m.aMid))}${m.causale ? ': ' + esc(m.causale) : ''}`, a: 0, neutro: m.importo};
     case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = !adminView();
-      return {ic:'🎁', t: `${esc(nomeM(m.daMid))} ha regalato ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
+      return {ic: m.trasf ? '🤝' : '🎁', t: `${esc(nomeM(m.daMid))} ${m.trasf ? 'ha ceduto (scambio)' : 'ha regalato'} ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
     case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» (+${m.pt ?? 2} punti)`, a: 0};
     case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti} punti della tessera fedeltà`, a: m.importo};
-    case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · pagato dalla cassa (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
+    case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · ${m.stato === 'attesa' ? 'richiesto al Fondo' : 'pagato dalla cassa'} (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
     case 'spesa': return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: m.fonte !== 'tasca'};
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
     case 'entrata': return {ic:'📥', t: `Entrata: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: m.importo, cassa: true};
@@ -1481,7 +1426,7 @@ function righeMov(list, d, opt){
         <div class="amt mono ${annullato ? 'strike' : ''}">${amt}</div>${pill}
         ${annullabile ? `<button class="btn link" style="padding:0" data-act="annulla-consumo" data-id="${m.id}">Annulla</button>` : ''}
         ${!opt.noAct && !opt.compact && puoStornare(m, d) ? `<button class="btn link mut" style="padding:0;color:var(--mut)" data-act="storno" data-id="${m.id}">${ic('undo','s')} Storna</button>` : ''}
-        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && m.fonte === 'denaro' ? 'paga-spesa' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
+        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && m.fonte === 'denaro' ? 'paga-spesa' : m.tipo === 'riscatto' ? 'riscatto-paga' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
       </div></div>`;
   }).join('')}</div>`;
 }
@@ -1535,18 +1480,19 @@ function pRegolamento(){
     '<b>Saldo mai sotto zero:</b> caffè e snack si registrano solo se il saldo copre il prezzo («Credito insufficiente: ricarica per consumare»). Lo stesso vale per regali e vendite di crediti. Chi ha un debito del vecchio modello resta bloccato finché una ricarica non lo copre e porta il saldo almeno al prezzo del prodotto.'])}
   ${sez('3. Ruoli e poteri', [
     '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
-    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, regala crediti ai colleghi (subito, senza approvazione e senza annullo), aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
-    '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, la liquidazione sussidiaria dei crediti invenduti, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
+    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), ricarica i propri crediti e li riscatta dal Fondo Gruppo (un amministratore conferma), registra le proprie pulizie e converte i propri Punti Pulizia, regala o trasferisce crediti ai colleghi (subito, senza approvazione e senza annullo), aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese, ricariche e riscatti esaminati, accrediti).',
+    '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, il pagamento dei riscatti dalla cassa, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
     '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
     '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
   ${sez('4. Quota annuale', [
     `La quota (${eur(g.quotaAnnua || 0)}) è un contributo al fondo, <b>separato dal saldo</b>: non genera debiti e non blocca i consumi.`,
     'Finché non è registrata, in Home compare l\'avviso «Quota saletta non ancora saldata». La registra un amministratore dopo il versamento (contanti, Revolut o già versata fuori app).',
     'L\'amministratore sceglie se accreditarla <b>anche come crediti consumabili</b> (SÌ) o solo come contributo al fondo (NO).'])}
-  ${sez('5. Mercato dei Crediti', [
-    '<b>Si acquistano, non si vendono:</b> chiunque può acquistare crediti dal <b>Fondo Gruppo</b> (versando contanti o Revolut: un amministratore conferma) oppure da un <b>collega a credito</b> (lo paga fuori dall\'app; il collega conferma dalla pagina Notifiche e i crediti passano a te). Il pulsante «Acquista crediti» è sempre attivo, anche con saldo positivo.',
-    '<b>Riscatto:</b> chi ha un saldo positivo preme «Riscatta crediti» e sceglie uno o più colleghi <b>con saldo negativo</b> (il contatore scende in tempo reale) e/o il <b>Fondo Gruppo</b> per la rimanenza. Il collega conferma dalle Notifiche dopo averti pagato fuori dall\'app; il Fondo ti liquida tramite un amministratore, nei limiti della cassa.',
-    '<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione. L\'elenco dei colleghi con crediti è ordinato dal credito maggiore al minore.'])}
+  ${sez('5. Ricarica e riscatto dei crediti', [
+    '<b>Ricarica:</b> il pulsante «Ricarica» invia una richiesta al Fondo Gruppo con importo e modalità di versamento (contanti in cassetta o Revolut). Quando un amministratore conferma l\'incasso, i crediti arrivano sul tuo saldo. Il pulsante è sempre attivo, anche con saldo positivo.',
+    '<b>Riscatto:</b> chi ha crediti liberi può chiederne la restituzione in denaro al Fondo Gruppo, indicando importo e preferenza (contanti o Revolut). L\'importo richiesto resta riservato (non si può spendere né regalare) finché un amministratore non lo paga dalla cassa e solo allora il saldo scende. Se la cassa non ha liquidità la richiesta può essere rifiutata e rifatta per un importo minore.',
+    '<b>Tra colleghi:</b> per passarsi crediti di persona c\'è «Regala / Trasferisci crediti»: è immediato, senza approvazione e senza annullo (solo un amministratore può stornarlo). Se avviene contro denaro si spunta «È uno scambio»: non conta come regalo nelle classifiche.',
+    '<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione.'])}
   ${sez('6. Lista della spesa e rimborsi', [
     'Chiunque aggiunge alla <b>Lista della spesa</b> ciò che serve alla saletta (caffè, bibite, snack, detergenti). Chi fa la spesa spunta gli articoli che compra e registra l\'acquisto con l\'importo totale e le eventuali note; gli acquisti urgenti non in lista si registrano con <b>Acquisto fuori lista</b>.',
     'Il rimborso si sceglie così: <b>in crediti</b> (dopo la convalida l\'importo diventa credito personale, la cassa non cambia) oppure <b>in denaro reale</b> (l\'amministratore usa «Convalida e Paga»: il denaro esce dalla cassa, contanti o Revolut, e il saldo del collega non cambia).',
@@ -1743,10 +1689,10 @@ function aggMov(G, m, sg){
     case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*(m.punti ?? PUNTI_DEF)); add(G.ptP, x, sg*(m.punti ?? PUNTI_DEF)); }); break;
     case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
     case 'quota': if(m.metodo === 'contanti' || m.metodo === 'revolut') t.quote += sg*m.importo; break;
-    case 'regalo': t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); break;
+    case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
     case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)); break;
     case 'punti_adj': add(m.kind === 'caffe' ? G.ptC : G.ptP, m.mid, sg*m.punti); break;
-    case 'riscatto': if(m.stato !== 'annullata') t.riscatti += sg*m.importo; break;
+    case 'riscatto': if(m.stato === 'confermata' || !m.stato) t.riscatti += sg*m.importo; break;
     case 'entrata': t.entrate += sg*m.importo; break;
     case 'uscita': t.uscite += sg*m.importo; break;
     case 'giroconto': t.giro += sg*m.importo; break;
@@ -2455,7 +2401,6 @@ function pImpostazioni(){
 A['fab'] = () => { st.fab = !st.fab; render(); };
 A['fab-close'] = () => { st.fab = false; render(); };
 A['fab-go'] = ds => { st.fab = false; render(); A[ds.v]({}); };
-A['mercato'] = () => A['go']({p:'crediti'});
 A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render(); };
 A['adm-tab'] = ds => { if(!ADM_TABS.some(x => x[0] === ds.v)) return; st.admTab = ds.v; LS.set('admTab', ds.v); st.page = 'bar'; LS.set('page', 'bar'); render(); };
 A['vista'] = ds => { st.vista = ds.v === 'user' ? 'user' : 'admin'; LS.set('vista', st.vista); st.page = 'bar'; LS.set('page', 'bar'); closeSheet(); window.scrollTo(0,0); render(); };
@@ -2744,7 +2689,7 @@ A['annulla-richiesta'] = ds => {
 };
 
 A['snack'] = () => {
-  const d = derived(), sd = saldo(st.mid);
+  const d = derived(), sd = saldo(st.mid) - riservato(st.mid);
   const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
   openSheet(`<h3>${ic('cookie')} Acquista snack</h3><p class="sub">Tocca l'articolo che hai preso. Credito disponibile: <b class="mono ${sd < 0 ? 'red' : 'green'}">${eurS(sd)}</b>${list.some(p => p.prezzo > sd) ? ' · gli articoli oltre il tuo credito sono disabilitati: <b>' + MSG_CREDITO.toLowerCase() + '</b>' : ''}.</p>
     ${list.length ? `<div class="list">${list.map(p => { const sk = d.S.stock[p.id] || 0, fin = (st.isAdmin && sk <= 0) || p.prezzo > sd; return `<button class="li" style="width:100%;text-align:left;${fin ? 'opacity:.45' : ''}" data-act="prendi-snack" data-id="${p.id}" ${fin ? 'disabled' : ''}>
@@ -2760,120 +2705,58 @@ A['prendi-snack'] = ds => {
   toast(`${p.nome} (−${eur(p.prezzo)})${st.isAdmin && rest <= SOGLIA_SCORTA ? ' · scorte basse!' : ''}`, '', {label:'Annulla', fn: () => annullaConsumo(id)});
 };
 
-A['salda'] = A['ricarica'] = ds => {
-  const fondo = !!ds.fondo, deb = debitoLibero();
-  if(fondo && deb <= 0) return toast('Non hai debiti da saldare', 'err');
-  const imp = ds.v ? Number(ds.v) : (deb > 0 ? deb : 500);
-  const ris = [];
-  const pre = ds.col ? 'collega' : ds.dest || (!fondo && ris[0] ? ris[0].id : 'cassa');
-  openSheet(`<h3>${ic('wallet')} ${fondo ? 'Paga quota fondo' : 'Salda debiti'}</h3>
-    <p class="sub">${fondo ? `Hai un debito di <b class="mono red">${eur(deb)}</b>. Puoi saldarlo in parte.` : `Scegli quanti crediti comprare e a chi pagare${debitoLibero() > 0 ? ` (il tuo debito è <b class="mono red">${eur(debitoLibero())}</b>)` : ''}.`}</p>
-    ${fondo ? '<input type="hidden" id="r-fondo" value="1">' : ''}
-    <label class="f"><span>Importo €</span><input class="in mono" id="r-imp" inputmode="decimal" value="${(imp/100).toFixed(2).replace('.',',')}" placeholder="es. 5,00"></label>
-    <label class="f" style="margin-bottom:6px"><span>A chi paghi?</span></label><div style="margin-bottom:10px">
-      ${ris.map(r => `<label class="check"><input type="radio" name="sd-dest" value="${r.id}" ${pre === r.id ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(nomeM(r.mid))}</b><span class="mut mono" style="font-size:12px">chiede ${eur(r.residuo)}</span></label>`).join('')}
-      <label class="check"><input type="radio" name="sd-dest" value="cassa" ${pre === 'cassa' ? 'checked' : ''}><b style="flex:1;font-size:14px">Alla cassa del fondo</b></label>
-      ${fondo ? '' : `<label class="check"><input type="radio" name="sd-dest" value="collega" ${pre === 'collega' ? 'checked' : ''}><b style="flex:1;font-size:14px">Compro crediti da un collega</b></label>
-      <select class="in" id="sd-col" style="margin-bottom:6px">${membriAttivi().filter(m => m.id !== st.mid).map(m => `<option value="${m.id}" ${ds.col === m.id ? 'selected' : ''}>${esc(nomeM(m.id))}</option>`).join('')}</select>`}</div>
-    <label class="f"><span>Come versi i soldi?</span>${segOpts('r-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut']], 'contanti')}</label>
-    <p class="hint">${ris.length ? 'Pagando direttamente un collega, i soldi non passano dalla cassa: lui conferma di averli ricevuti e i suoi crediti passano a te.' : 'Un amministratore conferma quando riceve i soldi.'}</p>
-    <button class="btn amber block big" data-act="conferma-ricarica">Conferma</button>`);
+/* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un amministratore --- */
+A['ricarica-nuova'] = () => {
+  const deb = debitoLibero(), base = deb > 0 ? deb : 1000;
+  openSheet(`<h3>${ic('wallet')} Ricarica crediti</h3>
+    <p class="sub">${deb > 0 ? `Hai un debito di <b class="mono red">${eur(deb)}</b>. ` : ''}Versi i soldi al Fondo Gruppo; quando un amministratore conferma l'incasso ricevi i crediti (1 credito = 1 €).</p>
+    <div class="chips" id="rc-tagli">${[500, 1000, 2000, 5000].map(v => `<button type="button" data-act="rc-taglio" data-v="${v}">${eur(v)}</button>`).join('')}</div>
+    <label class="f"><span>Importo €</span><input class="in mono" id="r-imp" inputmode="decimal" value="${(base / 100).toFixed(2).replace('.', ',')}"></label>
+    <label class="f"><span>Come versi i soldi?</span>${segOpts('r-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], 'contanti')}</label>
+    <button class="btn amber block big" id="btn-ricarica-conferma" data-act="conferma-ricarica">Invia la richiesta</button>`);
 };
+A['rc-taglio'] = ds => { const i = $('r-imp'); if(i) i.value = (Number(ds.v) / 100).toFixed(2).replace('.', ','); };
 A['conferma-ricarica'] = () => {
-  const imp = parseEuro(val('r-imp')), met = radio('r-met'), dest = radio('sd-dest') || 'cassa';
+  const imp = parseEuro(val('r-imp')), met = radio('r-met') || 'contanti';
   if(!(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
-  if($('r-fondo') && imp > debitoLibero()) return toast('Non puoi saldare più del tuo debito', 'err');
-  if(dest === 'collega'){
-    const col = val('sd-col'); if(!col || col === st.mid) return toast('Scegli il collega', 'err');
-    if(imp > (saldo(col) || 0)) return toast('Il collega non ha abbastanza crediti', 'err');
-    addMov({tipo:'scambio', mid: st.mid, dest: col, daMid: col, aMid: st.mid, importo: imp, metodo: met, stato: 'attesa'});
-    closeSheet(); return toast(`Richiesta inviata a ${nomeBreve(col)}: aspetta la sua conferma`);
-  }
-  if(dest !== 'cassa'){
-    const r = st.riscatti.find(x => x.id === dest);
-    if(!r || r.stato !== 'aperta' || imp > r.residuo) return toast('Quel collega chiede meno di così', 'err');
-    addMov({tipo:'scambio', mid: st.mid, dest: r.mid, daMid: r.mid, aMid: st.mid, importo: imp, metodo: met, rif: r.id, stato: 'attesa'});
-    closeSheet(); return toast(`Inviato a ${nomeBreve(r.mid)}: aspetta la sua conferma`);
-  }
-  addMov({tipo:'ricarica', mid: st.mid, importo: imp, metodo: met, ...($('r-fondo') ? {fondo: true} : {}), stato: st.isAdmin ? 'confermata' : 'attesa', ...(st.isAdmin ? {esitoDa: myName()} : {})});
+  addMov({tipo:'ricarica', mid: st.mid, importo: imp, metodo: met, stato: st.isAdmin ? 'confermata' : 'attesa', ...(st.isAdmin ? {esitoDa: myName()} : {})});
   closeSheet();
-  toast(st.isAdmin ? `Pagamento di ${eur(imp)} registrato` : `Inviato: ${eur(imp)} in attesa di conferma`);
+  toast(st.isAdmin ? `Ricarica di ${eur(imp)} registrata` : `Richiesta inviata: ${eur(imp)} in attesa di conferma`);
 };
-
-
-/* --- riscatto crediti, scambio crediti --- */
-A['annulla-riscatto'] = ds => { C('riscatti').doc(ds.id).set({stato: 'annullata'}, {merge: true}).then(() => toast('Riscatto annullato')).catch(e => toast(errMsg(e), 'err')); };
-A['riscatta-inizia'] = () => { st.riscSel = {}; A['go']({p:'crediti', t:'risc'}); };
-A['cred-tab'] = ds => { st.creditiTab = ds.v; render(); };
-A['risc-toggle'] = ds => { st.riscMet = radio('rm-met') || st.riscMet; st.riscSel[ds.id] = !st.riscSel[ds.id]; render(); };
-A['risc-invia'] = () => {
-  const al = allocaRiscatto(derived()); if(!al.out.length) return toast('Seleziona almeno un collega', 'err');
-  const met = radio('rm-met') || st.riscMet || 'contanti';
-  al.out.forEach(x => addMov({tipo:'scambio', mid: st.mid, dest: x.id, daMid: st.mid, aMid: x.id, importo: x.q, metodo: met, stato: 'attesa'}));
-  st.riscSel = {}; toast(`Richieste inviate a ${al.out.length} ${al.out.length === 1 ? 'collega' : 'colleghi'}`);
-};
-A['vendi-fondo'] = ds => {
+A['riscatta-nuovo'] = () => {
   const cr = creditoLibero(); if(cr <= 0) return toast('Non hai crediti da riscattare', 'err');
   openSheet(`<h3>${ic('banknote')} Riscatta crediti</h3>
-    <p class="sub">Hai <b class="mono green">${eur(cr)}</b> di crediti. Puoi riscattarli solo dal Fondo Gruppo (1 credito = 1 €): un amministratore ti paga dalla cassa e solo allora il credito scende. Se in cassa non c'è abbastanza liquidità, la richiesta resta in attesa.</p>
-    <label class="f"><span>Quanto riscatti €</span><input class="in mono" id="vf-imp" inputmode="decimal" value="${((ds && ds.v ? Math.min(Number(ds.v), cr) : cr)/100).toFixed(2).replace('.',',')}"></label>
-    <label class="f"><span>Come vuoi ricevere i soldi?</span>${segOpts('vf-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut']], 'contanti')}</label>
-    <button class="btn amber block big" data-act="conferma-vendi-fondo">Invia la richiesta</button>`);
+    <p class="sub">Hai <b class="mono green">${eur(cr)}</b> di crediti liberi. Chiedi al Fondo Gruppo di restituirti il denaro (1 credito = 1 €): l'importo resta riservato e il saldo scende solo quando un amministratore ti paga. Se in cassa non c'è liquidità la richiesta può essere rifiutata: potrai rifarla per un importo minore.</p>
+    <label class="f"><span>Quanto riscatti €</span><input class="in mono" id="vf-imp" inputmode="decimal" value="${(Math.min(cr, 50000) / 100).toFixed(2).replace('.', ',')}"></label>
+    <label class="f"><span>Come vuoi ricevere i soldi?</span>${segOpts('vf-met', [['contanti', '💶 Contanti'], ['revolut', '📱 Revolut']], 'contanti')}</label>
+    <button class="btn amber block big" id="btn-riscatto-conferma" data-act="conferma-riscatto">Invia la richiesta</button>`);
 };
-A['conferma-vendi-fondo'] = () => {
+A['conferma-riscatto'] = () => {
   const imp = parseEuro(val('vf-imp'));
   if(!(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
-  if(imp > creditoLibero()) return toast('Non puoi riscattare più dei tuoi crediti', 'err');
-  C('riscatti').doc().set({mid: st.mid, importo: imp, residuo: imp, metodo: radio('vf-met') || 'contanti', stato: 'aperta', fondo: true, ts: TS()})
-    .then(() => toast('Richiesta di liquidazione inviata')).catch(e => toast(errMsg(e), 'err'));
+  if(imp > creditoLibero()) return toast('Non puoi riscattare più dei tuoi crediti liberi', 'err');
+  addMov({tipo:'riscatto', mid: st.mid, importo: imp, metodo: radio('vf-met') || 'contanti', stato: 'attesa'});
+  closeSheet(); toast(`Richiesta di riscatto di ${eur(imp)} inviata`);
+};
+/* admin: paga il riscatto dalla cassa (importo intero, oppure rifiuta) */
+A['riscatto-paga'] = ds => {
+  const m = derived().movs.find(x => x.id === ds.id); if(!m || m.tipo !== 'riscatto' || m.stato !== 'attesa') return;
+  const c = derived().S.cassa || {};
+  openSheet(`<h3>${ic('banknote')} Paga il riscatto</h3>
+    <p class="sub"><b>${esc(nomeM(m.mid))}</b> chiede <b class="mono">${eur(m.importo)}</b> · preferisce ${esc(FONTI[m.metodo] || m.metodo)}. Saldo attuale: <b class="mono">${eurS(saldo(m.mid))}</b>.</p>
+    <div class="banner amber">${ic('wallet')}<div>Liquidità: contanti <b>${eur(c.contanti || 0)}</b> · Revolut <b>${eur(c.revolut || 0)}</b>. Paga solo se c'è capienza.</div></div>
+    <label class="f"><span>Da dove escono i soldi</span>${segOpts('rc-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], m.metodo === 'revolut' ? 'revolut' : 'contanti')}</label>
+    <button class="btn amber block big" id="btn-riscatto-paga" data-act="conferma-riscatto-paga" data-id="${m.id}">Ho pagato: conferma</button>
+    <p class="hint">L'importo è quello richiesto. Se non puoi pagarlo per intero, rifiuta la richiesta: il collega potrà rifarla per una cifra minore.</p>`);
+};
+A['conferma-riscatto-paga'] = ds => {
+  const m = derived().movs.find(x => x.id === ds.id); if(!m || m.tipo !== 'riscatto' || m.stato !== 'attesa') return closeSheet();
+  const met = radio('rc-met') || 'contanti';
+  if((saldo(m.mid) || 0) < m.importo) return toast('Il saldo del collega non copre più questo importo: rifiuta la richiesta', 'err');
+  if((((derived().S.cassa || {})[met]) || 0) < m.importo) return toast('Capienza di cassa insufficiente: scegli l\'altro metodo, fai un giroconto o rifiuta', 'err');
+  C('movimenti').doc(m.id).update({stato: 'confermata', esitoDa: myName(), esitoTs: TS(), ...(met !== m.metodo ? {metodo: met} : {})})
+    .then(() => toast('Riscatto pagato dalla cassa ✓')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
-};
-A['compra-fondo'] = () => {
-  const deb = debitoLibero();
-  openSheet(`<h3>${ic('wallet')} Compra dal Fondo Gruppo</h3>
-    <p class="sub">${debitoLibero() > 0 ? `Hai un debito di <b class="mono red">${eur(debitoLibero())}</b>. ` : ''}Versi contanti in sala o invii al Revolut comune; quando un amministratore conferma, ricevi i crediti (1 credito = 1 €).</p>
-    <label class="f"><span>Importo €</span><input class="in mono" id="cf-imp" inputmode="decimal" value="${(Math.max(deb, 500)/100).toFixed(2).replace('.',',')}"></label>
-    <label class="f"><span>Come versi i soldi?</span>${segOpts('cf-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut']], 'contanti')}</label>
-    <button class="btn amber block big" data-act="conferma-compra-fondo">Conferma</button>`);
-};
-A['conferma-compra-fondo'] = () => {
-  const imp = parseEuro(val('cf-imp'));
-  if(!(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
-  addMov({tipo:'ricarica', mid: st.mid, importo: imp, metodo: radio('cf-met') || 'contanti', stato: st.isAdmin ? 'confermata' : 'attesa', ...(st.isAdmin ? {esitoDa: myName()} : {})});
-  closeSheet(); toast(st.isAdmin ? `Pagamento di ${eur(imp)} registrato` : `Inviato: ${eur(imp)} in attesa di conferma`);
-};
-A['scambio-esito'] = ds => {
-  const m = derived().movs.find(x => x.id === ds.id); if(!m || m.stato !== 'attesa') return;
-  if(ds.v === 'confermata' && m.daMid === st.mid && saldo(st.mid) < m.importo) return toast('Non hai abbastanza crediti per questa vendita', 'err');
-  const ra = ds.v === 'confermata' && m.rifAcq ? st.acquisti.find(x => x.id === m.rifAcq) : null;
-  if(ds.v === 'confermata' && m.rifAcq && (!ra || ra.stato !== 'aperta' || ra.residuo < m.importo)) return toast('La richiesta è già stata soddisfatta: rifiuta questa cessione', 'err');
-  const b = db.batch();
-  b.set(C('movimenti').doc(m.id), {stato: ds.v, esitoDa: myName(), esitoTs: TS()}, {merge: true});
-  if(ra){ const res = ra.residuo - m.importo; b.set(C('acquisti').doc(ra.id), {residuo: res, stato: res > 0 ? 'aperta' : 'chiusa'}, {merge: true}); }
-  if(ds.v === 'confermata' && m.rif){
-    const r = st.riscatti.find(x => x.id === m.rif);
-    if(r){ const res = Math.max(0, r.residuo - m.importo); b.set(C('riscatti').doc(r.id), {residuo: res, stato: res > 0 ? 'aperta' : 'chiusa'}, {merge: true}); }
-  }
-  b.commit().then(() => toast(ds.v === 'confermata' ? 'Confermato ✓' : 'Rifiutato')).catch(e => toast(errMsg(e), 'err'));
-};
-A['riscatto-cassa'] = ds => {
-  const r = st.riscatti.find(x => x.id === ds.id); if(!r) return;
-  const deb = st.membri.filter(m => (saldo(m.id) || 0) < 0 && m.attivo !== false), tot = deb.reduce((a, m) => a - saldo(m.id), 0);
-  openSheet(`<h3>${ic('banknote')} Paga il riscatto dalla cassa</h3><p class="sub">${esc(nomeM(r.mid))} chiede ${eur(resEff(r))} · preferisce ${esc(FONTI[r.metodo] || r.metodo)}</p>
-    <div class="banner amber">${ic('wallet')}<div>Liquidità: contanti <b>${eur(derived().S.cassa.contanti || 0)}</b> · Revolut <b>${eur(derived().S.cassa.revolut || 0)}</b>. Il Fondo vende e compra sempre: paga solo se c'è capienza.</div></div>
-    <label class="f"><span>Importo € (max ${eur(Math.min(r.residuo, Math.max(0, saldo(r.mid))))})</span><input class="in mono" id="rc-imp" inputmode="decimal" value="${(Math.min(r.residuo, Math.max(0, saldo(r.mid)))/100).toFixed(2).replace('.',',')}"></label>
-    <label class="f"><span>Da dove escono i soldi</span>${segOpts('rc-met', [['contanti','💶 Contanti in sala'],['revolut','📱 Revolut']], r.metodo === 'revolut' ? 'revolut' : 'contanti')}</label>
-    <button class="btn amber block big" data-act="conferma-riscatto-cassa" data-id="${r.id}">Paga</button>`);
-};
-A['conferma-riscatto-cassa'] = ds => {
-  const r = st.riscatti.find(x => x.id === ds.id); if(!r) return closeSheet();
-  const imp = parseEuro(val('rc-imp')), max = Math.min(r.residuo, Math.max(0, saldo(r.mid)));
-  if(!(imp > 0) || imp > max) return toast('Importo non valido', 'err');
-  if(((derived().S.cassa[radio('rc-met') || 'contanti']) || 0) < imp) return toast('Capienza di cassa insufficiente per questo importo', 'err');
-  addMov({tipo:'riscatto', mid: r.mid, importo: imp, metodo: radio('rc-met') || 'contanti', rif: r.id, stato: 'confermata', esitoDa: myName()});
-  const res = Math.max(0, Math.min(r.residuo - imp, (saldo(r.mid) || 0) - imp));
-  C('riscatti').doc(r.id).set({residuo: res, stato: res > 0 ? 'aperta' : 'chiusa'}, {merge: true}).catch(e => toast(errMsg(e), 'err'));
-  closeSheet(); toast('Riscatto pagato dalla cassa');
 };
 
 /* acquisto libero (fuori lista): resta disponibile dalla pagina Lista della spesa */
@@ -2951,12 +2834,13 @@ function rgAggiorna(){
 A['regala'] = () => {
   const col = membriAttivi().filter(m => m.id !== st.mid).slice().sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
   if(!col.length) return toast('Non ci sono altri colleghi', 'err');
-  openSheet(`<h3>🎁 Regala crediti</h3>
-    <p class="sub">Il regalo è immediato: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
+  openSheet(`<h3>🎁 Regala / Trasferisci crediti</h3>
+    <p class="sub">Il trasferimento è immediato: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
     <div class="between" style="margin-bottom:8px"><b style="font-size:13px">Colleghi</b><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="rg-tutti" data-v="1">Seleziona tutti</button><button class="btn sm ghost" data-act="rg-tutti" data-v="0">Deseleziona tutti</button></span></div>
     <div style="max-height:34vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check"><input type="checkbox" class="rg-c" value="${m.id}" data-chg="rg-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}</div>
     <label class="f"><span>Crediti per ogni collega</span><input class="in mono" id="rg-q" inputmode="numeric" maxlength="3" value="1" data-chg="rg-upd"></label>
     <label class="f"><span>Causale (facoltativa)</span><input class="in" id="rg-msg" maxlength="80" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
+    <label class="check" style="margin:4px 0 8px"><input type="checkbox" id="rg-trasf"><b style="flex:1;font-size:13.5px">È uno scambio: ho ricevuto denaro in cambio</b></label>
     <div id="rg-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
     <div id="rg-warn" class="banner red" style="display:none">${ic('alert')}<div><b>Saldo insufficiente</b></div></div>
     <button class="btn green block big" id="rg-send" data-act="rg-invia" disabled>Invia i crediti</button>`);
@@ -2969,8 +2853,9 @@ A['rg-invia'] = () => {
   const q = +raw, imp = q * 100, msg = val('rg-msg').slice(0, 80);
   if(!ids.length) return toast('Seleziona almeno un collega', 'err');
   if(ids.length * imp > creditoLibero()) return toast('Saldo insufficiente', 'err');
-  ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {})}));
-  closeSheet(); toast(`🎁 Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
+  const trasf = !!($('rg-trasf') && $('rg-trasf').checked);
+  ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {}), ...(trasf ? {trasf: true} : {})}));
+  closeSheet(); toast(`${trasf ? '🤝' : '🎁'} Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
 };
 
 /* --- eventi --- */
@@ -3563,7 +3448,7 @@ A['chiudi-periodo'] = async () => {
   const incl = st.movimenti.filter(m => m.t <= limite);
   if(!incl.length) return toast('Nessun movimento da chiudere', 'err');
   if(incl.some(m => m.stato === 'attesa' && m.tipo !== 'scambio')) return toast('Prima conferma o rifiuta le richieste in attesa', 'err');
-  if(incl.some(m => m.stato === 'attesa' && m.tipo === 'scambio')) return toast('Ci sono scambi di crediti in attesa: devono accettarli o rifiutarli i colleghi destinatari', 'err');
+
   if(!confirm(`Chiudere il periodo con ${incl.length} movimenti?`)) return;
   st.busy = true; render();
   try {
