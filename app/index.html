@@ -230,6 +230,8 @@ textarea.in{min-height:96px;resize:vertical}
 .seg input{display:none}
 .seg label{padding:11px 6px;text-align:center;border-radius:12px;border:1px solid var(--line2);background:var(--bg2);font-size:13px;font-weight:700;color:var(--tx2);cursor:pointer}
 .seg input:checked+label{border-color:var(--amber);color:var(--amber);background:rgba(245,165,36,.08)}
+.seg label.off{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}.seg label .nd{display:block;font-size:10.5px;font-weight:700;margin-top:2px}
+.rvsw{display:flex;align-items:center;gap:12px;width:100%;text-align:left}.rvsw .trk{flex:none;width:46px;height:26px;border-radius:99px;background:var(--line2);position:relative;transition:background .2s}.rvsw .trk::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}.rvsw.on .trk{background:var(--green)}.rvsw.on .trk::after{transform:translateX(20px)}
 .check{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);background:var(--bg2);border-radius:13px;margin-bottom:7px;cursor:pointer}
 .check input{width:19px;height:19px;accent-color:var(--violet)}
 .hint{font-size:12px;color:var(--mut);margin:-4px 0 12px}
@@ -369,7 +371,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.17.0';
+const VERSION = '1.18.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -806,9 +808,14 @@ function openSheet(html){
 function closeSheet(){ $('sheet').classList.remove('on'); $('sheet-ov').classList.remove('on'); }
 const val = id => { const e = $(id); return e ? e.value.trim() : ''; };
 const radio = name => { const e = document.querySelector(`input[name="${name}"]:checked`); return e ? e.value : null; };
-function segOpts(name, opts, sel){
-  return `<div class="seg">${opts.map(([v,l]) => `<input type="radio" name="${name}" id="${name}-${v}" value="${v}" ${v===sel?'checked':''}><label for="${name}-${v}">${l}</label>`).join('')}</div>`;
+function segOpts(name, opts, sel, off){
+  off = off || [];
+  return `<div class="seg">${opts.map(([v,l]) => { const no = off.includes(v);
+    return `<input type="radio" name="${name}" id="${name}-${v}" value="${v}" ${v===sel&&!no?'checked':''} ${no?'disabled':''}><label for="${name}-${v}"${no?' class="off" aria-disabled="true"':''}>${l}${no?'<small class="nd">(Non disponibile)</small>':''}</label>`; }).join('')}</div>`;
 }
+/* canale Revolut: sospendibile dall'admin (campo revolutAttivo nel documento gruppo, assente = attivo) */
+const revolutOn = () => !st.gruppo || st.gruppo.revolutAttivo !== false;
+const revOff = () => revolutOn() ? [] : ['revolut'];
 
 /* =====================================================================
    RENDER
@@ -1258,7 +1265,8 @@ function pAdminHome(d, forza){
   const a = anno(), qPag = soci.filter(m => statoQuota(d, m.id, a) === 'pagata').length;
   const tabs = `<div class="atabs" role="tablist">${ADM_TABS.map(([k, e, l]) => `<button role="tab" aria-selected="${tab === k}" class="${tab === k ? 'on' : ''}" id="atab-${k}" data-act="adm-tab" data-v="${k}"><span>${e}</span>${l}${k === 'inbox' && cn.fondo ? `<span class="tb">${cn.fondo}</span>` : ''}</button>`).join('')}</div>`;
   const inbox = `${inboxAdmin(d)}${storicoRichieste(d)}`;
-  const cassa = `<div class="grid2" style="margin-bottom:8px">
+  const cassa = `<button class="card rvsw ${revolutOn() ? 'on' : ''}" id="sw-revolut" role="switch" aria-checked="${revolutOn()}" data-act="revolut-toggle" style="margin-bottom:10px"><span class="trk"></span><span class="grow"><b>Canale Revolut ${revolutOn() ? 'attivo' : 'sospeso'}</b><span class="mut" style="display:block;font-size:12px;margin-top:2px">${revolutOn() ? 'I colleghi possono scegliere Revolut per ricariche e riscatti.' : 'Ricariche e riscatti dei colleghi solo in contanti. Il saldo Revolut resta com\'è.'}</span></span></button>
+  <div class="grid2" style="margin-bottom:8px">
     <button class="btn green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Registra entrata</button>
     <button class="btn red" data-act="cassa-op" data-v="uscita">${ic('out','s')} Registra uscita</button>
     <button class="btn" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button>
@@ -2737,12 +2745,12 @@ A['ricarica-nuova'] = () => {
     <p class="sub">${deb > 0 ? `Hai un debito di <b class="mono red">${eur(deb)}</b>. ` : ''}Versi i soldi al Fondo Gruppo; quando un amministratore conferma l'incasso ricevi i crediti (1 credito = 1 €).</p>
     <div class="chips" id="rc-tagli">${[500, 1000, 2000, 5000].map(v => `<button type="button" data-act="rc-taglio" data-v="${v}">${eur(v)}</button>`).join('')}</div>
     <label class="f"><span>Importo €</span><input class="in mono" id="r-imp" inputmode="decimal" value="${(base / 100).toFixed(2).replace('.', ',')}"></label>
-    <label class="f"><span>Come versi i soldi?</span>${segOpts('r-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], 'contanti')}</label>
+    <label class="f"><span>Come versi i soldi?</span>${segOpts('r-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], 'contanti', revOff())}</label>
     <button class="btn amber block big" id="btn-ricarica-conferma" data-act="conferma-ricarica">Invia la richiesta</button>`);
 };
 A['rc-taglio'] = ds => { const i = $('r-imp'); if(i) i.value = (Number(ds.v) / 100).toFixed(2).replace('.', ','); };
 A['conferma-ricarica'] = () => {
-  const imp = parseEuro(val('r-imp')), met = radio('r-met') || 'contanti';
+  const imp = parseEuro(val('r-imp')), met = revolutOn() ? (radio('r-met') || 'contanti') : 'contanti';
   if(!(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
   addMov({tipo:'ricarica', mid: st.mid, importo: imp, metodo: met, stato: st.isAdmin ? 'confermata' : 'attesa', ...(st.isAdmin ? {esitoDa: myName()} : {})});
   closeSheet();
@@ -2753,14 +2761,14 @@ A['riscatta-nuovo'] = () => {
   openSheet(`<h3>${ic('banknote')} Riscatta crediti</h3>
     <p class="sub">Hai <b class="mono green">${eur(cr)}</b> di crediti liberi. Chiedi al Fondo Gruppo di restituirti il denaro (1 credito = 1 €): l'importo resta riservato e il saldo scende solo quando un amministratore ti paga. Se in cassa non c'è liquidità la richiesta può essere rifiutata: potrai rifarla per un importo minore.</p>
     <label class="f"><span>Quanto riscatti €</span><input class="in mono" id="vf-imp" inputmode="decimal" value="${(Math.min(cr, 50000) / 100).toFixed(2).replace('.', ',')}"></label>
-    <label class="f"><span>Come vuoi ricevere i soldi?</span>${segOpts('vf-met', [['contanti', '💶 Contanti'], ['revolut', '📱 Revolut']], 'contanti')}</label>
+    <label class="f"><span>Come vuoi ricevere i soldi?</span>${segOpts('vf-met', [['contanti', '💶 Contanti'], ['revolut', '📱 Revolut']], 'contanti', revOff())}</label>
     <button class="btn amber block big" id="btn-riscatto-conferma" data-act="conferma-riscatto">Invia la richiesta</button>`);
 };
 A['conferma-riscatto'] = () => {
   const imp = parseEuro(val('vf-imp'));
   if(!(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
   if(imp > creditoLibero()) return toast('Non puoi riscattare più dei tuoi crediti liberi', 'err');
-  addMov({tipo:'riscatto', mid: st.mid, importo: imp, metodo: radio('vf-met') || 'contanti', stato: 'attesa'});
+  addMov({tipo:'riscatto', mid: st.mid, importo: imp, metodo: revolutOn() ? (radio('vf-met') || 'contanti') : 'contanti', stato: 'attesa'});
   closeSheet(); toast(`Richiesta di riscatto di ${eur(imp)} inviata`);
 };
 /* admin: paga il riscatto dalla cassa (importo intero, oppure rifiuta) */
@@ -2770,7 +2778,7 @@ A['riscatto-paga'] = ds => {
   openSheet(`<h3>${ic('banknote')} Paga il riscatto</h3>
     <p class="sub"><b>${esc(nomeM(m.mid))}</b> chiede <b class="mono">${eur(m.importo)}</b> · preferisce ${esc(FONTI[m.metodo] || m.metodo)}. Saldo attuale: <b class="mono">${eurS(saldo(m.mid))}</b>.</p>
     <div class="banner amber">${ic('wallet')}<div>Liquidità: contanti <b>${eur(c.contanti || 0)}</b> · Revolut <b>${eur(c.revolut || 0)}</b>. Paga solo se c'è capienza.</div></div>
-    <label class="f"><span>Da dove escono i soldi</span>${segOpts('rc-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], m.metodo === 'revolut' ? 'revolut' : 'contanti')}</label>
+    <label class="f"><span>Da dove escono i soldi</span>${segOpts('rc-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], m.metodo === 'revolut' && revolutOn() ? 'revolut' : 'contanti')}</label>
     <button class="btn amber block big" id="btn-riscatto-paga" data-act="conferma-riscatto-paga" data-id="${m.id}">Ho pagato: conferma</button>
     <p class="hint">L'importo è quello richiesto. Se non puoi pagarlo per intero, rifiuta la richiesta: il collega potrà rifarla per una cifra minore.</p>`);
 };
@@ -3785,6 +3793,11 @@ function avvisiHome(){
   return h;
 }
 const avvisoAdminBtn = () => `<button class="btn sm block ghost" id="btn-avviso-nuovo" style="margin-bottom:10px" data-act="avviso-nuovo">📢 ${st.gruppo.avviso ? 'Sostituisci la comunicazione in Home' : 'Pubblica una comunicazione in Home'}</button>`;
+A['revolut-toggle'] = () => {
+  if(!st.isAdmin) return;
+  const on = !revolutOn();
+  G().update({revolutAttivo: on}).then(() => toast(on ? 'Canale Revolut riattivato' : 'Canale Revolut sospeso')).catch(e => toast(errMsg(e), 'err'));
+};
 A['avviso-nuovo'] = () => {
   if(!st.isAdmin) return;
   const cur = st.gruppo.avviso || {}, tp = AVV_TIPI[cur.tipo] ? cur.tipo : 'avviso';
