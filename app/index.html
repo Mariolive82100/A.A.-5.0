@@ -199,6 +199,17 @@ main.wide{max-width:980px}
 .banner.amber{background:rgba(245,165,36,.1);border:1px solid rgba(245,165,36,.3);color:#fde68a}
 .banner.red{background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.3);color:#fecdd3}
 .banner.sky{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);color:#bae6fd}
+.avv{position:relative;display:block;text-align:center;margin:0 0 12px;padding:18px 22px;border-radius:22px;border:1.5px solid var(--avc);background:var(--avb);color:var(--avt);animation:avv-respiro 2.6s ease-in-out infinite}
+.avv .avv-t{font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.95}
+.avv .avv-m{margin-top:6px;font-size:16px;font-weight:700;line-height:1.4;word-break:break-word}
+.avv .avv-a{margin-top:8px;font-size:11.5px;opacity:.75}
+.avv .iconbtn{position:absolute;top:8px;right:8px;width:32px;height:32px}
+.avv.amber{--avc:rgba(245,165,36,.75);--avb:rgba(245,165,36,.14);--avt:#fde68a;--avg:245,165,36}
+.avv.red{--avc:rgba(251,113,133,.75);--avb:rgba(251,113,133,.14);--avt:#fecdd3;--avg:251,113,133}
+.avv.sky{--avc:rgba(56,189,248,.75);--avb:rgba(56,189,248,.13);--avt:#bae6fd;--avg:56,189,248}
+.avv.green{--avc:rgba(16,185,129,.8);--avb:rgba(16,185,129,.15);--avt:#a7f3d0;--avg:16,185,129}
+@keyframes avv-respiro{0%,100%{opacity:.82;box-shadow:0 0 0 0 rgba(var(--avg),0)}50%{opacity:1;box-shadow:0 0 22px 3px rgba(var(--avg),.38)}}
+@media (prefers-reduced-motion:reduce){.avv{animation:none}}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
 th.s{cursor:pointer}th.r,td.r{text-align:right}th.c,td.c{text-align:center}
@@ -3755,7 +3766,7 @@ document.addEventListener('keydown', e => {
 setInterval(() => { if(st.page === 'feed' || st.page === 'bar') render(); }, 60000);
 
 /* ---------- Avvisi e comunicazioni in Home ---------- */
-const AVV_TIPI = {avviso: ['📢', 'Avviso', 'amber'], attenzione: ['⚠️', 'Attenzione', 'red'], info: ['☕', 'Info', 'sky']};
+const AVV_TIPI = {avviso: ['📢', 'Avviso', 'amber'], attenzione: ['⚠️', 'Attenzione', 'red'], info: ['ℹ️', 'Info', 'sky']};
 /* avvisi automatici di oggi: solo dati gia' in memoria (st.eventi), nessuna lettura ne' scrittura */
 function avvisiAuto(){
   const oggi = oggiISO();
@@ -3767,10 +3778,10 @@ function avvisiHome(){
   let h = '';
   if(av && typeof av.testo === 'string' && av.testo){
     const [em, lab, col] = AVV_TIPI[av.tipo] || AVV_TIPI.avviso, t = tms(av.ts);
-    h += `<div class="banner ${col}" id="avviso-admin"><div class="grow"><b>${em} ${lab}</b><div style="margin-top:3px;font-size:14px;line-height:1.4;word-break:break-word">${esc(av.testo)}</div><div style="margin-top:5px;font-size:11.5px;opacity:.75">${esc(av.autore || '')}${t ? ' · ' + quando(t) : ''}</div></div>
-      ${st.isAdmin ? `<button class="iconbtn" style="width:32px;height:32px;flex:none" id="avviso-rimuovi" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>`;
+    h += `<div class="avv ${col}" id="avviso-admin" role="status"><div class="avv-t">${em} ${lab}</div><div class="avv-m">${esc(av.testo)}</div><div class="avv-a">${esc(av.autore || '')}${t ? ' · ' + quando(t) : ''}</div>
+      ${st.isAdmin ? `<button class="iconbtn" id="avviso-rimuovi" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>`;
   }
-  auto.forEach((t, i) => { h += `<div class="banner amber" id="avviso-auto-${i}"><div class="grow" style="font-size:14px">${t}</div></div>`; });
+  auto.forEach((t, i) => { h += `<div class="avv green" id="avviso-auto-${i}" role="status"><div class="avv-m">${t}</div></div>`; });
   return h;
 }
 const avvisoAdminBtn = () => `<button class="btn sm block ghost" id="btn-avviso-nuovo" style="margin-bottom:10px" data-act="avviso-nuovo">📢 ${st.gruppo.avviso ? 'Sostituisci la comunicazione in Home' : 'Pubblica una comunicazione in Home'}</button>`;
