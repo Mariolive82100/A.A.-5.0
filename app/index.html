@@ -88,6 +88,12 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .home .grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .gbtn{position:relative;min-height:min(30vh,210px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px;border-radius:26px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);color:var(--tx);font-weight:800;font-size:clamp(19px,5.4vw,27px);line-height:1.15;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .gbtn:active{transform:scale(.97)}
+.gbtn:disabled{opacity:.42;filter:grayscale(.5)}
+.gbtn:disabled:active{transform:none}
+.tgl{width:48px;height:28px;border-radius:14px;background:var(--line2);border:0;position:relative;flex:none;padding:0}
+.tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s}
+.tgl.on{background:var(--green)}
+.tgl.on::after{left:23px}
 .gbtn small{font-size:12.5px;font-weight:600;color:var(--tx2)}
 .gbtn .em{font-size:34px;line-height:1}
 .gbtn.adm{border-color:rgba(167,139,250,.38);background:linear-gradient(135deg,rgba(245,165,36,.13),rgba(124,58,237,.16))}
@@ -319,7 +325,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.11.5';
+const VERSION = '1.12.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -597,7 +603,11 @@ function applyMov(S, m, sg){
     case 'addebito_quota': add(S.saldi, m.mid, -sg*m.importo); S.dovute[m.anno] = S.dovute[m.anno] || {}; add(S.dovute[m.anno], m.mid, sg); break;
     case 'quota':
       S.quote[m.anno] = S.quote[m.anno] || {}; add(S.quote[m.anno], m.mid, sg);
-      if(m.metodo === 'contanti' || m.metodo === 'revolut'){ add(S.saldi, m.mid, sg*m.importo); add(S.cassa, m.metodo, sg*m.importo); }
+      if(typeof m.cred === 'boolean'){
+        // modello prepagato: la quota e' un contributo al fondo; i crediti si accreditano solo se l'admin lo sceglie (cred)
+        if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo);
+        if(m.cred) add(S.saldi, m.mid, sg*m.importo);
+      } else if(m.metodo === 'contanti' || m.metodo === 'revolut'){ add(S.saldi, m.mid, sg*m.importo); add(S.cassa, m.metodo, sg*m.importo); }
       else if(m.metodo === 'esterno') add(S.saldi, m.mid, sg*m.importo);
       break;   // 'credito': pagata scalando il credito gia' versato, nessun movimento di soldi
     case 'scambio': if(m.stato === 'confermata'){ add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); } break;
@@ -605,7 +615,10 @@ function applyMov(S, m, sg){
     case 'ben_fatto': S.pbf = S.pbf || {}; add(S.pbf, m.aMid, sg*(m.pt ?? 2)); break;   // punti al destinatario; chi lo invia non perde nulla
     case 'riscatto_punti': S.pRisc = S.pRisc || {}; add(S.pRisc, m.mid, sg*m.punti); add(S.saldi, m.mid, sg*m.importo); break;
     case 'riscatto': if(m.stato !== 'annullata'){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
-    case 'rettifica': case 'accredito': add(S.saldi, m.mid, sg*m.importo); break;
+    case 'rettifica': add(S.saldi, m.mid, sg*m.importo); break;
+    case 'accredito': add(S.saldi, m.mid, sg*m.importo);
+      if(m.qmAnno){ S.dovute[m.qmAnno] = S.dovute[m.qmAnno] || {}; add(S.dovute[m.qmAnno], m.mid, -sg); }   // storno di un vecchio addebito di quota
+      break;
     case 'caffe_pagato': add(S.pcaf, m.mid, sg*m.qta); if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo); break;   // caffè pagati subito, fuori dall'app: nessun effetto sul saldo
     case 'carico': add(S.stock, m.pid, sg*m.qta); break;
     case 'conversione': add(S.saldi, m.mid, sg*m.importo); add(S.puntiConv, m.mid, sg*m.punti); break;
@@ -666,6 +679,10 @@ const myName = () => nomeM(st.mid);
 const membriAttivi = () => st.membri.filter(m => m.attivo !== false);
 const statoQuota = (d, mid, a) => ((d.S.quote[a] || {})[mid] || 0) > 0 ? 'pagata' : ((d.S.dovute[a] || {})[mid] || 0) > 0 ? 'dovuta' : 'nessuna';
 const saldo = mid => derived().S.saldi[mid] || 0;
+/* modello prepagato: nessuna uscita puo' portare il saldo sotto zero (controllo lato app, doppio sbarramento interfaccia + azione) */
+const MSG_CREDITO = 'Credito insufficiente: ricarica per consumare';
+const puoPagare = (imp, mid) => (saldo(mid || st.mid) || 0) >= imp;
+const maxCaffe = () => { const pc = st.gruppo.prezzoCaffe || 0, sd = saldo(st.mid); return pc > 0 ? Math.max(0, Math.min(30, Math.floor(sd / pc))) : (sd >= 0 ? 30 : 0); };
 // quanto posso ancora saldare / riscattare, tolte le operazioni gia' in corso
 function debitoLibero(){
   const d = derived(), s = d.S.saldi[st.mid] || 0;
@@ -762,19 +779,8 @@ const PAGES = {
   regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
 
-// Ogni anno, il primo telefono amministratore che apre l'app addebita la quota a ogni collega attivo.
-// L'id fisso (qa_ANNO_COLLEGA) impedisce doppi addebiti anche se lo fanno due admin insieme.
-const quoteTentate = new Set();
-function assicuraQuote(d){
-  if(!st.isAdmin || st.sync !== 'ok' || !st.ready.mv || !st.ready.m || modeKey !== 'admin' || !(st.gruppo.quotaAnnua > 0)) return;
-  const a = anno();
-  membriAttivi().forEach(m => {
-    const id = `qa_${a}_${m.id}`;
-    if(quoteTentate.has(id) || ((d.S.dovute[a] || {})[m.id] || 0) > 0 || d.movs.some(x => x.id === id)) return;
-    quoteTentate.add(id);
-    addMov({tipo:'addebito_quota', mid: m.id, anno: a, importo: st.gruppo.quotaAnnua}, id, true);
-  });
-}
+// Modello prepagato: la quota non genera piu' addebiti sul saldo. Resta la funzione (vuota) per i punti di chiamata.
+function assicuraQuote(){}
 
 let rq = false;
 /* scroll: ogni render ricostruisce main; ricordiamo la posizione per non farla tornare in cima (a ogni aggiornamento dati) */
@@ -1061,7 +1067,11 @@ function pBar(d){
   const basse = st.prodotti.filter(p => p.attivo !== false && (d.S.stock[p.id] || 0) <= SOGLIA_SCORTA);
   const recenti = d.movs.filter(m => m.uid === st.uid && ['caffe','snack'].includes(m.tipo) && !m.stato && !d.stornati.has(m.id) && Date.now() - m.t < ANNULLA_MIN*60000).reverse();
   const sq = statoQuota(d, st.mid, anno());
+  const quotaDa = st.gruppo.quotaAnnua > 0 && st.ready.mv && sq !== 'pagata';
+  const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0);
+  const noCaffe = !puoPagare(pc), noSnack = snDisp.length > 0 && !snDisp.some(p => puoPagare(p.prezzo));
   return `
+  ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un amministratore: la registrerà lui.</div></div>` : ''}
   <div class="card" style="text-align:center">
     <small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" id="home-saldo" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
@@ -1076,13 +1086,14 @@ function pBar(d){
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
     return `<div class="banner red">${ic('alert')}<div class="grow">Tasso di Onestà dell'ultima busta: <b>${tassoBusta(l)}%</b> (${l.n || 0} caffè registrati su ${BUSTA_CAFFE}). Chi beve il caffè deve registrarlo ogni volta!</div><button class="iconbtn" data-act="busta-visto" data-id="${l.id}">${ic('x','s')}</button></div>`; })()}
+  ${noCaffe ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno a ${eur(pc)}` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
   <div class="home" style="min-height:0;justify-content:flex-start;padding:0 0 4px">
     <div class="blob" style="width:200px;height:200px;background:#f5a524;top:4%;left:-40px"></div>
     <div class="blob" style="width:220px;height:220px;background:#7c3aed;top:38%;right:-60px"></div>
     <div class="blob" style="width:180px;height:180px;background:#10b981;bottom:2%;left:20%"></div>
     <div class="grid">
-      <button class="gbtn" data-act="caffe-menu"><span class="em">☕</span>Paga caffè<small>${eur(pc)} l'uno</small></button>
-      <button class="gbtn" data-act="snack"><span class="em">🍫</span>Acquista snack</button>
+      <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
+      <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? '<small>credito insufficiente</small>' : ''}</button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
       <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
     </div>
@@ -1211,7 +1222,7 @@ function pCrediti(d){
 function pAcquista(d){
   const deb = debitoLibero(), puo = true;
   const lista = membriAttivi().filter(m => m.id !== st.mid).map(m => ({m, s: d.S.saldi[m.id] || 0})).filter(x => x.s > 0).sort((a, b) => b.s - a.s || a.m.nome.localeCompare(b.m.nome));
-  return `<h2>${ic('wallet')} Mercato dei Crediti</h2><p class="sub">Acquista crediti: 1 credito = 1 €, senza commissioni; i soldi passano fuori dall'app.${puo ? ` Il tuo debito è <b class="mono red">${eur(deb)}</b>.` : ' Puoi acquistare crediti quando vuoi.'}</p>
+  return `<h2>${ic('wallet')} Mercato dei Crediti</h2><p class="sub">Acquista crediti: 1 credito = 1 €, senza commissioni; i soldi passano fuori dall'app.${deb > 0 ? ` Il tuo debito è <b class="mono red">${eur(deb)}</b>.` : ' Con i crediti puoi consumare caffè e snack.'}</p>
   <div class="li" style="margin-bottom:12px;border:1px dashed var(--line2);border-radius:14px;padding:10px;display:block">
     <div class="between"><b style="font-size:13px">🏦 Fondo Gruppo</b><span class="pill green">sempre disponibile</span></div>
     <div class="mut" style="font-size:12px;margin:4px 0 8px">Versi contanti o Revolut e un amministratore conferma.</div>
@@ -1383,7 +1394,9 @@ function descMov(m){
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
     case 'entrata': return {ic:'📥', t: `Entrata: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: m.importo, cassa: true};
     case 'giroconto': return {ic:'🔁', t: `Giroconto ${FONTI[m.da]} → ${FONTI[m.a]}`, a: 0, neutro: m.importo, cassa: true};
-    case 'quota': return {ic:'🛡️', t: `Quota ${esc(m.anno)} pagata da ${n} · ${METODI_QUOTA[m.metodo] || m.metodo}`, a: ['contanti','revolut','esterno'].includes(m.metodo) ? m.importo : 0, cassa: ['contanti','revolut'].includes(m.metodo)};
+    case 'quota': return typeof m.cred === 'boolean'
+      ? {ic:'🛡️', t: `Quota ${esc(m.anno)} pagata da ${n} · ${METODI_QUOTA[m.metodo] || m.metodo} · ${m.cred ? 'accreditata anche come crediti' : 'solo contributo al fondo'}`, a: m.cred ? m.importo : 0, cassa: ['contanti','revolut'].includes(m.metodo)}
+      : {ic:'🛡️', t: `Quota ${esc(m.anno)} pagata da ${n} · ${METODI_QUOTA[m.metodo] || m.metodo}`, a: ['contanti','revolut','esterno'].includes(m.metodo) ? m.importo : 0, cassa: ['contanti','revolut'].includes(m.metodo)};
     case 'addebito_quota': return {ic:'🧾', t: `Quota fondo ${esc(m.anno)} addebitata a ${n}`, a: -m.importo};
     case 'accredito': return {ic:'🎁', t: `Credito accreditato a ${n}${m.causale ? ': ' + esc(m.causale) : ''}`, a: m.importo};
     case 'rettifica': return {ic:'✏️', t: `Rettifica saldo di ${n}${m.causale ? ': ' + esc(m.causale) : ''}`, a: m.importo};
@@ -1464,9 +1477,9 @@ function pRegolamento(){
     '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
     '<b>Classifiche:</b> «Classifiche e statistiche» è visibile a tutti; i punti sono totali accumulati (vedi sezione 11)', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
   ${sez('2. Il saldo unico', [
-    'Ogni membro ha un solo saldo. <b>Positivo = credito</b> (il gruppo ti deve qualcosa), <b>negativo = debito</b> (devi qualcosa alla cassa o ai colleghi a credito).',
+    'Ogni membro ha un solo saldo di <b>crediti prepagati</b>: si ricarica prima e si consuma dopo.',
     '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
-    '<b>Nessun blocco:</b> non ci sono tetti al debito e i consumi non vengono interrotti. Ognuno salda appena può, versando in cassa o comprando crediti nel Mercato.'])}
+    '<b>Saldo mai sotto zero:</b> caffè e snack si registrano solo se il saldo copre il prezzo («Credito insufficiente: ricarica per consumare»). Lo stesso vale per regali e vendite di crediti. Chi ha un debito del vecchio modello resta bloccato finché una ricarica non lo copre e porta il saldo almeno al prezzo del prodotto.'])}
   ${sez('3. Ruoli e poteri', [
     '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
     '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), acquista crediti nel Mercato e li riscatta dal Fondo, registra le proprie pulizie e converte i propri Punti Pulizia, regala crediti ai colleghi (subito, senza approvazione e senza annullo), aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese e pagamenti esaminati, accrediti, scambi nel Mercato).',
@@ -1474,9 +1487,9 @@ function pRegolamento(){
     '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
     '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
   ${sez('4. Quota annuale', [
-    `A inizio anno il sistema addebita a tutti la quota (${eur(g.quotaAnnua || 0)}): il saldo parte in negativo di quella cifra.`,
-    '<b>Versamento diretto</b> in contanti o Revolut (il debito scende e la cassa sale) · <b>Compensazione</b> sui crediti già maturati (la cassa non cambia) · <b>Già versata</b>, se il contributo è stato dato fuori dall\'app, convalidata da un amministratore.',
-    'La quota è già inclusa nel saldo (parte in negativo): si salda come ogni debito, comprando crediti dal Fondo Gruppo o da un collega nel Mercato.'])}
+    `La quota (${eur(g.quotaAnnua || 0)}) è un contributo al fondo, <b>separato dal saldo</b>: non genera debiti e non blocca i consumi.`,
+    'Finché non è registrata, in Home compare l\'avviso «Quota saletta non ancora saldata». La registra un amministratore dopo il versamento (contanti, Revolut o già versata fuori app).',
+    'L\'amministratore sceglie se accreditarla <b>anche come crediti consumabili</b> (SÌ) o solo come contributo al fondo (NO).'])}
   ${sez('5. Mercato dei Crediti', [
     '<b>Si acquistano, non si vendono:</b> chiunque può acquistare crediti dal <b>Fondo Gruppo</b> (versando contanti o Revolut: un amministratore conferma) oppure da un <b>collega a credito</b> (lo paga fuori dall\'app; il collega conferma dalla pagina Notifiche e i crediti passano a te). Il pulsante «Acquista crediti» è sempre attivo, anche con saldo positivo.',
     '<b>Riscatto:</b> chi ha un saldo positivo preme «Riscatta crediti» e sceglie uno o più colleghi <b>con saldo negativo</b> (il contatore scende in tempo reale) e/o il <b>Fondo Gruppo</b> per la rimanenza. Il collega conferma dalle Notifiche dopo averti pagato fuori dall\'app; il Fondo ti liquida tramite un amministratore, nei limiti della cassa.',
@@ -2029,17 +2042,30 @@ function pInventario(d){
 }
 
 /* ---------- QUOTE ---------- */
+const quotaMov = (d, mid, a) => d.movs.find(x => x.tipo === 'quota' && x.mid === mid && String(x.anno) === String(a) && !d.stornati.has(x.id) && x.stato !== 'annullata');
+/* vecchi addebiti di quota (modello a debito) mai pagati: danno ancora un saldo ridotto */
+function quoteMigra(d){
+  const out = [];
+  for(const y in d.S.dovute) for(const mid in d.S.dovute[y]){
+    if(!(d.S.dovute[y][mid] > 0) || ((d.S.quote[y] || {})[mid] || 0) > 0) continue;
+    const m = membro(mid); if(!m || m.attivo === false) continue;
+    const mv = d.movs.find(x => x.tipo === 'addebito_quota' && x.mid === mid && String(x.anno) === y && !d.stornati.has(x.id));
+    out.push({y, mid, imp: mv ? mv.importo : (st.gruppo.quotaAnnua || 0)});
+  }
+  return out;
+}
 function pQuote(d){
   const a = anno();
-  const list = membriAttivi().map(m => ({...m, sq: statoQuota(d, m.id, a)}))
+  const list = membriAttivi().map(m => ({...m, sq: statoQuota(d, m.id, a), qm: quotaMov(d, m.id, a)}))
     .sort((x,y) => (x.sq === 'pagata') - (y.sq === 'pagata') || x.nome.localeCompare(y.nome));
-  const pagati = list.filter(m => m.sq === 'pagata').length;
+  const pagati = list.filter(m => m.sq === 'pagata').length, mig = quoteMigra(d);
   return `<h2>${ic('users')} Quote fondo ${a}</h2><p class="sub">Quota annuale di ${eur(st.gruppo.quotaAnnua||0)} · pagate ${pagati} su ${list.length}</p>
-  <div class="banner sky">${ic('wallet')}<div>La quota viene addebitata sul saldo di ogni collega a inizio anno (o quando entra). Chi non l'ha pagata parte in negativo; segnandola pagata il saldo torna su.</div></div>
+  <div class="banner sky">${ic('wallet')}<div>La quota è un contributo al fondo, separato dal portafoglio: non crea debiti e non cambia il saldo. Attiva l'interruttore quando la ricevi e scegli se accreditarla anche come crediti consumabili.</div></div>
+  ${mig.length ? `<div class="banner amber">${ic('alert')}<div class="grow">${mig.length} ${mig.length === 1 ? 'collega ha' : 'colleghi hanno'} ancora un addebito di quota del vecchio modello non pagato (${eur(mig.reduce((t, x) => t + x.imp, 0))} in meno nei saldi).</div><button class="btn sm amber" id="btn-quota-migra" data-act="quota-migra">Azzera addebiti quota pregressi</button></div>` : ''}
   <div class="card list">${list.map(m => `<div class="li">
-    <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d mono">saldo ${eurS(saldo(m.id))}</div></div>
-    ${m.sq === 'pagata' ? `<span class="pill green">${ic('check','s').replace('class="i s"','class="i s" style="width:12px;height:12px"')} pagata</span>` : m.sq === 'dovuta' ? `<span class="pill red">da pagare</span>` : `<span class="pill mut">non addebitata</span>`}
-    ${m.sq !== 'pagata' ? `<button class="btn sm green" data-act="quota" data-id="${m.id}">Segna</button>` : ''}</div>`).join('')}</div>`;
+    <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d mono">saldo ${eurS(saldo(m.id))}${m.sq === 'pagata' && m.qm && typeof m.qm.cred === 'boolean' ? ' · ' + (m.qm.cred ? 'accreditata come crediti' : 'solo fondo') : ''}</div></div>
+    <span class="pill ${m.sq === 'pagata' ? 'green' : 'red'}">${m.sq === 'pagata' ? 'pagata' : 'da pagare'}</span>
+    <button class="tgl ${m.sq === 'pagata' ? 'on' : ''}" role="switch" aria-checked="${m.sq === 'pagata'}" aria-label="Quota pagata: ${esc(nomeM(m.id))}" data-act="quota-toggle" data-id="${m.id}"></button></div>`).join('')}</div>`;
 }
 
 /* ---------- STATISTICHE ---------- */
@@ -2238,7 +2264,7 @@ A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
   <div class="card" style="margin:0 0 10px"><div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Il tuo ruolo</span><b>${st.isAdmin ? 'Amministratore' : 'Collega'}</b></div>
     <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Prezzo caffè</span><b class="mono">${eur(st.gruppo.prezzoCaffe || 0)}</b></div>
     <div class="between" style="font-size:13px"><span class="tx2">Quota fondo annuale</span><b class="mono">${eur(st.gruppo.quotaAnnua || 0)}</b></div></div>
-  <p class="hint">Il saldo di ciascuno comprende la quota annuale del fondo: chi non l'ha pagata parte in negativo. Ricariche e pagamenti della quota li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.</p>
+  <p class="hint">Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un amministratore. Ricariche e pagamenti li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.</p>
   <button class="btn block" data-act="sheet-close">Chiudi</button>`); };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
@@ -2374,7 +2400,7 @@ A['approva'] = ds => {
     </select></label>
     <p class="hint">Scegli un collega esistente se ha cambiato telefono o se l'avevi già aggiunto tu: mantiene saldo e storico.</p>
     ${st.gruppo.quotaAnnua > 0 ? `<label class="check"><input type="checkbox" id="ap-quota"><b style="flex:1;font-size:14px">Ha già pagato la quota ${anno()}</b><span class="mut mono" style="font-size:12px">${eur(st.gruppo.quotaAnnua)}</span></label>
-    <p class="hint">Se spunti, parte da saldo zero. Altrimenti parte da ${eur(-st.gruppo.quotaAnnua)}.</p>` : ''}
+    <p class="hint">Se spunti, la quota risulta pagata. Altrimenti il collega vedrà l'avviso «Quota non ancora saldata». Il saldo parte comunque da zero.</p>` : ''}
     <div class="grid2"><button class="btn red" data-act="rifiuta-accesso" data-id="${r.id}">Rifiuta</button><button class="btn green" data-act="conferma-approva" data-id="${r.id}">Approva</button></div>`);
 };
 A['conferma-approva'] = ds => {
@@ -2387,7 +2413,7 @@ A['conferma-approva'] = ds => {
   b.set(C('utenti').doc(r.id), {mid: mref.id, nome: esistente ? (membro(esistente) || {}).nome || r.nome : r.nome, ts: TS()});
   b.set(C('richieste').doc(r.id), {stato: 'approvata', mid: mref.id, esitoDa: myName(), esitoTs: TS()}, {merge: true});
   if($('ap-quota') && $('ap-quota').checked && statoQuota(derived(), mref.id, anno()) !== 'pagata')
-    addMov({tipo:'quota', mid: mref.id, anno: anno(), metodo: 'esterno', importo: st.gruppo.quotaAnnua});
+    addMov({tipo:'quota', mid: mref.id, anno: anno(), metodo: 'esterno', importo: st.gruppo.quotaAnnua, cred: false});
   b.commit().then(() => toast(`${r.nome} è nel gruppo`)).catch(e => toast('Non riuscito (' + errMsg(e) + ')', 'err'));
   closeSheet();
 };
@@ -2463,16 +2489,18 @@ A['esci-gruppo'] = force => {
 /* --- bar --- */
 const caffeBtn = () => { const q = st.caffeQta, pc = st.gruppo.prezzoCaffe || 0; return `${ic('check')} ${q > 1 ? `Offri un giro di ${q} caffè (${eur(pc*q)})` : `Registra 1 caffè (${eur(pc)})`}`; };
 A['caffe-menu'] = () => {
+  if(maxCaffe() < 1) return toast(MSG_CREDITO, 'err');
   st.caffeQta = 1;
-  openSheet(`<h3>${ic('coffee')} Acquista caffè</h3><p class="sub">Prezzo unitario <b class="amber">${eur(st.gruppo.prezzoCaffe || 0)}</b>. Quanti ne prendi?</p>
+  openSheet(`<h3>${ic('coffee')} Acquista caffè</h3><p class="sub">Prezzo unitario <b class="amber">${eur(st.gruppo.prezzoCaffe || 0)}</b>. Quanti ne prendi? <span class="mut">(max ${maxCaffe()} col tuo credito)</span></p>
     <div class="qty"><button data-act="cq" data-v="-1">−</button><span class="mono" id="cq-n">1</span><button data-act="cq" data-v="1">+</button></div>
     <button class="btn block big amber" id="cq-btn" data-act="caffe">${caffeBtn()}</button>`);
 };
-A['cq'] = ds => { st.caffeQta = Math.min(30, Math.max(1, st.caffeQta + Number(ds.v))); $('cq-n').textContent = st.caffeQta; const b = $('cq-btn'); b.innerHTML = caffeBtn(); b.className = 'btn block big ' + (st.caffeQta > 1 ? 'giro' : 'amber'); };
+A['cq'] = ds => { st.caffeQta = Math.min(Math.max(1, maxCaffe()), Math.max(1, st.caffeQta + Number(ds.v))); $('cq-n').textContent = st.caffeQta; const b = $('cq-btn'); b.innerHTML = caffeBtn(); b.className = 'btn block big ' + (st.caffeQta > 1 ? 'giro' : 'amber'); };
 let lastTap = 0;
 A['caffe'] = () => {
   if(Date.now() - lastTap < 900) return; lastTap = Date.now();
   const q = st.caffeQta, pc = st.gruppo.prezzoCaffe;
+  if(!puoPagare(pc * q)){ closeSheet(); return toast(MSG_CREDITO, 'err'); }
   const id = addMov({tipo:'caffe', mid: st.mid, qta: q, importo: pc * q, pt: ptCaffe() * q});
   bustaInc(q);
   st.caffeQta = 1; closeSheet(); render();
@@ -2489,15 +2517,16 @@ A['annulla-richiesta'] = ds => {
 };
 
 A['snack'] = () => {
-  const d = derived();
+  const d = derived(), sd = saldo(st.mid);
   const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
   openSheet(`<h3>${ic('cookie')} Acquista snack</h3><p class="sub">Tocca l'articolo che hai preso.</p>
-    ${list.length ? `<div class="list">${list.map(p => { const sk = d.S.stock[p.id] || 0, fin = st.isAdmin && sk <= 0; return `<button class="li" style="width:100%;text-align:left;${fin ? 'opacity:.45' : ''}" data-act="prendi-snack" data-id="${p.id}" ${fin ? 'disabled' : ''}>
-      <div class="av" style="font-size:22px">${esc(p.emoji || '🍫')}</div><div class="grow"><div class="t">${esc(p.nome)}</div>${st.isAdmin ? `<div class="d">${sk <= 0 ? 'Esaurito' : 'Giacenza ' + sk + ' pz'}</div>` : ''}</div><b class="mono amber">${eur(p.prezzo)}</b></button>`; }).join('')}</div>`
+    ${list.length ? `<div class="list">${list.map(p => { const sk = d.S.stock[p.id] || 0, fin = (st.isAdmin && sk <= 0) || p.prezzo > sd; return `<button class="li" style="width:100%;text-align:left;${fin ? 'opacity:.45' : ''}" data-act="prendi-snack" data-id="${p.id}" ${fin ? 'disabled' : ''}>
+      <div class="av" style="font-size:22px">${esc(p.emoji || '🍫')}</div><div class="grow"><div class="t">${esc(p.nome)}</div>${p.prezzo > sd ? '<div class="d red">Credito insufficiente</div>' : st.isAdmin ? `<div class="d">${sk <= 0 ? 'Esaurito' : 'Giacenza ' + sk + ' pz'}</div>` : ''}</div><b class="mono amber">${eur(p.prezzo)}</b></button>`; }).join('')}</div>`
       : '<div class="empty">Nessuno snack disponibile al momento.</div>'}`);
 };
 A['prendi-snack'] = ds => {
   const p = prodotto(ds.id); if(!p) return;
+  if(!puoPagare(p.prezzo)){ closeSheet(); return toast(MSG_CREDITO, 'err'); }
   const id = addMov({tipo:'snack', mid: st.mid, pid: p.id, qta: 1, importo: p.prezzo, nome: p.nome, emoji: p.emoji || ''});
   closeSheet();
   const rest = (derived().S.stock[p.id] || 0);
@@ -2745,7 +2774,7 @@ A['carica-archivio'] = async () => {
 
 /* --- storno ed esiti (admin) --- */
 function compactMov(m){
-  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, t:m.t, id:m.id});
+  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, t:m.t, id:m.id});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -2873,16 +2902,47 @@ A['conferma-carico'] = ds => {
 };
 
 /* --- quote (admin) --- */
+A['quota-toggle'] = ds => { statoQuota(derived(), ds.id, anno()) === 'pagata' ? A['quota-annulla'](ds) : A['quota'](ds); };
 A['quota'] = ds => {
-  const s = saldo(ds.id), q = st.gruppo.quotaAnnua;
-  openSheet(`<h3>${ic('users')} Quota ${anno()} di ${esc(nomeM(ds.id))}</h3><p class="sub">${eur(q)} · saldo attuale ${eurS(s)}</p>
-  <label class="f"><span>Come è stata pagata?</span>${segOpts('q-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut'],['credito','💳 Dal credito'],['esterno','✔️ Già versata']], s >= 0 ? 'credito' : 'contanti')}</label>
-  <p class="hint"><b>Contanti/Revolut</b>: soldi ricevuti ora, entrano in cassa. <b>Dal credito</b>: la quota è coperta da ricariche già fatte, nessun movimento di soldi. <b>Già versata</b>: pagata prima dell'app o fuori cassa, il saldo torna su senza toccare la cassa.</p>
+  const q = st.gruppo.quotaAnnua;
+  openSheet(`<h3>${ic('users')} Quota ${anno()} di ${esc(nomeM(ds.id))}</h3><p class="sub">${eur(q)} · saldo attuale ${eurS(saldo(ds.id))}</p>
+  <label class="f"><span>Come è stata pagata?</span>${segOpts('q-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut'],['esterno','✔️ Già versata']], 'contanti')}</label>
+  <div class="f"><span>Accreditare la quota come crediti consumabili nel portafoglio del collega?</span>${segOpts('q-cred', [['no','NO · solo fondo'],['si','SÌ · anche crediti']], 'no')}</div>
+  <p class="hint" id="q-hint"></p>
+  <div class="banner amber" id="q-warn" style="display:none">${ic('alert')}<div>Attenzione: con «Già versata» + SÌ vengono generati crediti senza un'entrata diretta in cassa (i soldi sono stati dati fuori dall'app).</div></div>
   <button class="btn green block big" data-act="conferma-quota" data-id="${ds.id}">Segna pagata</button>`);
+  quotaAggiorna();
 };
+function quotaAggiorna(){
+  const h = $('q-hint'); if(!h) return;
+  const met = radio('q-met'), cr = radio('q-cred') === 'si', q = st.gruppo.quotaAnnua || 0;
+  h.textContent = (met === 'esterno' ? 'Versata fuori cassa: nessuna entrata in cassa. ' : 'I soldi entrano in cassa come contributo al fondo. ') + (cr ? `Il collega riceve anche +${eur(q)} di crediti consumabili.` : 'Il saldo del collega non cambia.');
+  $('q-warn').style.display = cr && met === 'esterno' ? 'flex' : 'none';
+}
 A['conferma-quota'] = ds => {
-  addMov({tipo:'quota', mid: ds.id, anno: anno(), metodo: radio('q-met'), importo: st.gruppo.quotaAnnua});
+  const d = derived(), a = anno();
+  if(statoQuota(d, ds.id, a) === 'pagata'){ closeSheet(); return toast('Quota già registrata'); }
+  const base = `qp_${a}_${ds.id}`, id = d.movs.some(x => x.id === base) ? base + '_' + Date.now().toString(36) : base;
+  addMov({tipo:'quota', mid: ds.id, anno: a, metodo: radio('q-met') || 'contanti', importo: st.gruppo.quotaAnnua, cred: radio('q-cred') === 'si'}, id);
   closeSheet(); toast('Quota registrata');
+};
+A['quota-annulla'] = ds => {
+  const d = derived(), m = quotaMov(d, ds.id, anno());
+  if(!m) return toast('Quota registrata prima dell\'ultima chiusura: non annullabile da qui', 'err');
+  openSheet(`<h3>${ic('undo')} Annullare il pagamento?</h3><p class="sub">Quota ${anno()} di ${esc(nomeM(ds.id))} · ${eur(m.importo)}</p>
+    <p class="tx2" style="font-size:13px">La quota torna «da pagare»${['contanti','revolut'].includes(m.metodo) ? ' e l\'importo esce dalla cassa' : ''}.${m.cred ? ' I crediti accreditati vengono tolti: se il collega li ha già spesi il suo saldo può andare sotto zero.' : ''}</p>
+    <div class="grid2"><button class="btn" data-act="sheet-close">Indietro</button><button class="btn red" data-act="conferma-storno" data-id="${m.id}">Annulla pagamento</button></div>`);
+};
+A['quota-migra'] = () => {
+  const mig = quoteMigra(derived()); if(!mig.length) return toast('Niente da azzerare');
+  openSheet(`<h3>${ic('wallet')} Azzera addebiti quota pregressi</h3><p class="sub">Per ogni collega sotto viene accreditato l'importo dell'addebito mai pagato, così il saldo torna com'era. Chi aveva già pagato non viene toccato.</p>
+    <div class="list">${mig.map(x => `<div class="li"><div class="grow"><div class="t">${esc(nomeM(x.mid))}</div><div class="d">quota ${esc(x.y)}</div></div><b class="mono green">+${eur(x.imp)}</b></div>`).join('')}</div>
+    <button class="btn amber block big" style="margin-top:10px" id="btn-quota-migra-ok" data-act="conferma-quota-migra">Accredita</button>`);
+};
+A['conferma-quota-migra'] = () => {
+  const mig = quoteMigra(derived());
+  mig.forEach(x => addMov({tipo:'accredito', mid: x.mid, importo: x.imp, causale: `Storno addebito quota ${x.y} (nuovo modello)`, qmAnno: x.y}, `qm_${x.y}_${x.mid}`));
+  closeSheet(); toast(mig.length ? `Azzerati ${mig.length} addebiti` : 'Niente da azzerare');
 };
 
 
@@ -2973,7 +3033,7 @@ A['salva-membro'] = ds => {
   else {
     const ref = C('membri').doc();
     ref.set({nome, nick, attivo: true, creato: TS()}).catch(e => toast(errMsg(e), 'err'));
-    if($('m-quota') && $('m-quota').checked) addMov({tipo:'quota', mid: ref.id, anno: anno(), metodo: 'esterno', importo: st.gruppo.quotaAnnua});
+    if($('m-quota') && $('m-quota').checked) addMov({tipo:'quota', mid: ref.id, anno: anno(), metodo: 'esterno', importo: st.gruppo.quotaAnnua, cred: false});
   }
   closeSheet(); toast('Collega salvato');
 };
@@ -3535,6 +3595,7 @@ document.addEventListener('click', e => {
   if(f){ e.preventDefault(); guard(f)(el.dataset, el); }
 });
 document.addEventListener('change', e => {
+  if(e.target && (e.target.name === 'q-met' || e.target.name === 'q-cred')) quotaAggiorna();
   const el = e.target.closest('[data-chg]');
   if(el && el.dataset.chg === 'stat-periodo'){ st.statPeriodo = el.value; render(); }
   if(el && el.dataset.chg === 'corr') corrAggiorna();
