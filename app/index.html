@@ -319,7 +319,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.11.1';
+const VERSION = '1.11.2';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -777,6 +777,9 @@ function assicuraQuote(d){
 }
 
 let rq = false;
+/* scroll: ogni render ricostruisce main; ricordiamo la posizione per non farla tornare in cima (a ogni aggiornamento dati) */
+let scY = 0, scFuori = 0;
+window.addEventListener('scroll', () => { if(!scFuori) scY = window.scrollY; }, {passive: true});
 function render(){ if(rq) return; rq = true; requestAnimationFrame(() => { rq = false; doRender(); }); }
 
 function doRender(){
@@ -784,13 +787,15 @@ function doRender(){
   const inApp = st.sync !== 'nocfg' && st.gid && st.uid && st.ready.g && st.ready.u && st.mid && membro(st.mid);
   $('hdr').classList.toggle('hidden', !inApp);
   $('dock').classList.toggle('hidden', !inApp);
+  const y0 = scFuori && Date.now() - scFuori < 4000 ? scY : window.scrollY;   // se la schermata d'ingresso è comparsa per un attimo, torna dov'eri
+  const rimettiScroll = () => { scFuori = 0; if(Math.abs(window.scrollY - y0) > 1) window.scrollTo(0, y0); };
   const keep = {}, foc = document.activeElement && main.contains(document.activeElement) ? document.activeElement.id : null;
   main.querySelectorAll('input[id]:not([type=file]),textarea[id],select[id]').forEach(e => { keep[e.id] = e.type === 'checkbox' ? e.checked : e.value; });
   const restore = () => {
     for(const id in keep){ const e = $(id); if(e){ if(e.type === 'checkbox') e.checked = keep[id]; else e.value = keep[id]; } }
-    if(foc && $(foc)) $(foc).focus();
+    if(foc && $(foc)) $(foc).focus({preventScroll: true});   // senza preventScroll il browser portava in vista il campo (select/input) in cima alla pagina
   };
-  if(!inApp){ main.innerHTML = renderEntry(); restore(); return; }
+  if(!inApp){ if(!scFuori) scFuori = Date.now(); main.innerHTML = renderEntry(); restore(); return; }
   if(st.pinDoc === null || (st.pinDoc && st.pinDoc.temporaneo)){   // schermata bloccante: PIN personale da scegliere
     $('hdr').classList.add('hidden'); $('dock').classList.add('hidden'); closeSheet(); A['drawer-close']();
     main.classList.remove('wide'); main.innerHTML = entryPinGate(); restore(); return;
@@ -828,6 +833,7 @@ function doRender(){
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
   main.innerHTML = sw + fn(d);
   restore();
+  rimettiScroll();
 }
 
 function renderDrawer(){
