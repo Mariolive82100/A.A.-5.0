@@ -319,7 +319,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.11.4';
+const VERSION = '1.11.5';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1667,18 +1667,19 @@ function graficoBarre(S, o){
 A['sc-pick'] = ds => { const i = Number(ds.i); st.scSel = (st.scSel && st.scSel.c === ds.c && st.scSel.i === i) ? null : {c: ds.c, i}; render(); };
 
 /* aggregazione di una lista di movimenti (periodo corrente, oppure movimenti da archiviare alla chiusura) */
-function nuovoAgg(){ return {caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
+function nuovoAgg(){ return {ptC:{}, ptP:{}, ptS:{}, ptB:{}, caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
 function aggMov(G, m, sg){
   sg = sg || 1; const t = G.tot;
   switch(m.tipo){
-    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
+    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ if(m.tipo === 'caffe') add(G.ptC, m.mid, sg*(m.pt ?? m.qta)); add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
     case 'snack': if(m.stato !== 'annullata'){ add(G.snack, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
-    case 'spesa': if(m.stato === 'confermata'){ add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*m.importo; } break;
-    case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*(m.punti ?? PUNTI_DEF)); }); break;
+    case 'spesa': if(m.stato === 'confermata'){ add(G.ptS, m.mid, sg*(m.pt ?? PUNTI_SPESA)); add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*m.importo; } break;
+    case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*(m.punti ?? PUNTI_DEF)); add(G.ptP, x, sg*(m.punti ?? PUNTI_DEF)); }); break;
     case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
     case 'quota': if(m.metodo === 'contanti' || m.metodo === 'revolut') t.quote += sg*m.importo; break;
     case 'regalo': t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); break;
-    case 'ben_fatto': add(G.bfRic, m.aMid, sg); break;
+    case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)); break;
+    case 'punti_adj': add(m.kind === 'caffe' ? G.ptC : G.ptP, m.mid, sg*m.punti); break;
     case 'riscatto': if(m.stato !== 'annullata') t.riscatti += sg*m.importo; break;
     case 'entrata': t.entrate += sg*m.importo; break;
     case 'uscita': t.uscite += sg*m.importo; break;
@@ -1687,14 +1688,29 @@ function aggMov(G, m, sg){
   }
 }
 function aggrega(list){ const G = nuovoAgg(); list.forEach(m => aggMov(G, m)); return G; }
-let _aggC = {d: null, k: ''};
-function aggPeriodo(d){
-  const r = rangeSal(), k = [st.salPer, st.salDa, st.salA, st.arcMov ? st.arcMov.length : -1, new Date().toDateString()].join('|');
-  if(_aggC.d !== d || _aggC.k !== k){
-    const tutti = (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
-    _aggC = {d, k, r, tutti, G: aggrega(tutti)};
-  }
-  return _aggC;
+let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''};
+function aggRange(d, r, slot){
+  const k = [r.da, r.a, st.arcMov ? st.arcMov.length : -1, new Date().toDateString()].join('|');
+  const c = slot === 'cl' ? _aggCl : _aggC;
+  if(c.d === d && c.k === k) return c;
+  const tutti = (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
+  const n = {d, k, r, tutti, G: aggrega(tutti)};
+  if(slot === 'cl') _aggCl = n; else _aggC = n;
+  return n;
+}
+function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
+/* periodo della classifica punti: "sempre" = cumulato (null), minimo "questo mese" */
+function clRange(){
+  const o = new Date(), y = o.getFullYear(), p = st.clPerC || 'sempre';
+  if(p === 'sempre') return null;
+  if(p === 'mese') return {da: new Date(y, o.getMonth(), 1).getTime(), a: Infinity, label: 'Questo mese'};
+  if(p === 'anno') return {da: new Date(y, 0, 1).getTime(), a: Infinity, label: 'Quest\'anno'};
+  const cur = y + '-' + String(o.getMonth() + 1).padStart(2, '0');
+  let m1 = st.clMDa || cur, m2 = st.clMA || cur;
+  if(m1 > m2){ const t = m1; m1 = m2; m2 = t; }
+  const [y1, a1] = m1.split('-').map(Number), [y2, a2] = m2.split('-').map(Number);
+  const nm = (yy, mm) => new Date(yy, mm - 1, 1).toLocaleDateString('it-IT', {month: 'short', year: 'numeric'});
+  return {da: new Date(y1, a1 - 1, 1).getTime(), a: new Date(y2, a2, 0, 23, 59, 59, 999).getTime(), label: m1 === m2 ? nm(y1, a1) : nm(y1, a1) + ' → ' + nm(y2, a2)};
 }
 /* storico dei periodi chiusi: i colleghi lo leggono dal proprio estratto, l'admin lo ricava dalle chiusure (nessuna lettura in più) */
 function riepDaChiusura(c){
@@ -1780,15 +1796,22 @@ function clChiusi(tab){
 }
 function clClassifica(d){
   const k = (st.clSort && st.clSort.k) || 'tot', dir = (st.clSort && st.clSort.dir) || -1;
-  const righe = membriAttivi().map(m => { const c = nz(d.S.pcaf, m.id), p = nz(d.S.punti, m.id), s = nz(d.S.pspesa, m.id), b = nz(d.S.pbf, m.id); return {m, nome: m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const r = clRange(), G = r ? aggRange(d, r, 'cl').G : null;
+  const righe = membriAttivi().map(m => { const c = G ? nz(G.ptC, m.id) : nz(d.S.pcaf, m.id), p = G ? nz(G.ptP, m.id) : nz(d.S.punti, m.id), s = G ? nz(G.ptS, m.id) : nz(d.S.pspesa, m.id), b = G ? nz(G.ptB, m.id) : nz(d.S.pbf, m.id); return {m, nome: m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const pc = st.clPerC || 'sempre', opt = (v, l) => `<option value="${v}" ${pc === v ? 'selected' : ''}>${l}</option>`;
+  const cur = new Date().toISOString().slice(0, 7);
+  const sel = `<label class="f" style="margin:0 0 8px"><span>Periodo</span><select class="in" data-chg="clpc">${opt('sempre', 'Sempre (totale accumulato)')}${opt('mese', 'Questo mese')}${opt('anno', 'Quest\'anno')}${opt('mesi', 'Per mesi…')}</select></label>
+    ${pc === 'mesi' ? `<div class="grid2" style="margin:0 0 8px"><label class="f" style="margin:0"><span>Dal mese</span><input class="in" type="month" id="cl-m-da" data-chg="clmesi" max="${cur}" value="${esc(st.clMDa || cur)}"></label><label class="f" style="margin:0"><span>Al mese</span><input class="in" type="month" id="cl-m-a" data-chg="clmesi" max="${cur}" value="${esc(st.clMA || cur)}"></label></div>` : ''}
+    ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}`;
   const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
   righe.sort((a, b) => k === 'nome' ? dir * a.nome.localeCompare(b.nome) : dir * (a[k] - b[k]) || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const th = (key, l, cls) => `<th class="${cls || 'c'}"><button class="btn link" style="padding:0;font-size:11.5px;font-weight:800" data-act="cl-sort" data-k="${key}">${l}${k === key ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
-  return `<div class="card"><h3><span>🏆 La classifica</span></h3>
+  return `<div class="card"><h3><span>🏆 La classifica</span></h3>${sel}
     ${righe.length ? `<table><thead><tr><th>#</th>${th('nome', 'Nome', '')}${th('c', '☕ Caffè')}${th('p', '✨ Pulizie')}${th('s', '🧾 Spesa')}${th('b', '👏 Ben fatto')}${th('tot', 'Totale')}</tr></thead><tbody>
     ${righe.map(x => `<tr ${x.m.id === st.mid ? 'style="background:rgba(245,165,36,.10)"' : ''}><td class="mut mono">${pos[x.m.id]}</td><td><b>${esc(nomeBreve(x.m.id) || x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.p}</td><td class="c mono">${x.s}</td><td class="c mono">${x.b}</td><td class="c mono amber"><b>${x.tot}</b></td></tr>`).join('')}
     </tbody></table>` : '<div class="empty">Nessun collega.</div>'}
-    <p class="hint" style="margin:8px 0 0">Tocca un'intestazione per ordinare. Caffè: ${ptCaffe()} per caffè. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono punti totali accumulati: riscattarli non ti fa scendere.</p></div>`;
+    <p class="hint" style="margin:8px 0 0">Tocca un'intestazione per ordinare. Caffè: ${ptCaffe()} per caffè. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. ${r ? 'Punti guadagnati nel periodo scelto (comprese eventuali rettifiche).' : 'Sono punti totali accumulati: riscattarli non ti fa scendere.'}</p>
+    ${r ? (st.isAdmin ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : '<p class="hint" style="margin:6px 0 0">Per i periodi scelti contano i movimenti dall\'ultima chiusura di periodo; "Sempre" include tutto lo storico.</p>') : ''}</div>`;
 }
 function pClassifiche(d){
   const tab = st.clTab || 'class';
@@ -3517,6 +3540,8 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'clper'){ st.clPer = Number(el.value); st.scSel = null; render(); }
+  if(el && el.dataset.chg === 'clpc'){ st.clPerC = el.value; render(); }
+  if(el && el.dataset.chg === 'clmesi'){ st.clMDa = $('cl-m-da').value || st.clMDa; st.clMA = $('cl-m-a').value || st.clMA; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
