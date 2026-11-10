@@ -352,7 +352,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.14.0';
+const VERSION = '1.14.1';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1699,7 +1699,7 @@ function serieGen(tutti, r, f){
 }
 /* grafico a barre generico: una serie, un asse, tocca una barra per il dettaglio, tabella dati a scomparsa */
 function graficoBarre(S, o){
-  const buck = S.buck, N = buck.length, unita = {ora: 'ora', giorno: 'giorno', mese: 'mese', periodo: 'periodo', weekday: 'giorno della settimana'}[S.g];
+  const buck = S.buck, N = buck.length, unita = {ora: 'ora', giorno: 'giorno', mese: 'mese', periodo: 'periodo', weekday: 'giorno della settimana', misto: 'periodo e giorno'}[S.g];
   const fmt = o.fmt || (v => String(v)), ax = o.ax || (v => v);
   const tot = buck.reduce((a, b) => a + b.n, 0), max = Math.max(0, ...buck.map(b => b.n));
   if(!tot) return `<div class="empty">${o.vuoto}</div>`;
@@ -1789,6 +1789,54 @@ const storicoPeriodi = () => st.isAdmin ? storicoDaChiusure() : ((st.estratto &&
 const dBreve = ms => new Date(ms).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit', year: '2-digit'});
 const riepLabel = p => (p.da ? dBreve(p.da) : 'inizio') + ' → ' + dBreve(p.fino);
 
+/* ---------- Continuità tra periodi chiusi e periodo aperto (tutto in memoria, nessuna lettura in più) ----------
+   Regola: nei totali e nei grafici entrano solo i periodi chiusi compresi INTERAMENTE nell'intervallo scelto. */
+const AGG_MAPS = ['ptC', 'ptP', 'ptS', 'ptB', 'caffe', 'snack', 'euro', 'spese', 'speseN', 'turni', 'pPul', 'regDati', 'bfRic'];
+/* scomposizione settimanale di gruppo salvata nel riepilogo: [lunedì ms, consumi, turni, spese, ricariche] */
+function serieSett(list, lo){
+  const w = {}, fs = [fCons, fTurni, fSpese, fRic];
+  const mon = t => { const x = new Date(t); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x.getTime(); };
+  list.forEach(m => {
+    let src = m, sg = 1, t = m.t;
+    if(m.tipo === 'storno'){ if(!m.orig) return; src = m.orig; sg = -1; t = m.orig.t >= lo ? m.orig.t : m.t; }
+    const k = mon(t);
+    fs.forEach((f, i) => { const v = f(src); if(v){ (w[k] = w[k] || [0, 0, 0, 0])[i] += sg * v; } });
+  });
+  return Object.keys(w).map(Number).sort((a, b) => a - b).map(k => [k].concat(w[k]));
+}
+function aggConChiusi(d, r, slot){
+  const base = aggRange(d, r, slot), usa = !(st.isAdmin && st.arcMov), P = usa ? storicoPeriodi() : [];
+  const L = P.filter(p => p.da >= (r.da || 0) && p.fino <= r.a);
+  const out = {r, tutti: base.tutti, G: base.G, L, usa, cut: P.length ? P[P.length - 1].fino : 0,
+    parziali: P.filter(p => p.fino > r.da && p.da < r.da), parz: L.some(p => p.legacy || p.snack == null), noPt: L.some(p => !p.ptC)};
+  if(!L.length) return out;
+  const G = nuovoAgg(), mer = (dst, src) => { if(src) Object.keys(src).forEach(k => { if(typeof src[k] === 'number') add(dst, k, src[k]); }); };
+  AGG_MAPS.forEach(k => { mer(G[k], base.G[k]); L.forEach(p => mer(G[k], p[k])); });
+  Object.keys(G.tot).forEach(k => { G.tot[k] = (base.G.tot[k] || 0) + L.reduce((a, p) => a + ((p.tot && p.tot[k]) || 0), 0); });
+  out.G = G; return out;
+}
+const aggPeriodoC = d => aggConChiusi(d, rangeSal(), 'st');
+function noteChiusi(c){
+  if(!c.usa) return '';
+  const o = [];
+  if(c.L.length) o.push(`Includo ${c.L.length} ${c.L.length === 1 ? 'periodo chiuso' : 'periodi chiusi'} compresi interamente nell'intervallo${c.parz ? ' (alcuni con dati parziali)' : ''}.`);
+  if(c.parziali.length) o.push(`Il periodo chiuso ${riepLabel(c.parziali[0])} inizia prima dell'intervallo scelto e non è incluso.`);
+  return o.length ? `<p class="hint" style="margin:0 0 10px" id="nota-chiusi">${o.join(' ')}</p>` : '';
+}
+/* serie di gruppo continua: barre dei periodi chiusi inclusi (settimanali se disponibili, altrimenti una per periodo) + serie normale del periodo aperto */
+function serieCont(c, f, idx, legacy){
+  const r = c.r, ini = c.usa ? Math.max(r.da || 0, c.cut) : r.da;
+  const S = serieGen(c.tutti, {da: ini, a: r.a}, f);
+  if(!c.L.length) return S;
+  const dm = ms => { const x = new Date(ms); return `${pad(x.getDate())}/${pad(x.getMonth() + 1)}`; };
+  const pre = [];
+  c.L.forEach(p => {
+    if(p.ser && p.ser.length) p.ser.forEach(w => pre.push({lab: dm(w[0]), full: 'Settimana dal ' + dm(w[0]) + ' (periodo chiuso)', n: Math.max(0, w[1 + idx] || 0)}));
+    else pre.push({lab: dm(p.fino), full: riepLabel(p) + ' (periodo chiuso)', n: Math.max(0, legacy(p))});
+  });
+  return {g: 'misto', buck: pre.concat(S.buck)};
+}
+
 function rankList(items, fmt, vuoto){
   items = items.filter(x => x.v > 0).sort((a, b) => b.v - a.v || nomeM(a.id).localeCompare(nomeM(b.id)));
   if(!items.length) return `<div class="empty">${vuoto}</div>`;
@@ -1865,16 +1913,16 @@ function clChiusi(tab){
 const CL_CAT = [['c', '☕', 'Consumi'], ['p', '✨', 'Pulizie'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
 const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
 function clRighe(d){
-  const r = clRange(), G = r ? aggRange(d, r, 'cl').G : null;
+  const r = clRange(), M = r ? aggConChiusi(d, r, 'cl') : null, G = M ? M.G : null;
   const righe = membriAttivi().map(m => { const c = G ? nz(G.ptC, m.id) : nz(d.S.pcaf, m.id), p = G ? nz(G.ptP, m.id) : nz(d.S.punti, m.id), s = G ? nz(G.ptS, m.id) : nz(d.S.pspesa, m.id), b = G ? nz(G.ptB, m.id) : nz(d.S.pbf, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
   const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
-  return {r, righe, pos};
+  return {r, righe, pos, M};
 }
 /* conteggi per i titoli: periodo scelto, oppure "sempre" = ultimi periodi chiusi (estratto/chiusure) + periodo aperto */
 function clConteggi(d, r){
   const sommaIn = (dst, src) => { Object.keys(src || {}).forEach(k => add(dst, k, src[k] || 0)); };
   const out = {caffe: {}, turni: {}, speseN: {}, bf: {}};
-  const G = aggRange(d, r || {da: 0, a: Infinity}, 'cl').G;
+  const G = r ? aggConChiusi(d, r, 'cl').G : aggRange(d, {da: 0, a: Infinity}, 'cl').G;
   sommaIn(out.caffe, G.caffe); sommaIn(out.turni, G.turni); sommaIn(out.speseN, G.speseN); sommaIn(out.bf, G.bfRic);
   if(!r && !(st.isAdmin && st.arcMov)) storicoPeriodi().forEach(p => { sommaIn(out.caffe, p.caffe); sommaIn(out.turni, p.turni); sommaIn(out.speseN, p.speseN); sommaIn(out.bf, p.bfRic); });
   return out;
@@ -1907,14 +1955,14 @@ function clHero(righe, pos, T, r){
   </div>`;
 }
 function clClassifica(d){
-  const {r, righe, pos} = clRighe(d), T = clTitoli(d, r);
+  const {r, righe, pos, M} = clRighe(d), T = clTitoli(d, r);
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const pc = st.clPerC || 'sempre', opt = (v, l) => `<option value="${v}" ${pc === v ? 'selected' : ''}>${l}</option>`;
   const cur = new Date().toISOString().slice(0, 7);
   const sel = `<label class="f" style="margin:0 0 8px"><span>Periodo</span><select class="in" data-chg="clpc">${opt('sempre', 'Sempre (totale accumulato)')}${opt('mese', 'Questo mese')}${opt('anno', 'Quest\'anno')}${opt('mesi', 'Per mesi…')}</select></label>
     ${pc === 'mesi' ? `<div class="grid2" style="margin:0 0 8px"><label class="f" style="margin:0"><span>Dal mese</span><input class="in" type="month" id="cl-m-da" data-chg="clmesi" max="${cur}" value="${esc(st.clMDa || cur)}"></label><label class="f" style="margin:0"><span>Al mese</span><input class="in" type="month" id="cl-m-a" data-chg="clmesi" max="${cur}" value="${esc(st.clMA || cur)}"></label></div>` : ''}
-    ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}`;
+    ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}${M ? noteChiusi(M) + (M.noPt ? '<p class="hint" style="margin:0 0 10px">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : '') : ''}`;
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
   const chips = [['tot', 'Tutti'], ['c', '☕ Consumi'], ['p', '✨ Pulizie'], ['s', '🧾 Spese'], ['b', '👏 Ben fatto']];
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
@@ -1959,14 +2007,15 @@ function viewMiei(c){
   const mine = c.tutti.filter(m => m.tipo === 'storno' ? (m.orig && m.orig.mid === me) : m.mid === me);
   const caffe = Math.max(0, nz(G.caffe, me)), snack = Math.max(0, nz(G.snack, me)), euro = nz(G.euro, me);
   const tutti = att.reduce((a, m) => a + Math.max(0, nz(G.caffe, m.id) + nz(G.snack, m.id)), 0), media = att.length ? Math.round(tutti / att.length * 10) / 10 : 0;
-  const S = serieGen(mine, r, fCons), giorni = S.g === 'giorno' ? S.buck.filter(b => b.n > 0).length : null;
+  const ri = c.usa ? {da: Math.max(r.da || 0, c.cut), a: r.a} : r;
+  const S = serieGen(mine, ri, fCons), giorni = S.g === 'giorno' ? S.buck.filter(b => b.n > 0).length : null;
   const gg = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'], gl = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
   const wd = gg.map((lab, i) => ({lab, full: gl[i], n: 0}));
-  mine.forEach(m => { let v, t = m.t; if(m.tipo === 'storno'){ if(!m.orig) return; v = -fCons(m.orig); if(m.orig.t >= r.da && m.orig.t <= r.a) t = m.orig.t; } else v = fCons(m); if(!v) return; wd[(new Date(t).getDay() + 6) % 7].n += v; });
+  mine.forEach(m => { let v, t = m.t; if(m.tipo === 'storno'){ if(!m.orig) return; v = -fCons(m.orig); if(m.orig.t >= ri.da && m.orig.t <= ri.a) t = m.orig.t; } else v = fCons(m); if(!v) return; wd[(new Date(t).getDay() + 6) % 7].n += v; });
   wd.forEach(b => { b.n = Math.max(0, b.n); });
   return `<div class="card" id="miei-consumi"><h3><span>👤 I miei consumi</span><b class="mono amber">${caffe + snack}</b></h3>
     <div class="grid3"><div class="stat"><small>☕ Caffè</small><b class="mono">${caffe}</b></div><div class="stat"><small>🍫 Snack</small><b class="mono">${snack}</b></div><div class="stat"><small>💶 Spesi</small><b class="mono">${eur(euro)}</b></div></div>
-    <p class="hint" style="margin:8px 0 0">${giorni != null ? `Hai consumato in <b>${giorni}</b> ${giorni === 1 ? 'giorno' : 'giorni'} del periodo. ` : ''}Media del gruppo: <b>${media}</b> consumazioni a testa · tu: <b>${caffe + snack}</b>.</p></div>
+    <p class="hint" style="margin:8px 0 0">${giorni != null ? `Hai consumato in <b>${giorni}</b> ${giorni === 1 ? 'giorno' : 'giorni'} del periodo. ` : ''}Media del gruppo: <b>${media}</b> consumazioni a testa · tu: <b>${caffe + snack}</b>.${c.usa && c.cut > (r.da || 0) ? ` I totali includono i periodi chiusi indicati sopra; i grafici partono dall'ultima chiusura (${dBreve(c.cut)}).` : ''}</p></div>
   <div class="card"><h3><span>📈 Quando consumo</span></h3>${graficoBarre(S, {c: 'miei', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo tuo in questo periodo.'})}</div>
   <div class="card"><h3><span>📆 Nei giorni della settimana</span></h3>${graficoBarre({g: 'weekday', buck: wd}, {c: 'miei-wd', nome: 'Consumazioni', col: 'var(--sky)', vuoto: 'Nessun consumo tuo in questo periodo.'})}</div>`;
 }
@@ -1992,13 +2041,13 @@ function pClassifiche(d){
     }
     return head + clPeriodo(d) + clChiusi(tab);
   }
-  const c = aggPeriodo(d), r = c.r, T = c.tutti, G = c.G;
-  const ch = tab === 'acq' ? {cons: graficoBarre(serieGen(T, r, fCons), {c: 'cons', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo in questo periodo.'}),
-      spese: graficoBarre(serieGen(T, r, fSpese), {c: 'spese', nome: 'Spese', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna spesa convalidata in questo periodo.'})}
-    : tab === 'pul' ? {pul: graficoBarre(serieGen(T, r, fTurni), {c: 'pul', nome: 'Turni', col: 'var(--violet)', vuoto: 'Nessun turno in questo periodo.'})}
-    : {pag: graficoBarre(serieGen(T, r, fRic), {c: 'pag', nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna ricarica in questo periodo.'})};
-  if(tab === 'acq') return head + clPeriodo(d) + acqToggle() + bustaWidget() + (acqVista() === 'miei' ? viewMiei(c) : viewAcq(G, ch));
-  return head + clPeriodo(d) + (tab === 'pul' ? viewPul(G, ch) : viewPag(G, ch));
+  const c = aggPeriodoC(d), r = c.r, G = c.G;
+  const ch = tab === 'acq' ? {cons: graficoBarre(serieCont(c, fCons, 0, p => sumo(p.caffe) + sumo(p.snack)), {c: 'cons', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo in questo periodo.'}),
+      spese: graficoBarre(serieCont(c, fSpese, 2, p => (p.tot && p.tot.speseTot) || 0), {c: 'spese', nome: 'Spese', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna spesa convalidata in questo periodo.'})}
+    : tab === 'pul' ? {pul: graficoBarre(serieCont(c, fTurni, 1, p => sumo(p.turni)), {c: 'pul', nome: 'Turni', col: 'var(--violet)', vuoto: 'Nessun turno in questo periodo.'})}
+    : {pag: graficoBarre(serieCont(c, fRic, 3, p => (p.tot && p.tot.ric) || 0), {c: 'pag', nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna ricarica in questo periodo.'})};
+  if(tab === 'acq') return head + clPeriodo(d) + noteChiusi(c) + acqToggle() + bustaWidget() + (acqVista() === 'miei' ? viewMiei(c) : viewAcq(G, ch));
+  return head + clPeriodo(d) + noteChiusi(c) + (tab === 'pul' ? viewPul(G, ch) : viewPag(G, ch));
 }
 A['cl-tab'] = ds => { st.clTab = ds.v; st.scSel = null; render(); };
 A['cl-chip'] = ds => { st.clSort = {k: CL_KEYS.includes(ds.k) ? ds.k : 'tot', dir: -1}; render(); };
@@ -3527,7 +3576,7 @@ A['chiudi-periodo'] = async () => {
     incl.forEach(m => { if(m._ts.seconds > fino.seconds || (m._ts.seconds === fino.seconds && m._ts.nanoseconds > fino.nanoseconds)) fino = m._ts; });
     const id = 'c' + fino.toMillis();
     const b = db.batch();
-    const G = aggrega(incl), riep = {id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, tot: G.tot};
+    const G = aggrega(incl), riep = {id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, ptC: G.ptC, ptP: G.ptP, ptS: G.ptS, ptB: G.ptB, ser: serieSett(incl, prev ? prev.fino.toMillis() : 0), tot: G.tot};
     const storico = st.chiusure.map(riepDaChiusura).concat([riep]).sort((x, y) => x.fino - y.fino).slice(-STORICO_MAX);
     const bf = {}, stor = new Set(incl.filter(m => m.tipo === 'storno').map(m => m.rif)), lim = Date.now() - 40 * 864e5;
     if(prev && prev.bf) Object.keys(prev.bf).forEach(k => { bf[k] = (prev.bf[k] || []).slice(); });
