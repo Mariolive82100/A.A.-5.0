@@ -371,7 +371,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.18.1';
+const VERSION = '1.18.2';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1130,7 +1130,7 @@ function pBar(d){
     </div>
     <button class="btn link" style="margin-top:6px" id="btn-regala-home" data-act="regala">🎁 Regala / Trasferisci crediti</button>
     ${(() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
-      return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Tessera fedeltà: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Tessera fedeltà</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
+      return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
     ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
   </div>
@@ -1406,7 +1406,7 @@ function descMov(m){
     case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = !adminView();
       return {ic: m.trasf ? '🤝' : '🎁', t: `${esc(nomeM(m.daMid))} ${m.trasf ? 'ha ceduto (scambio)' : 'ha regalato'} ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
     case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» (+${m.pt ?? 2} punti)`, a: 0};
-    case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti} punti della tessera fedeltà`, a: m.importo};
+    case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti} Punti Collega Modello`, a: m.importo};
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · ${m.stato === 'attesa' ? 'richiesto al Fondo' : 'pagato dalla cassa'} (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
     case 'spesa': return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: m.fonte !== 'tasca'};
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
@@ -1543,9 +1543,9 @@ function pRegolamento(){
     'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
     'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
     'A fine esercizio l\'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.'])}
-  ${sez('11. Punti e Tessera fedeltà', [
+  ${sez('11. Punti Collega Modello', [
     `<b>Si guadagnano:</b> ☕ ${ptCaffe()} per caffè · 🍫 ${ptSnack()} per snack · 🧾 ${ptSpesa()} per spesa convalidata · ✨ ${pp} per turno di pulizia · 👏 ${ptBenFatto()} per ogni «Ben fatto» ricevuto.`,
-    `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}), dalla Tessera fedeltà. La classifica conta i punti totali: riscattare non la cambia.`,
+    `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}), dai Punti Collega Modello. La classifica conta i punti totali: riscattare non la cambia.`,
     `<b>Ben fatto!</b> riconosce un collega, con motivazione obbligatoria (max 80 caratteri). Chi lo invia non perde punti; ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}.`,
     'Valori, soglia e gettoni li decidono gli amministratori; i cambi valgono per gli eventi futuri.'])}`;
 }
@@ -2331,7 +2331,7 @@ const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
     <p class="hint" style="margin:10px 0 0">Il prezzo del caffè e il listino si gestiscono dalla scheda Magazzino dell'Amministrazione. Le regole dei punti sono nel menu, alla voce Regole Punti e Saletta.</p>
   </div>
 `;
-const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti e Ricompense</h3>
+const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Modello</h3>
     <p class="hint" style="margin:0 0 8px">Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.</p>
     <div class="grid2">
       <label class="f"><span>Soglia riscatto (punti)</span><input class="in mono" id="rp-soglia" inputmode="numeric" value="${sogliaPunti()}"></label>
@@ -2372,7 +2372,7 @@ const cardAdmins = () => `
 `;
 
 function pRegole(){
-  return `<h2>${ic('sparkles')} Regole Punti e Saletta</h2><p class="sub">Soglie fedeltà, punti per attività e limiti</p>${cardRegolePunti()}`;
+  return `<h2>${ic('sparkles')} Regole Punti e Saletta</h2><p class="sub">Soglie dei Punti Collega Modello, punti per attività e limiti</p>${cardRegolePunti()}`;
 }
 function pBackup(d){
   return `<h2>${ic('download')} Backup & Ripristino</h2><p class="sub">Copia dei dati fuori dall'app.</p>
@@ -3259,16 +3259,16 @@ A['conferma-caffe-fuori'] = () => {
   closeSheet(); toast(`${q} caffè registrati per ${nomeM(mid)}`);
 };
 /* --- punti caffè, punti (admin), spesa admin, prezzo caffè --- */
-/* --- tessera fedeltà: punti di tutte le categorie, riscatto a soglia --- */
+/* --- Punti Collega Modello: punti di tutte le categorie, riscatto a soglia --- */
 A['tessera'] = () => {
   const d = derived(), r = sogliaPunti(), cr = creditiSoglia(), pt = ptDisp(d, st.mid), ok = pt >= r, me = st.mid;
   const usati = ptUsati(d, me);
-  openSheet(`<h3>⭐ Tessera fedeltà</h3>
+  openSheet(`<h3>⭐ Punti Collega Modello</h3>
     <div class="stat" style="margin-bottom:10px"><small>Punti posseduti</small><b class="mono ${ok ? 'green' : 'amber'}">${pt} / ${r}</b></div>
     <p class="tx2" style="font-size:14px;margin:0 0 12px">☕ ${nz(d.S.pcaf, me)} · ✨ ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
     <button class="btn green block big" id="btn-riscatta-punti" data-act="riscatta-punti" ${ok ? '' : 'disabled'}>🎉 Riscatta punti</button>
     <div id="regola-punti" style="margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:14px">
-      <b style="font-size:16px;display:block;margin-bottom:6px">Come si guadagnano i punti</b>
+      <b style="font-size:16px;display:block;margin-bottom:6px">Regolamento Punti Collega Modello: come maturare punti</b>
       ${[['☕', 'Ogni caffè', ptCaffe()], ['🍫', 'Ogni snack', ptSnack()], ['🧾', 'Ogni spesa convalidata', ptSpesa()], ['✨', 'Ogni turno di pulizia', puntiPulizia()], ['👏', 'Ogni «Ben fatto» ricevuto', ptBenFatto()]].map(([e, l, n]) => `<div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>${e} ${l}</span><b class="mono amber" style="font-size:18px;white-space:nowrap">+${n} ${n === 1 ? 'punto' : 'punti'}</b></div>`).join('')}
       <div style="margin-top:12px;padding:12px;border-radius:12px;background:rgba(52,211,153,.12);text-align:center;font-size:16.5px;font-weight:800;line-height:1.35" class="green">Ogni ${r} punti = ${cr} ${cr === 1 ? 'credito' : 'crediti'} (${eur(cr * 100)})</div>
       <p class="tx2" style="font-size:14px;line-height:1.5;margin:10px 0 0">Riscattare i punti non cambia la tua posizione in classifica.</p></div>`);
