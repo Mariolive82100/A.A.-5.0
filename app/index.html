@@ -258,7 +258,8 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
     <b id="hdr-name"><svg class="i s"><use href="#i-coffee"/></svg>Armieri 5.0</b>
     <small><span class="dot" id="syncdot"></span><span id="hdr-sub"></span></small>
   </div>
-  <button class="sbadge pos hidden" id="hdr-sb" style="margin-left:auto" data-act="go" data-p="registro" aria-label="Saldo"></button>
+  <button class="iconbtn" id="hdr-update" style="margin-left:auto" data-act="aggiorna" aria-label="Aggiorna all'ultima versione" title="Aggiorna all'ultima versione"><svg class="i"><use href="#i-repeat"/></svg></button>
+  <button class="sbadge pos hidden" id="hdr-sb" style="margin-left:6px" data-act="go" data-p="registro" aria-label="Saldo"></button>
 </header>
 
 <main id="main"></main>
@@ -325,7 +326,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.12.1';
+const VERSION = '1.12.3';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1069,7 +1070,7 @@ function pBar(d){
   const sq = statoQuota(d, st.mid, anno());
   const quotaDa = st.gruppo.quotaAnnua > 0 && st.ready.mv && sq !== 'pagata';
   const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0);
-  const noCaffe = !puoPagare(pc), noSnack = snDisp.length > 0 && !snDisp.some(p => puoPagare(p.prezzo));
+  const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
   return `
   ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un amministratore: la registrerà lui.</div></div>` : ''}
   <div class="card" style="text-align:center">
@@ -1086,14 +1087,14 @@ function pBar(d){
   </div>
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
     return `<div class="banner red">${ic('alert')}<div class="grow">Tasso di Onestà dell'ultima busta: <b>${tassoBusta(l)}%</b> (${l.n || 0} caffè registrati su ${BUSTA_CAFFE}). Chi beve il caffè deve registrarlo ogni volta!</div><button class="iconbtn" data-act="busta-visto" data-id="${l.id}">${ic('x','s')}</button></div>`; })()}
-  ${noCaffe || noSnack ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${noCaffe && noSnack ? ' (caffè e snack)' : noCaffe ? ' (caffè)' : ' (snack)'}${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno al prezzo del prodotto` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
+  ${noCaffe || (noSnack && !snVuoto) ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${noCaffe && noSnack && !snVuoto ? ' (caffè e snack)' : noCaffe ? ' (caffè)' : ' (snack)'}${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno al prezzo del prodotto` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
   <div class="home" style="min-height:0;justify-content:flex-start;padding:0 0 4px">
     <div class="blob" style="width:200px;height:200px;background:#f5a524;top:4%;left:-40px"></div>
     <div class="blob" style="width:220px;height:220px;background:#7c3aed;top:38%;right:-60px"></div>
     <div class="blob" style="width:180px;height:180px;background:#10b981;bottom:2%;left:20%"></div>
     <div class="grid">
       <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
-      <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? '<small>credito insufficiente</small>' : ''}</button>
+      <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
       <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
     </div>
@@ -2266,6 +2267,16 @@ A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
     <div class="between" style="font-size:13px"><span class="tx2">Quota fondo annuale</span><b class="mono">${eur(st.gruppo.quotaAnnua || 0)}</b></div></div>
   <p class="hint">Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un amministratore. Ricariche e pagamenti li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.</p>
   <button class="btn block" data-act="sheet-close">Chiudi</button>`); };
+/* forza l'aggiornamento: svuota cache e service worker, rilegge i file dalla rete e ricarica (dati e accesso restano) */
+A['aggiorna'] = async () => {
+  toast('Aggiorno all\'ultima versione…');
+  try{
+    await Promise.all(['index.html', 'config.js', 'sw.js'].map(f => fetch(f, {cache: 'reload'}).catch(() => {})));
+    if('serviceWorker' in navigator){ const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); }
+    if(window.caches){ const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); }
+  }catch(e){}
+  location.reload();
+};
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
 A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
