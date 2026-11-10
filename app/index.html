@@ -319,7 +319,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.11.2';
+const VERSION = '1.11.4';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1462,7 +1462,7 @@ function pRegolamento(){
     'Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.',
     '<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.',
     '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
-    '<b>Classifiche:</b> la pagina «Classifiche e statistiche» è visibile a tutti. I Punti spesa valgono 2 per ogni richiesta di rimborso convalidata da un amministratore (nessun punto se è in attesa o respinta); i punti sono totali accumulati e non scendono se li converti in crediti.', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
+    '<b>Classifiche:</b> «Classifiche e statistiche» è visibile a tutti; i punti sono totali accumulati (vedi sezione 11)', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
   ${sez('2. Il saldo unico', [
     'Ogni membro ha un solo saldo. <b>Positivo = credito</b> (il gruppo ti deve qualcosa), <b>negativo = debito</b> (devi qualcosa alla cassa o ai colleghi a credito).',
     '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
@@ -1489,24 +1489,22 @@ function pRegolamento(){
   ${sez('7. Inventario e listino', [
     'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità. Per il caffè l\'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.',
     'Gli amministratori fanno verifiche fisiche periodiche: sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.'])}
-  ${sez('8. Pulizie e Punti Pulizia', [
-    '<b>Turno personale:</b> ognuno registra solo le proprie pulizie, nella data di oggi o in una data passata. In cima alla classifica gli amministratori vedono chi ha meno punti accumulati.',
-    `<b>Attribuzione:</b> ogni pulizia registrata vale <b>+${pp} Punti Pulizia</b> (valore stabilito dagli amministratori). Gli amministratori possono stornare registrazioni non veritiere.`,
-    `<b>Limiti anti-abuso:</b> si possono registrare al massimo <b>${pulGruppoN()}</b> ${pulGruppoN() === 1 ? 'pulizia' : 'pulizie'} di gruppo e <b>${pulUtenteN()}</b> ${pulUtenteN() === 1 ? 'turno' : 'turni'} per collega a settimana (da lunedì a domenica). Gli amministratori possono stornare una registrazione indebita: i punti si azzerano e il turno torna disponibile.`,
-    `<b>Punti:</b> i punti pulizia confluiscono nella Tessera fedeltà insieme a quelli di caffè, spese convalidate e «Ben fatto» (vedi sezione 11).`])}
+  ${sez('8. Pulizie', [
+    `Ognuno registra solo i propri turni (oggi o in una data passata) e riceve <b>+${pp} punti</b>.`,
+    `Limiti a settimana (lunedì-domenica): <b>${pulGruppoN()}</b> ${pulGruppoN() === 1 ? 'pulizia' : 'pulizie'} per tutto il gruppo e <b>${pulUtenteN()}</b> ${pulUtenteN() === 1 ? 'turno' : 'turni'} per collega. Gli amministratori possono stornare registrazioni indebite: punti azzerati e turno di nuovo disponibile.`])}
   ${sez('9. Busta del caffè e Tasso di Onestà', [
     `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
     '<b>Tasso di Onestà = caffè registrati ÷ 130 × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che qualcuno beve senza registrare.',
     'Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.'])}
-  ${sez('11. Tessera fedeltà e «Ben fatto!»', [
-    `<b>Come si guadagnano i punti:</b> ☕ ${ptCaffe()} per ogni caffè · 🧾 ${ptSpesa()} per ogni spesa convalidata (zero se in attesa o respinta) · ✨ ${pp} per ogni turno di pulizia · 👏 ${ptBenFatto()} per ogni «Ben fatto» ricevuto.`,
-    `<b>Tessera:</b> tutti i punti posseduti si sommano. Ogni <b>${sogliaPunti()} punti</b> si riscattano <b>${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'}</b> (${eur(creditiSoglia() * 100)}). I punti riscattati non fanno scendere la classifica, che conta i punti totali accumulati.`,
-    `<b>Ben fatto!</b> è un riconoscimento a un collega meritevole, con una motivazione obbligatoria (max 80 caratteri). Chi lo invia non perde punti; ognuno ha <b>${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}</b>. Gli amministratori possono stornare i riconoscimenti non veritieri.`,
-    'Valori, soglia e gettoni sono stabiliti dagli amministratori; un cambio vale per gli eventi futuri, quelli passati mantengono il valore con cui sono stati registrati.'])}
   ${sez('10. Chiusure, backup e trasparenza', [
     'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
     'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
-    'A fine esercizio l\'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.'])}`;
+    'A fine esercizio l\'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.'])}
+  ${sez('11. Punti e Tessera fedeltà', [
+    `<b>Si guadagnano:</b> ☕ ${ptCaffe()} per caffè · 🧾 ${ptSpesa()} per spesa convalidata · ✨ ${pp} per turno di pulizia · 👏 ${ptBenFatto()} per ogni «Ben fatto» ricevuto.`,
+    `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}), dalla Tessera fedeltà. La classifica conta i punti totali: riscattare non la cambia.`,
+    `<b>Ben fatto!</b> riconosce un collega, con motivazione obbligatoria (max 80 caratteri). Chi lo invia non perde punti; ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}.`,
+    'Valori, soglia e gettoni li decidono gli amministratori; i cambi valgono per gli eventi futuri.'])}`;
 }
 
 /* ---------- PULIZIE ---------- */
@@ -3035,10 +3033,13 @@ A['tessera'] = () => {
   const usati = ptUsati(d, me);
   openSheet(`<h3>⭐ Tessera fedeltà</h3>
     <div class="stat" style="margin-bottom:10px"><small>Punti posseduti</small><b class="mono ${ok ? 'green' : 'amber'}">${pt} / ${r}</b></div>
-    <p class="hint" style="margin:0 0 10px">☕ ${nz(d.S.pcaf, me)} · ✨ ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
+    <p class="tx2" style="font-size:14px;margin:0 0 12px">☕ ${nz(d.S.pcaf, me)} · ✨ ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
     <button class="btn green block big" id="btn-riscatta-punti" data-act="riscatta-punti" ${ok ? '' : 'disabled'}>🎉 Riscatta punti</button>
-    <div class="card" style="margin:12px 0 0;padding:12px"><b style="font-size:13px">Regolamento accredito punti</b>
-      <p class="tx2" style="font-size:12.5px;line-height:1.55;margin:6px 0 0">☕ Caffè: +${ptCaffe()} · 🧾 Spesa convalidata: +${ptSpesa()} · ✨ Turno pulizia: +${puntiPulizia()} · 👏 «Ben fatto» ricevuto: +${ptBenFatto()}<br>Ogni ${r} punti = ${cr} ${cr === 1 ? 'credito' : 'crediti'} (${eur(cr * 100)}). Riscattare non cambia la tua classifica.</p></div>`);
+    <div id="regola-punti" style="margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:14px">
+      <b style="font-size:16px;display:block;margin-bottom:6px">Come si guadagnano i punti</b>
+      ${[['☕', 'Ogni caffè', ptCaffe()], ['🧾', 'Ogni spesa convalidata', ptSpesa()], ['✨', 'Ogni turno di pulizia', puntiPulizia()], ['👏', 'Ogni «Ben fatto» ricevuto', ptBenFatto()]].map(([e, l, n]) => `<div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>${e} ${l}</span><b class="mono amber" style="font-size:18px;white-space:nowrap">+${n} ${n === 1 ? 'punto' : 'punti'}</b></div>`).join('')}
+      <div style="margin-top:12px;padding:12px;border-radius:12px;background:rgba(52,211,153,.12);text-align:center;font-size:16.5px;font-weight:800;line-height:1.35" class="green">Ogni ${r} punti = ${cr} ${cr === 1 ? 'credito' : 'crediti'} (${eur(cr * 100)})</div>
+      <p class="tx2" style="font-size:14px;line-height:1.5;margin:10px 0 0">Riscattare i punti non cambia la tua posizione in classifica.</p></div>`);
 };
 A['riscatta-punti'] = () => {
   const d = derived(), r = sogliaPunti(), cr = creditiSoglia();
