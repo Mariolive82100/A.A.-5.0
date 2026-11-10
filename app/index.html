@@ -95,6 +95,12 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .tgl.on{background:var(--green)}
 .tgl.on::after{left:23px}
 .gbtn small{font-size:12.5px;font-weight:600;color:var(--tx2)}
+.gbtn.sm{min-height:min(19vh,132px);padding:10px;gap:6px;border-radius:22px;font-size:14px}.gbtn.sm .em{font-size:30px}
+.ruota-box{position:relative;width:min(78vw,300px);margin:10px auto 12px}.ruota-box svg{width:100%;height:auto;display:block}
+.ruota-pt{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:22px solid var(--amber);filter:drop-shadow(0 2px 2px rgba(0,0,0,.45));z-index:2}
+@keyframes ruota-spin{from{transform:rotate(var(--from))}to{transform:rotate(var(--to))}}
+.perla{border:1px solid var(--line);border-radius:16px;background:var(--card2);padding:12px 14px;margin-bottom:10px}
+.perla q{display:block;font-size:15.5px;font-weight:600;line-height:1.4;quotes:'«' '»';word-break:break-word}
 .gbtn .em{font-size:34px;line-height:1}
 .gbtn.adm{border-color:rgba(167,139,250,.38);background:linear-gradient(135deg,rgba(245,165,36,.13),rgba(124,58,237,.16))}
 body.adm header{border-bottom:2px solid var(--violet)}
@@ -352,7 +358,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.15.1';
+const VERSION = '1.17.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -516,6 +522,7 @@ function stopData(){
   if(movUnsub){ movUnsub(); movUnsub = null; }
   if(movUnsubD){ movUnsubD(); movUnsubD = null; }
   lastCutoffKey = null;
+  if(perleUnsub){ perleUnsub(); perleUnsub = null; } perleKey = '';
 }
 let retryT = null, retryN = 0;
 const onDataErr = e => {
@@ -544,7 +551,10 @@ function syncMode(){
     render();
   }, () => {}));
   dataUnsubs.push(C('prodotti').onSnapshot(s => { st.prodotti = docs(s); render(); }, onDataErr));
-  dataUnsubs.push(C('eventi').onSnapshot(s => { st.eventi = docs(s); render(); }, onDataErr));
+  let evA = [], evB = [];   // compleanni (ricorrenti) + ultimi 30 per data: mai l'intera collezione
+  const evMerge = () => { const mp = new Map(); evA.concat(evB).forEach(e => mp.set(e.id, e)); st.eventi = [...mp.values()]; render(); };
+  dataUnsubs.push(C('eventi').where('tipo', '==', 'compleanno').limit(30).onSnapshot(s => { evA = docs(s); evMerge(); }, onDataErr));
+  dataUnsubs.push(C('eventi').orderBy('data', 'desc').limit(30).onSnapshot(s => { evB = docs(s); evMerge(); }, onDataErr));
   dataUnsubs.push(C('buste').onSnapshot(s => { st.buste = docs(s); render(); }, onDataErr));
   // lista della spesa: articoli da comprare / in rimborso, più gli ultimi 30 acquistati (nessun indice composito)
   let lsAtt = [], lsSto = [];
@@ -852,13 +862,14 @@ function doRender(){
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
   main.innerHTML = sw + fn(d);
   restore();
   rimettiScroll();
+  perleSync();
 }
 
 function renderDrawer(){
@@ -879,8 +890,8 @@ function renderDrawer(){
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
 }
 
-const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco','spesa'];
-const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','pulizie','inventario','eventi','impostazioni','regolamento','registro','crediti','notifiche','admin'];
+const SALETTA_SUB = ['saletta','pulizie','eventi','inventario','gioco','ruota','perle'];
+const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','pulizie','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
 const PAGINE_ADMIN = ['regole','bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
@@ -1105,6 +1116,7 @@ function pBar(d){
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
     ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
   </div>
+  ${avvisiHome()}
   ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
     return `<div class="banner red">${ic('alert')}<div class="grow">Tasso di Onestà dell'ultima busta: <b>${tassoBusta(l)}%</b> (${l.n || 0} caffè registrati su ${BUSTA_CAFFE}). Chi beve il caffè deve registrarlo ogni volta!</div><button class="iconbtn" data-act="busta-visto" data-id="${l.id}">${ic('x','s')}</button></div>`; })()}
   ${noCaffe || (noSnack && !snVuoto) ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${noCaffe && noSnack && !snVuoto ? ' (caffè e snack)' : noCaffe ? ' (caffè)' : ' (snack)'}${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno al prezzo del prodotto` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
@@ -1262,7 +1274,7 @@ function pAdminHome(d, forza){
     <p class="hint" style="margin:8px 0 0">Palette, zucchero, bicchieri e detersivi non si contano: registrali con «Registra spesa».</p>
   </div>
 `;
-  return `${bannerBackup()}
+  return `${bannerBackup()}${avvisiHome()}${avvisoAdminBtn()}
   <div class="card tesoro">
     <div class="between"><small class="mut">Saldo Disponibile del Fondo (Cassa Totale)</small>${d.pendenti.length ? `<button class="pill red" style="border:0" data-act="adm-tab" data-v="inbox">${d.pendenti.length} in attesa</button>` : ''}</div>
     <div class="big mono amber" id="t-cassa">${eur(t.cassa)}</div>
@@ -1561,19 +1573,21 @@ function prossimaData(ev){
   return s;
 }
 function giorniA(iso){ const [y,m,d] = iso.split('-').map(Number); const t = new Date(y, m-1, d), o = new Date(); o.setHours(0,0,0,0); return Math.round((t - o) / 86400000); }
+const backHome = () => `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button>`;
 const backSaletta = () => adminView() ? '' : `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="saletta">← Saletta</button>`;
 /* lista della spesa: articoli ancora da comprare (badge su pulsanti e schede) */
 const nSpesa = () => (st.listaSpesa || []).filter(x => x.stato === 'da_comprare').length;
 const badgeSpesa = () => nSpesa() ? `<span class="tb tbi" id="badge-spesa">${nSpesa()}</span>` : '';
 const badgeSpesaAbs = () => nSpesa() ? `<span class="tb" id="badge-spesa" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${nSpesa()}</span>` : '';
 function pSaletta(d){
-  return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Lista della spesa, pulizie, eventi, scorte e un po' di svago.</p>
-  <div class="grid2" style="gap:14px">
-    <button class="gbtn" id="sal-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa${badgeSpesaAbs()}</button>
-    <button class="gbtn" id="sal-pulizie" data-act="go" data-p="pulizie"><span class="em">✨</span>Pulizie sala</button>
-    <button class="gbtn" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi</button>
-    <button class="gbtn" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
-    <button class="gbtn" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Gioco caffè</button>
+  return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Pulizie, eventi, scorte e un po' di svago.</p>
+  <div class="grid2" style="gap:12px">
+    <button class="gbtn sm" id="sal-pulizie" data-act="go" data-p="pulizie"><span class="em">✨</span>Pulizie sala</button>
+    <button class="gbtn sm" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi</button>
+    <button class="gbtn sm" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
+    <button class="gbtn sm" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Gioco caffè</button>
+    <button class="gbtn sm" id="sal-ruota" data-act="go" data-p="ruota"><span class="em">☕</span>Ruota del Barista<small>Chi fa i caffè?</small></button>
+    <button class="gbtn sm" id="sal-perle" data-act="go" data-p="perle"><span class="em">💬</span>Bacheca delle Perle<small>Frasi celebri</small></button>
   </div>`;
 }
 
@@ -2014,7 +2028,7 @@ function pSpesa(d){
       <div class="av">${on ? '☑' : '☐'}</div><div class="grow"><div class="t" style="white-space:normal;font-size:14px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.richiestoDa) || '(sconosciuto)')} · ${x.ts ? quando(tms(x.ts)) : 'ora'}</div></div></button>
       ${puoDel ? `<button class="iconbtn" style="width:32px;height:32px" data-act="spesa-del" data-id="${x.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div>`;
   };
-  return `${backSaletta()}<h2>🛒 Lista della spesa</h2><p class="sub">Cosa serve alla saletta. Chi fa la spesa spunta gli articoli e registra l'acquisto: l'amministratore lo rimborsa.</p>
+  return `${backHome()}<h2>🛒 Lista della spesa</h2><p class="sub">Cosa serve alla saletta. Chi fa la spesa spunta gli articoli e registra l'acquisto: l'amministratore lo rimborsa.</p>
   <div class="card"><div class="row" style="gap:8px;align-items:flex-end"><label class="f" style="flex:1;margin:0"><span>Cosa serve?</span><input class="in" id="sp-nome" maxlength="60" placeholder="es. Caffè in grani" autocomplete="off"></label>
     <button class="btn amber" id="btn-spesa-add" data-act="spesa-aggiungi">${ic('plus','s')} Aggiungi</button></div></div>
   <div class="card"><h3><span>Da comprare</span><b class="mono amber">${attivi.length}</b></h3>
@@ -3739,6 +3753,140 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Enter' && e.target.id === 'sp-nome') A['spesa-aggiungi']();
 });
 setInterval(() => { if(st.page === 'feed' || st.page === 'bar') render(); }, 60000);
+
+/* ---------- Avvisi e comunicazioni in Home ---------- */
+const AVV_TIPI = {avviso: ['📢', 'Avviso', 'amber'], attenzione: ['⚠️', 'Attenzione', 'red'], info: ['☕', 'Info', 'sky']};
+/* avvisi automatici di oggi: solo dati gia' in memoria (st.eventi), nessuna lettura ne' scrittura */
+function avvisiAuto(){
+  const oggi = oggiISO();
+  return (st.eventi || []).filter(e => e && e.titolo && e.data && prossimaData(e) === oggi)
+    .map(e => e.tipo === 'compleanno' ? `🎂 Oggi è il compleanno di <b>${esc(e.titolo)}</b>! Ricordategli i pasticcini 🎉` : `📅 Oggi: <b>${esc(e.titolo)}</b>`);
+}
+function avvisiHome(){
+  const av = st.gruppo && st.gruppo.avviso, auto = avvisiAuto();
+  let h = '';
+  if(av && typeof av.testo === 'string' && av.testo){
+    const [em, lab, col] = AVV_TIPI[av.tipo] || AVV_TIPI.avviso, t = tms(av.ts);
+    h += `<div class="banner ${col}" id="avviso-admin"><div class="grow"><b>${em} ${lab}</b><div style="margin-top:3px;font-size:14px;line-height:1.4;word-break:break-word">${esc(av.testo)}</div><div style="margin-top:5px;font-size:11.5px;opacity:.75">${esc(av.autore || '')}${t ? ' · ' + quando(t) : ''}</div></div>
+      ${st.isAdmin ? `<button class="iconbtn" style="width:32px;height:32px;flex:none" id="avviso-rimuovi" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>`;
+  }
+  auto.forEach((t, i) => { h += `<div class="banner amber" id="avviso-auto-${i}"><div class="grow" style="font-size:14px">${t}</div></div>`; });
+  return h;
+}
+const avvisoAdminBtn = () => `<button class="btn sm block ghost" id="btn-avviso-nuovo" style="margin-bottom:10px" data-act="avviso-nuovo">📢 ${st.gruppo.avviso ? 'Sostituisci la comunicazione in Home' : 'Pubblica una comunicazione in Home'}</button>`;
+A['avviso-nuovo'] = () => {
+  if(!st.isAdmin) return;
+  const cur = st.gruppo.avviso || {}, tp = AVV_TIPI[cur.tipo] ? cur.tipo : 'avviso';
+  st.avvTipo = tp;
+  openSheet(`<h3>📢 Comunicazione in Home</h3><p class="sub">Visibile a tutti i colleghi finché non la rimuovi o la sostituisci. Ne resta una sola attiva.</p>
+    <div class="chips" id="av-tipi">${Object.entries(AVV_TIPI).map(([k, [e, l]]) => `<button id="av-t-${k}" class="${tp === k ? 'on' : ''}" data-act="avviso-tipo" data-v="${k}">${e} ${l}</button>`).join('')}</div>
+    <label class="f"><span>Testo</span><textarea class="in" id="av-testo" maxlength="200" rows="4" placeholder="Es. Domani la saletta è chiusa per pulizie">${esc(cur.testo || '')}</textarea></label>
+    <button class="btn amber block big" id="btn-avviso-pubblica" data-act="avviso-pubblica">${cur.testo ? 'Sostituisci' : 'Pubblica'}</button>
+    ${cur.testo ? `<button class="btn red block" style="margin-top:8px" id="btn-avviso-rimuovi2" data-act="avviso-rimuovi">Rimuovi la comunicazione attiva</button>` : ''}`);
+};
+A['avviso-tipo'] = ds => { if(!AVV_TIPI[ds.v]) return; st.avvTipo = ds.v; document.querySelectorAll('#av-tipi button').forEach(b => b.classList.toggle('on', b.dataset.v === ds.v)); };
+A['avviso-pubblica'] = () => {
+  if(!st.isAdmin) return;
+  const testo = val('av-testo'), tipo = AVV_TIPI[st.avvTipo] ? st.avvTipo : 'avviso';
+  if(testo.length < 3) return toast('Scrivi il testo della comunicazione', 'err');
+  const autore = (nomeBreve(st.mid) || 'Amministratore').slice(0, 40);
+  G().update({avviso: {tipo, testo: testo.slice(0, 200), autore, ts: TS()}}).then(() => toast('Comunicazione pubblicata')).catch(e => toast(errMsg(e), 'err'));
+  closeSheet();
+};
+A['avviso-rimuovi'] = () => {
+  if(!st.isAdmin) return;
+  G().update({avviso: firebase.firestore.FieldValue.delete()}).then(() => toast('Comunicazione rimossa')).catch(e => toast(errMsg(e), 'err'));
+  closeSheet();
+};
+
+/* ---------- Saletta: Ruota del Barista (solo client) e Bacheca delle Perle ---------- */
+function rndInt(n){ const lim = 4294967296 - 4294967296 % n; let x; do { x = crypto.getRandomValues(new Uint32Array(1))[0]; } while(x >= lim); return x % n; }
+function ruotaSt(){
+  if(!st.ruota){ const sv = LS.get('ruotaSel', []); st.ruota = {sel: Object.fromEntries(membriAttivi().filter(m => sv.includes(m.id)).map(m => [m.id, true])), ids: [], ang: 0, from: 0, gira: false, t0: 0, win: null, vinc: null}; }
+  return st.ruota;
+}
+function ruotaSvg(ids, nome){
+  const n = ids.length, A_ = 360 / n, R = 140, C0 = 150, pt = a => [C0 + R * Math.sin(a * Math.PI / 180), C0 - R * Math.cos(a * Math.PI / 180)];
+  const fs = n <= 6 ? 15 : n <= 10 ? 12 : 10, mx = n <= 6 ? 12 : n <= 10 ? 9 : 7;
+  return ids.map((id, i) => {
+    const a1 = i * A_, a2 = (i + 1) * A_, [x1, y1] = pt(a1), [x2, y2] = pt(a2), mid = a1 + A_ / 2, nm = nome(id), lab = nm.length > mx ? nm.slice(0, mx - 1) + '…' : nm;
+    return `<path d="M${C0} ${C0}L${x1.toFixed(2)} ${y1.toFixed(2)}A${R} ${R} 0 ${A_ > 180 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}Z" fill="hsl(${Math.round(i * 360 / n)} 62% 42%)" stroke="rgba(255,255,255,.55)" stroke-width="1.5"/>
+      <text transform="rotate(${mid.toFixed(2)} ${C0} ${C0})" x="${C0}" y="${C0 - R * 0.62}" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" font-weight="800" fill="#fff">${esc(lab)}</text>`;
+  }).join('') + `<circle cx="${C0}" cy="${C0}" r="16" fill="var(--card)" stroke="rgba(255,255,255,.6)" stroke-width="2"/><text x="${C0}" y="${C0 + 1}" text-anchor="middle" dominant-baseline="middle" font-size="16">☕</text>`;
+}
+function pRuota(d){
+  const r = ruotaSt(), nome = id => nomeBreve(id) || nomeM(id), att = membriAttivi().slice().sort((a, b) => nome(a.id).localeCompare(nome(b.id)));
+  const sel = att.filter(m => r.sel[m.id]).map(m => m.id), ids = r.gira || r.vinc ? r.ids : sel;
+  const anim = r.gira ? `--from:${r.from}deg;--to:${r.ang}deg;animation:ruota-spin 4.2s cubic-bezier(.12,.6,.1,1) ${(-(Date.now() - r.t0) / 1000).toFixed(2)}s forwards` : `transform:rotate(${r.ang}deg)`;
+  const ruota = ids.length >= 2 ? `<div class="ruota-box"><div class="ruota-pt"></div><svg viewBox="0 0 300 300" id="ruota-svg" style="${anim}" role="img" aria-label="Ruota con ${ids.length} colleghi">${ruotaSvg(ids, nome)}</svg></div>`
+    : '<div class="empty">Spunta almeno 2 colleghi presenti e gira la ruota.</div>';
+  const esito = r.vinc && !r.gira ? `<div class="card" id="ruota-esito" style="text-align:center;border-color:var(--amber)"><div style="font-size:40px;line-height:1.1">☕</div><div style="font-size:22px;font-weight:800;margin:4px 0">Tocca a ${esc(nome(r.vinc))}!</div><div class="mut" style="font-size:13px">Alla macchinetta a fare i caffè per tutti.</div></div>` : '';
+  return `${backSaletta()}<h2>☕ La Ruota del Barista</h2><p class="sub">Chi si mette alla macchinetta? Scegli i presenti e lascia decidere alla sorte.</p>
+  ${ruota}${esito}
+  <button class="btn amber block big" id="ruota-gira" data-act="ruota-gira" ${sel.length >= 2 && !r.gira ? '' : 'disabled'}>${r.gira ? 'Gira…' : r.vinc ? '🔁 Rigira la ruota' : '🎡 Gira la ruota!'}</button>
+  <div class="card" style="margin-top:12px"><h3><span>Chi c'è</span><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="ruota-tutti" data-v="1" ${r.gira ? 'disabled' : ''}>Tutti</button><button class="btn sm ghost" data-act="ruota-tutti" data-v="0" ${r.gira ? 'disabled' : ''}>Nessuno</button></span></h3>
+    <div class="list">${att.map(m => `<button class="li" data-act="ruota-toggle" data-id="${m.id}" ${r.gira ? 'disabled' : ''} style="width:100%;text-align:left;${r.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${r.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:14px">${esc(nome(m.id))}${m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div></button>`).join('')}</div>
+    <p class="hint" style="margin:8px 0 0">Estrazione casuale e uniforme: ognuno ha la stessa probabilità. Non viene salvato nulla.</p></div>`;
+}
+A['ruota-toggle'] = ds => { const r = ruotaSt(); if(r.gira) return; r.sel[ds.id] = !r.sel[ds.id]; r.vinc = null; render(); };
+A['ruota-tutti'] = ds => { const r = ruotaSt(); if(r.gira) return; r.sel = {}; if(ds.v === '1') membriAttivi().forEach(m => { r.sel[m.id] = true; }); r.vinc = null; render(); };
+A['ruota-gira'] = () => {
+  const r = ruotaSt(); if(r.gira) return;
+  const ids = membriAttivi().slice().sort((a, b) => (nomeBreve(a.id) || nomeM(a.id)).localeCompare(nomeBreve(b.id) || nomeM(b.id))).filter(m => r.sel[m.id]).map(m => m.id);
+  if(ids.length < 2) return toast('Scegli almeno 2 colleghi', 'err');
+  LS.set('ruotaSel', ids);
+  const n = ids.length, A_ = 360 / n, k = rndInt(n), jit = (rndInt(1000) / 1000 - 0.5) * 0.7 * A_;
+  r.ids = ids; r.win = ids[k]; r.vinc = null; r.gira = true; r.from = r.ang; r.t0 = Date.now();
+  r.ang = (r.from - (r.from % 360)) + 1800 + ((360 - ((k + 0.5) * A_ + jit)) % 360 + 360) % 360;
+  render();
+  setTimeout(() => { r.gira = false; r.vinc = r.win; try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){} render(); }, 4300);
+};
+
+/* Bacheca delle Perle: listener limitato, attivo solo con la pagina aperta e l'app in primo piano */
+let perleUnsub = null, perleKey = '';
+function perleSync(){
+  const vuole = !!inAppOra() && st.page === 'perle' && document.visibilityState !== 'hidden';
+  const key = vuole ? st.gid + '|' + (st.perleN || 20) : '';
+  if(key === perleKey) return;
+  if(perleUnsub){ perleUnsub(); perleUnsub = null; }
+  perleKey = key;
+  if(!vuole) return;
+  st.perleErr = null;
+  perleUnsub = C('perle').orderBy('ts', 'desc').limit(st.perleN || 20).onSnapshot(s => {
+    st.perle = s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps: 'estimate'})})); st.perleOk = true; render();
+  }, e => { st.perleOk = true; st.perleErr = errMsg(e); render(); });
+}
+document.addEventListener('visibilitychange', perleSync);
+function pPerle(d){
+  const L = st.perle || [], N = st.perleN || 20;
+  const card = p => `<div class="perla"><q>${esc(p.testo)}</q><div style="margin-top:6px;font-size:13.5px;font-weight:700">— ${esc(p.autore)}${p.contesto ? ` <span class="mut" style="font-weight:500">· ${esc(p.contesto)}</span>` : ''}</div>
+    <div class="between" style="margin-top:6px"><span class="mut" style="font-size:11.5px">inserita da ${esc(nomeBreve(p.mid) || nomeM(p.mid) || '?')} · ${p.ts ? quando(tms(p.ts)) : 'ora'}</span>
+    ${st.isAdmin || p.mid === st.mid ? `<button class="iconbtn" style="width:32px;height:32px" data-act="perla-del" data-id="${p.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div></div>`;
+  return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>💬 Bacheca delle Perle</h2><p class="sub" style="margin:0">Frasi celebri sentite in saletta</p></div>
+    <button class="btn sm amber" id="btn-perla-nuova" data-act="perla-nuova">${ic('plus','s')} Nuova</button></div>
+  ${st.perleErr ? `<div class="banner red">${ic('alert')}<div>Non riesco a leggere la bacheca (${esc(st.perleErr)}).</div></div>` : ''}
+  ${L.length ? `<div id="perle-lista">${L.map(card).join('')}</div>` : `<div class="card"><div class="empty">${st.perleOk ? 'Ancora nessuna perla. Inserisci la prima!' : 'Carico…'}</div></div>`}
+  ${L.length >= N && N < 30 ? `<button class="btn sm block ghost" data-act="perle-altre">Mostra altre</button>` : ''}`;
+}
+A['perle-altre'] = () => { st.perleN = 30; render(); };
+A['perla-nuova'] = () => {
+  const nomi = membriAttivi().map(m => nomeBreve(m.id) || m.nome);
+  openSheet(`<h3>💬 Nuova perla</h3><p class="sub">Una frase da ricordare, sentita in saletta o durante il turno.</p>
+    <label class="f"><span>Chi l'ha detta</span><input class="in" id="pe-aut" maxlength="40" list="pe-nomi" autocomplete="off" placeholder="es. Marco" autofocus><datalist id="pe-nomi">${nomi.map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></label>
+    <label class="f"><span>La frase</span><textarea class="in" id="pe-txt" maxlength="280" rows="3" placeholder="Scrivi la citazione"></textarea></label>
+    <label class="f"><span>Data o contesto (facoltativo)</span><input class="in" id="pe-ctx" maxlength="60" placeholder="es. riunione del lunedì"></label>
+    <button class="btn amber block big" id="btn-perla-salva" data-act="perla-salva">Pubblica</button>`);
+};
+A['perla-salva'] = () => {
+  const autore = val('pe-aut'), testo = val('pe-txt'), contesto = val('pe-ctx');
+  if(autore.length < 2) return toast('Indica chi l\'ha detta', 'err');
+  if(testo.length < 3) return toast('Scrivi la frase', 'err');
+  if(st.perleUltima && Date.now() - st.perleUltima < 15000) return toast('Un attimo: aspetta qualche secondo tra una perla e l\'altra', 'err');
+  st.perleUltima = Date.now();
+  C('perle').add({autore, testo, ...(contesto ? {contesto} : {}), mid: st.mid, ts: TS()}).catch(e => toast('Non salvata (' + errMsg(e) + ')', 'err'));
+  closeSheet(); toast('Perla pubblicata 💬');
+};
+A['perla-del'] = ds => { if(!confirm('Eliminare questa perla?')) return; C('perle').doc(ds.id).delete().catch(e => toast(errMsg(e), 'err')); };
 
 /* ---------- tasto / gesture "Indietro" (History API) ----------
    Una sola voce "sentinella" sopra la base della cronologia: a ogni Indietro l'app decide cosa chiudere
