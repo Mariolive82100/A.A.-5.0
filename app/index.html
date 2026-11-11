@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.33.0';
+const VERSION = '1.34.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -711,6 +711,7 @@ function applyMov(S, m, sg){
     case 'conversione_caffe': add(S.saldi, m.mid, sg*m.importo); add(S.pcafConv, m.mid, sg*m.punti*fx(m)); break;
     case 'punti_adj': add(m.kind === 'caffe' ? S.pcaf : S.punti, m.mid, sg*m.punti*fx(m)); break;
     case 'pulizia': (m.mids || []).forEach(x => { add(S.turni, x, sg); add(S.punti, x, sg*ptPulM(m)); if(sg > 0) S.ultimo[x] = Math.max(S.ultimo[x] || 0, m.giorno ? new Date(m.giorno + 'T12:00:00').getTime() : (m.t || 0)); }); break;
+    case 'obiettivo': if(m.fase === 'fatto'){ add(S.turni, m.mid, sg); add(S.punti, m.mid, sg*(m.punti || 0)); if(sg > 0) S.ultimo[m.mid] = Math.max(S.ultimo[m.mid] || 0, m.t || 0); } break;   // il «carico» non assegna nulla: i punti arrivano alla conferma
     case 'storno': if(m.orig) applyMov(S, m.orig, -sg); break;
   }
 }
@@ -790,7 +791,7 @@ const ptBenFatto = () => cfgN('ptBenFatto', 2);
 const flagOn = k => !(st.gruppo && st.gruppo[k] === false);
 const ptMaster = () => flagOn('ptOn');
 const onP = k => ptMaster() && flagOn(k);
-const PUL_FLAG = {macc: 'pulMaccOn', secchio: 'pulSecchioOn', sala: 'pulSalaOn'};
+const PUL_FLAG = {macc: 'pulMaccOn'};
 const pulOn = k => onP(PUL_FLAG[k]);
 const ptCaffeE = () => onP('ptCaffeOn') ? ptCaffe() : 0, ptSnackE = () => onP('ptCaffeOn') ? ptSnack() : 0;
 const ptSpesaE = () => onP('ptSpesaOn') ? ptSpesa() : 0, ptBfE = () => onP('ptBfOn') ? ptBenFatto() : 0;
@@ -798,13 +799,10 @@ const MSG_PUL_OFF = '🚫 Riscatto punti disabilitato dall\'amministratore';
 const sogliaPunti = () => Math.max(1, cfgN('sogliaPunti', 30));
 const creditiSoglia = () => Math.max(1, cfgN('creditiSoglia', 1));
 const bfN = () => Math.max(1, cfgN('bfN', 1));
-const pulGruppoN = () => Math.min(20, Math.max(1, cfgN('pulGruppoN', 1)));
 const bfPeriodo = () => (st.gruppo && st.gruppo.bfPeriodo) === 'mese' ? 'mese' : 'settimana';
-/* tre compiti di pulizia oggettivi (parametri admin nel documento del gruppo: nessuna lettura in più) */
-const ptPulMacc = () => cfgN('ptPulMacc', 10), ptPulSecchio = () => cfgN('ptPulSecchio', 5), ptPulSala = () => cfgN('ptPulSala', 50);
+/* macchinetta del caffè (parametri admin nel documento del gruppo: nessuna lettura in più) */
+const ptPulMacc = () => cfgN('ptPulMacc', 10);
 const pulMaccCaffe = () => Math.min(200, Math.max(1, cfgN('pulMaccCaffe', 20)));
-const pulSecchioFine = () => Math.min(24, Math.max(1, cfgN('pulSecchioFine', 12)));
-const pulSecchioInizio = () => Math.min(pulSecchioFine() - 1, Math.max(0, cfgN('pulSecchioInizio', 7)));
 /* scala punti ×10: scalaDa = istante del passaggio (scritto dall'admin). I movimenti e le chiusure PRECEDENTI si rivalutano solo in memoria:
    caffè, snack, spesa, «Ben fatto», riscatti ×10; i vecchi turni di pulizia valgono PUL_LEGACY (come la nuova «Pulizia generale») */
 const PUL_LEGACY = 50;
@@ -856,7 +854,7 @@ function scambiInviati(d){
 function creditoLibero(){ return Math.max(0, (derived().S.saldi[st.mid] || 0) - riservato(st.mid)); }
 
 /* ---------- scritture ---------- */
-function addMov(data, id, silenzioso){
+function addMov(data, id, silenzioso, onFail){
   const ref = id ? C('movimenti').doc(id) : C('movimenti').doc();
   const cts = Date.now();
   const full = clean({...data, uid: st.uid, amid: st.mid, autore: myName(), cts, ts: TS()});
@@ -865,7 +863,7 @@ function addMov(data, id, silenzioso){
   render();
   ref.set(full).catch(e => {
     delete st.pending[ref.id]; _derCache = null;
-    if(!silenzioso) toast('Operazione rifiutata (' + errMsg(e) + ')', 'err'); render();
+    if(onFail) onFail(e); else if(!silenzioso) toast('Operazione rifiutata (' + errMsg(e) + ')', 'err'); render();
   });
   return ref.id;
 }
@@ -910,7 +908,7 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], obiettivi:['Obiettivi del giorno','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Classifica e statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
@@ -969,17 +967,16 @@ function doRender(){
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
   $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['pulizie','Pulizie','brush'],['notifiche','Notifiche','bell']];
-  const nPul = !av ? nPulDisp() : 0;
+  const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = av ? cn.fondo : cn.pers;
   if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['classifiche','Classifica e statistiche','chart']);
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}${p === 'pulizie' && nPul ? `<span class="tb" id="tb-pulizie">${nPul}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, obiettivi:pObiettivi, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
@@ -1008,10 +1005,10 @@ function renderDrawer(){
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
 }
 
-const SALETTA_SUB = ['saletta','eventi','inventario','gioco','ruota','perle'];
-const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','pulizie','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche','admin'];
+const SALETTA_SUB = ['saletta','eventi','inventario','gioco','ruota','perle','spesa'];
+const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','obiettivi','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADMIN = ['regole','bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','pulizie','impostazioni','regolamento'];
+const PAGINE_ADMIN = ['regole','bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','obiettivi','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
 const pagineConsentite = () => !st.isAdmin ? PAGINE_COLLEGA : adminView() ? PAGINE_ADMIN : PAGINE_UTENTE;
 
@@ -1246,7 +1243,7 @@ function pBar(d){
       <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
       <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
-      <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
+      <button class="gbtn" id="btn-obiettivi" data-act="go" data-p="obiettivi"><span class="em">🎯</span>Obiettivi del giorno<small>${!ptMaster() ? 'punti disattivati' : nObDisp() ? nObDisp() + (nObDisp() === 1 ? ' da prendere' : ' da prendere') : 'tutto a posto'}</small>${badgeObiettivi()}</button>
     </div>
   </div>
 
@@ -1506,6 +1503,7 @@ function descMov(m){
     case 'carico': { const p = prodotto(m.pid);
       if(m.pid === PID_CAFFE) return {ic:'📦', t: `Buste di caffè ${m.qta > 0 ? '+' : ''}${m.qta}`, a: 0};
       return {ic:'📦', t: `Giacenza ${esc((p && p.nome) || m.nome || '')} ${m.qta > 0 ? '+' : ''}${m.qta} pz`, a: 0}; }
+    case 'obiettivo': { const o = esc(m.nome || 'Obiettivo'); return {ic:'🎯', t: m.fase === 'fatto' ? `Obiettivo completato: ${o} · ${esc(nomeM(m.mid))} (+${m.punti || 0} punti)` : `Obiettivo preso in carico: ${o} · ${esc(nomeM(m.mid))}`, a: 0}; }
     case 'pulizia': { const lab = {macc: 'Pulizia macchinetta', secchio: 'Secchio svuotato', sala: 'Pulizia generale'}[m.task] || 'Pulizie'; return {ic:'✨', t: `${lab}: ${(m.mids||[]).map(x => esc(nomeM(x))).join(', ')} (+${ptPulM(m)} punti a testa)`, a: 0}; }
     case 'conversione': return {ic:'🔄', t: `${n} converte ${m.punti} Punti Pulizia in crediti`, a: m.importo};
     case 'conversione_caffe': return {ic:'☕', t: `${n} converte ${m.punti} Punti Caffè in crediti`, a: m.importo};
@@ -1646,7 +1644,7 @@ function pRegolamento(){
   const g = st.gruppo || {};
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
-  const spento = ptMaster() ? ['macc', 'secchio', 'sala'].filter(k => !pulOn(k)).map(k => PUL_DEF[k][1]) : [];
+  const spento = ptMaster() ? ['macc'].filter(k => !pulOn(k)).map(k => PUL_DEF[k][1]) : [];
   const nota = (ok, txt) => ok ? '' : txt;
   return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.0 · novembre 2026</p>
   ${sez('🎯 Principi', [
@@ -1667,15 +1665,16 @@ function pRegolamento(){
     'Chiunque aggiunge alla <b>Lista della spesa</b>; chi compra spunta gli articoli e registra l\'importo.',
     'Rimborso <b>in crediti</b> o <b>in denaro</b>: vale solo dopo la <b>convalida</b> di un admin.',
     'Se rifiutata o annullata, gli articoli tornano in lista.'])}
-  ${sez('🧹 Pulizie', [
-    `🧹 <b>Generale:</b> ${pt(ptPulSala())}, ${pulGruppoN()} ${pulGruppoN() === 1 ? 'volta' : 'volte'} a settimana per tutto il gruppo (lun-dom).`,
+  ${sez('🎯 Obiettivi del giorno', [
+    'Dal pulsante «Obiettivi del giorno» in Home: ogni obiettivo ha una fascia oraria e un punteggio, e lo svolge <b>una sola persona</b>.',
+    'Premi <b>Prendo in carico</b> e poi <b>Conferma completamento</b> entro la fine della fascia: solo allora ricevi i punti.',
+    'Se la fascia scade senza conferma l\'obiettivo risulta <b>non svolto</b> a tuo carico: niente punti e non torna disponibile fino al ciclo successivo.',
     `☕ <b>Macchinetta:</b> ${pt(ptPulMacc())}, si sblocca ogni <b>${pulMaccCaffe()} caffè</b> del gruppo.`,
-    `🪣 <b>Secchio:</b> ${pt(ptPulSecchio())}, una volta al giorno, dalle ${pulSecchioInizio()}:00 alle ${pulSecchioFine()}:00.`,
     'Si registrano subito, senza date passate. Un admin può stornare registrazioni indebite.',
-    !ptMaster() ? '⚠️ Sistema punti disattivato: nessun accredito.' : spento.length ? `⚠️ Riscatto sospeso dall'admin: ${spento.join(', ')}.` : ''])}
-  ${sez('⭐ Punti Collega Modello', [
+    !ptMaster() ? '⚠️ Sistema punti disattivato: gli obiettivi sono bloccati.' : spento.length ? `⚠️ Riscatto sospeso dall'admin: ${spento.join(', ')}.` : ''])}
+    ${sez('⭐ Punti Collega Modello', [
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dall\'admin:</b> nessun accredito; i punti già maturati restano.' : '',
-    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${ptSnackE()} per snack · 🧾 ${ptSpesaE()} per spesa convalidata · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🧹 pulizie (sopra).`,
+    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${ptSnackE()} per snack · 🧾 ${ptSpesaE()} per spesa convalidata · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 obiettivi (sopra).`,
     `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}). La classifica non cambia.`,
     `<b>Ben fatto!</b> riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
@@ -1696,44 +1695,49 @@ function pRegolamento(){
 }
 
 /* ---------- PULIZIE ---------- */
-const PUL_DEF = {macc: ['☕', 'Macchinetta caffè'], secchio: ['🪣', 'Secchio acqua'], sala: ['🧹', 'Pulizia sala']};
+const PUL_DEF = {macc: ['☕', 'Macchinetta caffè']};
 function pulBarra(k, ps, me){
-  const t = ps[k], disp = pulDisp(ps)[k], [em, nome] = PUL_DEF[k], now = Date.now(), chi = x => esc(nomeBreve(x.mid) || nomeM(x.mid));
-  let pct = 0, stato = '', fatto = false;
-  if(k === 'macc'){
-    pct = Math.min(100, Math.round(t.n / t.soglia * 100));
-    stato = `${Math.min(t.n, t.soglia)}/${t.soglia} caffè · ${t.pronto ? '<b>Pronta!</b>' : `Mancano <b>${t.soglia - t.n}</b>`}`;
-  } else if(k === 'secchio'){
-    fatto = !!t.fatto;
-    if(t.fatto){ pct = 100; stato = `✅ Svuotato oggi da <b>${chi(t.fatto)}</b> · riapre tra ${pulCount(t.prossima - now)}`; }
-    else if(t.aperto){ pct = 100; stato = `Da svuotare · chiude tra ${pulCount(t.chiude - now)}`; }
-    else { pct = Math.max(0, Math.min(100, Math.round((now - t.prev) / Math.max(1, t.prossima - t.prev) * 100))); stato = `Disponibile tra <b>${pulCount(t.prossima - now)}</b>`; }
-  } else {
-    const u = t.w[t.w.length - 1], N = pulGruppoN();
-    fatto = t.bloccato;
-    pct = Math.min(100, Math.round(t.w.length / N * 100));
-    stato = t.bloccato ? `✅ Eseguita questa settimana${u ? ` da <b>${chi(u)}</b>` : ''} · riapre tra ${pulCount(t.rinnovo - now)}` : `Disponibile (${t.w.length}/${N})`;
-  }
-  const off = !pulOn(k);
-  if(off){ stato = MSG_PUL_OFF; pct = 0; fatto = false; }
+  const t = ps[k], disp = pulDisp(ps)[k], [em, nome] = PUL_DEF[k], chi = x => esc(nomeBreve(x.mid) || nomeM(x.mid));
+  const off = !pulOn(k), pct = off ? 0 : Math.min(100, Math.round(t.n / t.soglia * 100));
+  const stato = off ? MSG_PUL_OFF : `${Math.min(t.n, t.soglia)}/${t.soglia} caffè · ${t.pronto ? '<b>Pronta!</b>' : `Mancano <b>${t.soglia - t.n}</b>`}`;
   const adm = st.isAdmin && t.ult && t.ult.id ? `<p class="hint" style="margin:6px 0 0;font-size:11px" id="pul-ult-${k}">Ultima: <b>${chi(t.ult)}</b> · ${quando(t.ult.t)} · <button class="btn link" style="padding:0;font-size:11px" id="btn-storna-${k}" data-act="storno" data-id="${t.ult.id}">Storna</button></p>` : '';
-  return `<div class="pbar ${disp ? 'on' : fatto ? 'done' : ''}${off ? ' off' : ''}" id="pul-card-${k}">
+  return `<div class="pbar ${disp ? 'on' : ''}${off ? ' off' : ''}" id="pul-card-${k}">
     <div class="pbr1"><b>${em} ${nome}</b><span class="pill violet">+${t.pt} pt</span></div>
     <div class="pbg"><i style="width:${pct}%"></i></div>
     <div class="pbr3"><span class="pbs" id="pul-stato-${k}">${stato}</span>
       <button class="btn sm pulbtn" id="btn-pul-${k}" data-act="pul" data-k="${k}" ${disp && me ? '' : 'disabled'}>${disp ? 'Riscatta punti' : off ? '🚫 Disabilitato' : '⏳ Non attivo'}</button></div>${adm}</div>`;
 }
 const avvisoPuntiOff = () => ptMaster() ? '' : `<div class="banner amber" id="punti-off">${ic('alert')}<div class="grow"><b>Sistema punti disattivato</b><br><span style="font-size:12.5px">Nessun punto viene accreditato: le classifiche mostrano lo storico.</span></div></div>`;
-function pPulizie(d){
-  const me = st.mid, ps = pulStato();
+/* scheda di un obiettivo: stato, chi lo ha in carico, pulsante coerente con la fase */
+function obScheda(o, me){
+  const x = obStato(o), chi = mid => esc(nomeBreve(mid) || nomeM(mid)), now = Date.now(), off = !ptMaster();
+  const mio = x.mid && x.mid === me;
+  let stato = '', btn = '', pct = 0, cls = '';
+  if(x.s === 'fatto'){ stato = `✅ Completato da <b>${chi(x.mid)}</b>${mio ? ' (tu)' : ''}`; pct = 100; cls = 'done'; btn = `<button class="btn sm pulbtn" disabled>Completato</button>`; }
+  else if(x.s === 'carico'){ stato = `In carico a <b>${chi(x.mid)}</b>${mio ? ' (tu)' : ''} · scade tra ${pulCount(x.scad - now)}`; pct = 60; cls = mio ? 'on' : '';
+    btn = mio ? `<button class="btn sm pulbtn" id="btn-ob-conf-${o.id}" data-act="ob-conferma" data-id="${o.id}">Conferma completamento</button>` : `<button class="btn sm pulbtn" disabled>In carico a ${chi(x.mid)}</button>`; }
+  else if(x.s === 'scaduto'){ stato = `❌ Non svolto (scaduto a carico di <b>${chi(x.mid)}</b>)`; pct = 0; btn = `<button class="btn sm pulbtn" disabled>Non svolto</button>`; }
+  else if(x.s === 'libero'){ stato = `Disponibile · chiude tra ${pulCount(x.ch - now)}`; pct = 100; cls = off ? '' : 'on'; btn = `<button class="btn sm pulbtn" id="btn-ob-carico-${o.id}" data-act="ob-carico" data-id="${o.id}" ${me && !off ? '' : 'disabled'}>${off ? '🚫 Punti disattivati' : 'Prendo in carico'}</button>`; }
+  else { stato = esc(x.msg); pct = 0; btn = `<button class="btn sm pulbtn" disabled>⏳ Non attivo</button>`; }
+  const adm = st.isAdmin && x.car ? `<p class="hint" style="margin:6px 0 0;font-size:11px">${x.s === 'fatto' ? 'Conferma' : 'Presa in carico'} di <b>${chi(x.mid)}</b> · <button class="btn link" style="padding:0;font-size:11px" id="btn-storna-ob-${o.id}" data-act="storno" data-id="${x.s === 'fatto' ? x.fid : x.car.id}">Storna</button></p>` : '';
+  return `<div class="pbar ${cls}${off ? ' off' : ''}" id="ob-card-${o.id}">
+    <div class="pbr1"><b>🎯 ${esc(o.nome)}</b><span class="pill violet">+${o.pt} pt</span></div>
+    <p class="hint" style="margin:2px 0 6px;font-size:11.5px">${obDescr(o)}</p>
+    <div class="pbg"><i style="width:${pct}%"></i></div>
+    <div class="pbr3"><span class="pbs" id="ob-stato-${o.id}">${stato}</span>${btn}</div>${adm}</div>`;
+}
+function pObiettivi(d){
+  const me = st.mid, ps = pulStato(), lista = obLista().filter(o => o.on !== false);
   const scala = st.isAdmin && !scalaDa() ? `<div class="banner amber" id="pul-scala">${ic('alert')}<div class="grow">La scala punti ×10 non è ancora attiva: i punti dei compiti sono già nel nuovo formato.</div><button class="btn sm amber" data-act="go" data-p="regole">Regole</button></div>` : '';
   const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || (d.S.turni[b.id]||0) - (d.S.turni[a.id]||0) || a.nome.localeCompare(b.nome));
-  return `<h2>${ic('brush')} Pulizie</h2><p class="sub" style="margin-bottom:12px">Fai il tuo compito e riscatta i punti.</p>
+  return `<h2>${ic('brush')} Obiettivi del giorno</h2><p class="sub" style="margin-bottom:12px">Prendi in carico un obiettivo, svolgilo e conferma: i punti arrivano alla conferma.</p>
   ${scala}
   ${avvisoPuntiOff()}
-  ${['macc', 'secchio', 'sala'].map(k => pulBarra(k, ps, me)).join('')}
-  <div class="card" id="classifica-pulizie"><h3>🏆 Mastro Lindo · Classifica Punti Pulizia</h3>
-    <table><thead><tr><th>#</th><th>Collega</th><th class="c">Punti</th><th class="c">Compiti</th></tr></thead><tbody>
+  ${pulBarra('macc', ps, me)}
+  ${lista.map(o => obScheda(o, me)).join('')}
+  ${lista.length ? '' : `<div class="card" id="ob-vuoto"><p class="hint" style="margin:0">Nessun obiettivo attivo al momento.${st.isAdmin ? ' Puoi crearli da Impostazioni.' : ''}</p></div>`}
+  <div class="card" id="classifica-pulizie"><h3>🏆 Mastro Lindo · Classifica Punti Obiettivi</h3>
+    <table><thead><tr><th>#</th><th>Collega</th><th class="c">Punti</th><th class="c">Svolti</th></tr></thead><tbody>
     ${classifica.map((m,i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(m.nome)}</b>${m.id === me ? ' <span class="pill violet">tu</span>' : ''}</td><td class="c mono violet"><b>${d.S.punti[m.id]||0}</b></td><td class="c mono">${d.S.turni[m.id]||0}</td></tr>`).join('')}
     </tbody></table></div>
   `;
@@ -1765,9 +1769,10 @@ function nEventiNuovi(){
 const badgeEventi = () => { const n = nEventiNuovi(); return n ? `<span class="tb" id="badge-eventi" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${n}</span>` : ''; };
 const badgeSpesaAbs = () => nSpesa() ? `<span class="tb" id="badge-spesa" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${nSpesa()}</span>` : '';
 function pSaletta(d){
-  return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Eventi, scorte e un po' di svago.</p>
+  return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Eventi, spesa, scorte e un po' di svago.</p>
   <div class="grid2" style="gap:12px">
     <button class="gbtn sm" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi${badgeEventi()}</button>
+    <button class="gbtn sm" id="sal-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
     <button class="gbtn sm" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
     <button class="gbtn sm" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Chi paga il caffè?</button>
     <button class="gbtn sm" id="sal-ruota" data-act="go" data-p="ruota"><span class="em">☕</span>Ruota del Barista<small>Chi fa i caffè?</small></button>
@@ -1806,7 +1811,7 @@ const nz = (o, k) => (o && o[k]) || 0;
 const sumo = o => o ? Object.values(o).reduce((a, b) => a + b, 0) : 0;
 const fCons = m => ((m.tipo === 'caffe' || m.tipo === 'caffe_pagato' || m.tipo === 'snack') && m.stato !== 'annullata') ? (m.qta || 0) : 0;
 const fSpese = m => (m.tipo === 'spesa' && m.stato === 'confermata') ? (m.importo || 0) : 0;
-const fTurni = m => m.tipo === 'pulizia' ? (m.mids || []).length : 0;
+const fTurni = m => m.tipo === 'pulizia' ? (m.mids || []).length : (m.tipo === 'obiettivo' && m.fase === 'fatto') ? 1 : 0;
 const fRic = m => (m.tipo === 'ricarica' && m.stato === 'confermata') ? (m.importo || 0) : 0;
 
 /* serie nel periodo: per ora (oggi), per giorno (fino a ~3 mesi), per mese (oltre) */
@@ -1885,6 +1890,7 @@ function aggMov(G, m, sg){
     case 'snack': if(m.stato !== 'annullata'){ add(G.snack, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); add(G.ptC, m.mid, sg*(m.pt ?? 0)*fx(m)); } break;
     case 'spesa': if(m.stato === 'confermata'){ add(G.ptS, m.mid, sg*(m.pt ?? PUNTI_SPESA)*fx(m)); add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*m.importo; } break;
     case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*ptPulM(m)); add(G.ptP, x, sg*ptPulM(m)); }); break;
+    case 'obiettivo': if(m.fase === 'fatto'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
     case 'quota': if(m.metodo === 'contanti' || m.metodo === 'revolut') t.quote += sg*m.importo; break;
     case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
@@ -1988,7 +1994,7 @@ const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi pri
 
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
-const CL_CAT = [['c', '☕', 'Consumi'], ['p', '✨', 'Pulizie'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
+const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Obiettivi'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
 const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
 /* posizione del collegato nella classifica punti del mese corrente (stessa regola e stesso ordine della pagina Classifica; tutto in memoria) */
 function posMese(d){
@@ -2038,7 +2044,7 @@ function clHero(righe, pos, T, r){
   const me = righe.find(x => x.m.id === st.mid); if(!me) return '';
   const byTot = righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)), rk = pos[me.m.id], n = righe.length;
   let msg;
-  if(!me.tot) msg = '🚀 Registra un consumo, una pulizia o una spesa per entrare in classifica.';
+  if(!me.tot) msg = '🚀 Registra un consumo, un obiettivo o una spesa per entrare in classifica.';
   else if(rk === 1){ const s = byTot[1]; msg = !s ? '🏆 Sei l\'unico in classifica!' : me.tot > s.tot ? `🏆 Sei in testa con ${me.tot - s.tot} ${me.tot - s.tot === 1 ? 'punto' : 'punti'} di vantaggio su ${esc(s.nome)}.` : `🏆 Sei in testa a pari punti con ${esc(s.nome)}: un punto in più e li stacchi.`; }
   else if(rk <= 3){ const su = byTot[rk - 2], x = Math.max(1, su.tot - me.tot + 1); msg = `🎖️ Sei sul podio! Ti ${x === 1 ? 'manca 1 punto' : 'mancano ' + x + ' punti'} per superare ${esc(su.nome)}.`; }
   else { const t3 = byTot[2], x = Math.max(1, t3.tot - me.tot + 1); msg = `🎯 Ti ${x === 1 ? 'manca 1 punto' : 'mancano ' + x + ' punti'} per entrare sul podio (superare ${esc(t3.nome)}).`; }
@@ -2094,7 +2100,7 @@ function cardOnesta(c, r){
 /* totali aggregati della sala per il tipo di punti scelto */
 function clSala(righe, key, G){
   const tot = k => righe.reduce((a, x) => a + x[k], 0), nn = o => Math.max(0, sumo(o));
-  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti pulizie', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
+  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti obiettivi', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
   const det = {
     tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
@@ -2137,7 +2143,7 @@ function clClassifica(d, R, T, c){
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '✨ Punti pulizie'], ['s', '🧾 Punti spesa'], ['b', '👏 Punti «Ben fatto»']];
+  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '✨ Punti obiettivi'], ['s', '🧾 Punti spesa'], ['b', '👏 Punti «Ben fatto»']];
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
   const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
   const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
@@ -2152,7 +2158,7 @@ function clClassifica(d, R, T, c){
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   return `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${ptPulSala()} generale, ${ptPulMacc()} macchinetta, ${ptPulSecchio()} secchio. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
+    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Obiettivi: ${ptPulMacc()} macchinetta, più i punti indicati su ogni obiettivo del giorno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   ${cardOnesta(c, r)}
   ${albo}`;
@@ -2552,7 +2558,7 @@ const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
   </div>
 `;
 const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['rp-on-spesa', 'ptSpesaOn', '🧾 Punti spesa fondo'], ['rp-on-bf', 'ptBfOn', '👏 Punti «Ben fatto»'],
-  ['rp-on-macc', 'pulMaccOn', '☕ Pulizia macchinetta (riscatto)'], ['rp-on-secchio', 'pulSecchioOn', '🪣 Svuotamento secchio (riscatto)'], ['rp-on-sala', 'pulSalaOn', '🧹 Pulizia generale sala (riscatto)']];
+  ['rp-on-macc', 'pulMaccOn', '☕ Pulizia macchinetta (riscatto)']];
 const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Modello</h3>
     ${infoBtn(`Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.`, 'Come funziona')}
     ${scalaDa() ? `<p class="hint" id="scala-attiva" style="margin:0 0 10px">✅ Scala punti ×10 attiva dal ${dataOra(scalaDa()).slice(0, 10)}.</p>`
@@ -2577,21 +2583,12 @@ const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Mode
       <label class="f"><span>Gettoni «Ben fatto»</span><input class="in mono" id="rp-bfn" inputmode="numeric" value="${bfN()}"></label>
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
-    <h3 style="margin-top:14px">Compiti di pulizia</h3>
+    <h3 style="margin-top:14px">Macchinetta caffè</h3>
     <div class="grid2">
       <label class="f"><span>☕ Macchinetta: punti</span><input class="in mono" id="rp-pm" inputmode="numeric" value="${ptPulMacc()}"></label>
       <label class="f"><span>…ogni quanti caffè</span><input class="in mono" id="rp-pmc" inputmode="numeric" value="${pulMaccCaffe()}"></label>
     </div>
-    <div class="grid2">
-      <label class="f"><span>🪣 Secchio: punti</span><input class="in mono" id="rp-ps" inputmode="numeric" value="${ptPulSecchio()}"></label>
-      <div class="grid2" style="gap:8px"><label class="f"><span>…dalle ore</span><input class="in mono" id="rp-psi" inputmode="numeric" value="${pulSecchioInizio()}"></label>
-      <label class="f"><span>…alle ore</span><input class="in mono" id="rp-pse" inputmode="numeric" value="${pulSecchioFine()}"></label></div>
-    </div>
-    <div class="grid2">
-      <label class="f"><span>🧹 Pulizia generale: punti</span><input class="in mono" id="rp-psa" inputmode="numeric" value="${ptPulSala()}"></label>
-      <label class="f"><span>…volte a settimana</span><input class="in mono" id="rp-pulg" inputmode="numeric" value="${pulGruppoN()}"></label>
-    </div>
-    <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti">Salva le regole</button>
+        <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti">Salva le regole</button>
   </div>
 `;
 const cardAdmins = () => `
@@ -2639,8 +2636,8 @@ function pImpostazioni(){
     <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${st.isAdmin ? 'Amministratore' : 'Collega'}</div></div>
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
   ${st.mid ? `<div class="card"><div class="between"><div><b>PIN personale</b><div class="mut" style="font-size:12px">Serve a ritrovare il profilo se cambi telefono</div></div><button class="btn sm" data-act="pin-cambia">${ic('lock','s')} Cambia</button></div></div>` : ''}
-  ${st.isAdmin ? cardParametri() + cardAdmins() : ''}
-  <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e pulizie</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
+  ${st.isAdmin ? cardObiettivi() + cardParametri() + cardAdmins() : ''}
+  <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e obiettivi</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
   ${!st.isAdmin ? `<div class="card"><h3>${ic('shield','s')} Amministratore</h3>
     ${st.reqAdmin && st.reqAdmin.stato === 'attesa' ? `<p class="tx2" style="font-size:13px;margin:0 0 10px">Richiesta inviata: un amministratore deve approvarla.</p><button class="btn block ghost" data-act="ritira-richiesta-admin">Ritira la richiesta</button>`
       : `${st.reqAdmin && st.reqAdmin.stato === 'rifiutata' ? `<div class="banner red">${ic('alert')}<div>La tua ultima richiesta non è stata accettata.</div></div>` : ''}<p class="tx2" style="font-size:13px;margin:0 0 10px">Vuoi aiutare a gestire la saletta? Chiedi di diventare amministratore: lo decide chi lo è già.</p><button class="btn amber block" data-act="richiedi-admin" ${st.busy?'disabled':''}>Richiedi accesso come amministratore</button>`}
@@ -2775,7 +2772,7 @@ A['crea'] = async () => {
   try {
     const gid = newCode(), g = db.collection('saletta').doc(gid);
     const me = g.collection('membri').doc();
-    await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1, scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: 1, ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, ptPulSecchio: 5, ptPulSala: 50, pulMaccCaffe: 20, pulSecchioFine: 12, pulSecchioInizio: 7, pulGruppoN: 1});
+    await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1, scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: 1, ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, pulMaccCaffe: 20});
     await g.collection('segreti').doc('pin').set({pin});
     await g.collection('admin').doc(st.uid).set({pin, nome: io, ts: TS()});
     const b = db.batch();
@@ -3064,9 +3061,6 @@ A['conferma-paga-spesa'] = ds => {
 };
 
 /* --- pulizie: tre compiti oggettivi, tutto calcolato sui movimenti già in memoria (nessuna lettura in più) --- */
-function pulInizioSettimana(){ const o = new Date(); o.setHours(0, 0, 0, 0); return new Date(o.getFullYear(), o.getMonth(), o.getDate() - ((o.getDay() + 6) % 7)).getTime(); }
-function pulInizioGiorno(){ const o = new Date(); o.setHours(0, 0, 0, 0); return o.getTime(); }
-function pulRinnovo(){ const i = new Date(pulInizioSettimana()); return new Date(i.getFullYear(), i.getMonth(), i.getDate() + 7).toLocaleDateString('it-IT', {weekday: 'long', day: 'numeric', month: 'long'}); }
 /* caffè registrati dall'ultima pulizia macchinetta valida: parte dalla base della chiusura (pulCaf) e conta caffe + caffe_pagato non annullati né stornati */
 function pulCafCalc(base, list){
   const stor = new Set(list.filter(m => m.tipo === 'storno').map(m => m.rif)), ids = new Set(list.map(m => m.id));
@@ -3083,35 +3077,20 @@ function pulCafCalc(base, list){
 const pulCount = ms => { const m = Math.max(1, Math.ceil(ms / 60000)), g = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mi = m % 60; return g ? `${g}g ${h}h` : h ? `${h}h ${mi}m` : `${mi}m`; };
 const pulOra = (base, h) => new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, 0, 0, 0).getTime();   // ore h del giorno di base (24 = mezzanotte successiva)
 function pulStato(){
-  const d = derived(), ini = pulInizioSettimana(), now = new Date(), tn = now.getTime(), oggi0 = pulInizioGiorno(), tutti = tuttiMov();
+  const d = derived(), tutti = tuttiMov();
   const base = st.isAdmin ? (ultimaChiusura() || {}) : ((st.estratto && st.estratto.mp) || {});
-  const live = tutti.filter(m => m.tipo === 'pulizia' && !d.stornati.has(m.id)).map(m => ({mid: m.mid, t: m.t, id: m.id, k: m.task || 'sala'}));
-  const pre = (base.pulRec || []).map(x => ({mid: x.m, t: x.t, k: x.k || 'sala'}));   // pulizie recenti prima dell'ultima chiusura
-  const all = pre.concat(live).sort((a, b) => a.t - b.t), ult = k => { const a = all.filter(x => x.k === k); return a[a.length - 1] || null; };
-  const sala = all.filter(x => x.k === 'sala' && x.t >= ini), sec = all.filter(x => x.k === 'secchio' && x.t >= oggi0);
-  const n = pulCafCalc(base.pulCaf || 0, tutti), soglia = pulMaccCaffe(), inizio = pulSecchioInizio(), fine = pulSecchioFine();
-  const apre = pulOra(now, inizio), chiude = pulOra(now, fine), dom = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), ieri = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const fatto = sec[sec.length - 1] || null, aperto = tn >= apre && tn < chiude;
-  const prossima = (fatto || tn >= chiude) ? pulOra(dom, inizio) : apre;                       // prossima apertura del secchio
-  const prev = fatto ? fatto.t : (tn >= chiude ? chiude : pulOra(ieri, fine));                  // da quando si attende (per la barra)
-  const sett = new Date(ini), rinnovo = new Date(sett.getFullYear(), sett.getMonth(), sett.getDate() + 7).getTime();
-  return {
-    macc: {n, soglia, pronto: n >= soglia, ult: ult('macc'), pt: ptPulMacc()},
-    secchio: {fatto, aperto, apre, chiude, prossima, prev, inizio, fine, ult: ult('secchio'), pt: ptPulSecchio()},
-    sala: {w: sala, bloccato: sala.length >= pulGruppoN(), rinnovo, ult: ult('sala'), pt: ptPulSala()}
-  };
+  const live = tutti.filter(m => m.tipo === 'pulizia' && m.task === 'macc' && !d.stornati.has(m.id)).map(m => ({mid: m.mid, t: m.t, id: m.id}));
+  const pre = (base.pulRec || []).filter(x => x.k === 'macc').map(x => ({mid: x.m, t: x.t}));
+  const all = pre.concat(live).sort((a, b) => a.t - b.t), n = pulCafCalc(base.pulCaf || 0, tutti), soglia = pulMaccCaffe();
+  return {macc: {n, soglia, pronto: n >= soglia, ult: all[all.length - 1] || null, pt: ptPulMacc()}};
 }
-const pulDisp = ps => ({macc: ps.macc.pronto && pulOn('macc'), secchio: !ps.secchio.fatto && ps.secchio.aperto && pulOn('secchio'), sala: !ps.sala.bloccato && pulOn('sala')});
+const pulDisp = ps => ({macc: ps.macc.pronto && pulOn('macc')});
 function pulMsg(ps, k){
   if(!pulOn(k)) return MSG_PUL_OFF;
-  if(k === 'macc') return `Mancano ${ps.macc.soglia - ps.macc.n} caffè alla prossima pulizia`;
-  if(k === 'secchio') return ps.secchio.fatto ? `Svuotato oggi da ${nomeBreve(ps.secchio.fatto.mid) || nomeM(ps.secchio.fatto.mid)}` : `Disponibile tra ${pulCount(ps.secchio.prossima - Date.now())}`;
-  const u = ps.sala.w[ps.sala.w.length - 1];
-  return `La saletta è già stata pulita${u ? ` da ${nomeBreve(u.mid) || nomeM(u.mid)} (${quando(u.t)})` : ''}. Di nuovo da ${pulRinnovo()}`;
+  return `Mancano ${ps.macc.soglia - ps.macc.n} caffè alla prossima pulizia`;
 }
-const nPulDisp = () => st.mid ? Object.values(pulDisp(pulStato())).filter(Boolean).length : 0;   // badge della scheda Pulizie
-const ptPulK = k => ({macc: ptPulMacc, secchio: ptPulSecchio, sala: ptPulSala}[k] || (() => 0))();
-/* «Riscatta punti»: registrazione immediata del compito, alla data/ora corrente */
+const ptPulK = () => ptPulMacc();
+/* «Riscatta punti» della macchinetta: registrazione immediata, alla data/ora corrente */
 A['pul'] = ds => {
   const k = ds.k; if(!PUL_DEF[k] || !st.mid) return;
   if(!pulOn(k)) return toast(MSG_PUL_OFF, 'err');
@@ -3119,12 +3098,143 @@ A['pul'] = ds => {
   addMov({tipo: 'pulizia', task: k, mid: st.mid, mids: [st.mid], punti: ptPulK(k), giorno: oggiISO()});
   toast(`${PUL_DEF[k][1]}: +${ptPulK(k)} punti ✨`);
 };
+
+/* --- Obiettivi del giorno: configurati dall'admin nel documento del gruppo (mappa obiettivi), nessuna lettura in più.
+   Un solo assegnatario: il «carico» ha ID deterministico (create-only per i colleghi), quindi un secondo tentativo viene rifiutato dalle regole. --- */
+const OB_DOW = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+const OB_FREQ = {g: 'Giornaliero', s: 'Settimanale', m: 'Mensile'};
+const OB_MAX = 20;
+const obMap = () => { const o = st.gruppo && st.gruppo.obiettivi; return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; };
+const obLista = () => { const M = obMap(); return Object.keys(M).filter(k => M[k] && typeof M[k].nome === 'string').map(k => ({...M[k], id: k})).sort((a, b) => (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome)); };
+const obH = h => String(h).padStart(2, '0') + ':00';
+const obDescr = o => `${OB_FREQ[o.freq] || 'Giornaliero'}${o.freq === 's' && Number.isInteger(o.dow) && o.dow >= 0 ? ' · ' + OB_DOW[o.dow] : ''} · ${obH(o.da)}–${obH(o.a)}`;
+function obCiclo(o, dt){
+  dt = dt || new Date();
+  if(o.freq === 'm') return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}`;
+  if(o.freq === 's') return isoDi(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - ((dt.getDay() + 6) % 7)));
+  return isoDi(dt);
+}
+const obGiornoOk = (o, dt) => o.freq !== 's' || !Number.isInteger(o.dow) || o.dow < 0 || dt.getDay() === o.dow;
+const obId = (pre, o, cyc, n) => `${pre}_${o}_${cyc}_${n}`;
+/* stato dell'obiettivo nel ciclo corrente: libero | carico | fatto | scaduto | chiuso (calcolato sui movimenti in memoria; gli stornati non contano) */
+function obStato(o, now){
+  now = now || new Date();
+  const tn = now.getTime(), cyc = obCiclo(o, now), stor = derived().stornati;
+  const mv = tuttiMov().filter(m => m.tipo === 'obiettivo' && m.ob === o.id && m.ciclo === cyc);
+  const car = mv.filter(m => m.fase === 'carico').sort((a, b) => (+a.n) - (+b.n)), viva = car.filter(m => !stor.has(m.id)), ult = viva[viva.length - 1];
+  if(ult){
+    const f = mv.find(m => m.fase === 'fatto' && m.car === ult.id && !stor.has(m.id));
+    if(f) return {s: 'fatto', mid: ult.mid, t: f.t, car: ult, fid: f.id};
+    return {s: tn <= ult.scad ? 'carico' : 'scaduto', mid: ult.mid, scad: ult.scad, car: ult};
+  }
+  const n = car.length ? String(Math.max(...car.map(m => +m.n)) + 1) : '0', ap = pulOra(now, o.da), ch = pulOra(now, o.a);
+  if(+n > 2) return {s: 'chiuso', msg: 'Obiettivo non più riaprile in questo ciclo'};
+  if(obGiornoOk(o, now) && tn >= ap && tn < ch) return {s: 'libero', n, cyc, ch};
+  let msg;
+  if(!obGiornoOk(o, now)) msg = `Disponibile ${OB_DOW[o.dow].toLowerCase()} dalle ${obH(o.da)}`;
+  else if(tn < ap) msg = `Apre alle ${obH(o.da)} (tra ${pulCount(ap - tn)})`;
+  else msg = o.freq === 'g' ? `Chiuso per oggi · riapre domani alle ${obH(o.da)}` : `Chiuso per oggi · prossima finestra dalle ${obH(o.da)}`;
+  return {s: 'chiuso', msg};
+}
+const obAttivi = () => ptMaster() ? obLista().filter(o => o.on !== false) : [];
+const nObDisp = () => st.mid ? (pulDisp(pulStato()).macc ? 1 : 0) + obAttivi().filter(o => obStato(o).s === 'libero').length : 0;   // badge: attivi e non ancora presi
+const badgeObiettivi = () => { const n = ptMaster() ? nObDisp() : 0; return n ? `<span class="tb" id="badge-obiettivi" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${n}</span>` : ''; };
+A['ob-carico'] = ds => {
+  if(!st.mid) return;
+  if(!ptMaster()) return toast(MSG_PUL_OFF, 'err');
+  const o = obLista().find(x => x.id === ds.id); if(!o || o.on === false) return toast('Obiettivo non più disponibile', 'err');
+  const x = obStato(o); if(x.s !== 'libero') return toast(x.s === 'carico' || x.s === 'fatto' || x.s === 'scaduto' ? 'Obiettivo già preso da un collega' : (x.msg || 'Obiettivo non disponibile'), 'err');
+  const id = obId('ob', o.id, x.cyc, x.n);
+  addMov({tipo: 'obiettivo', fase: 'carico', ob: o.id, ciclo: x.cyc, n: x.n, mid: st.mid, punti: o.pt, nome: o.nome.slice(0, 40), scad: x.ch}, id, true,
+    () => toast('Obiettivo già preso da un collega', 'err'));
+  toast(`🎯 In carico a te: conferma il completamento entro le ${obH(o.a)}`);
+};
+A['ob-conferma'] = ds => {
+  if(!st.mid) return;
+  if(!ptMaster()) return toast(MSG_PUL_OFF, 'err');
+  const o = obLista().find(x => x.id === ds.id); if(!o) return toast('Obiettivo non più disponibile', 'err');
+  const x = obStato(o);
+  if(x.s === 'scaduto') return toast('Tempo scaduto: obiettivo non svolto', 'err');
+  if(x.s !== 'carico' || x.mid !== st.mid) return toast('Questo obiettivo non è in carico a te', 'err');
+  const c = x.car;
+  addMov({tipo: 'obiettivo', fase: 'fatto', ob: o.id, ciclo: c.ciclo, n: c.n, car: c.id, mid: st.mid, punti: o.pt, nome: o.nome.slice(0, 40)}, obId('obf', o.id, c.ciclo, c.n), true,
+    e => toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'Conferma rifiutata: tempo scaduto o obiettivo modificato' : 'Operazione rifiutata (' + errMsg(e) + ')', 'err'));
+  toast(`🎯 Obiettivo completato: +${o.pt} punti`);
+};
 /* countdown e badge: aggiornati ogni 20 s sui dati in memoria (nessuna lettura Firestore); si ridisegna solo se cambia qualcosa */
 let pulSig = '';
 setInterval(() => {
   if(!st.mid || !st.gid || document.hidden) return;
-  try { const x = pulDisp(pulStato()), sig = [x.macc, x.secchio, x.sala].join() + '|' + (st.page === 'pulizie' ? Math.floor(Date.now() / 60000) : ''); if(sig !== pulSig){ pulSig = sig; render(); } } catch(e){ /* dati non ancora pronti */ }
+  try { const sig = [pulDisp(pulStato()).macc].concat(obAttivi().map(o => obStato(o).s)).join() + '|' + (st.page === 'obiettivi' ? Math.floor(Date.now() / 60000) : ''); if(sig !== pulSig){ pulSig = sig; render(); } } catch(e){ /* dati non ancora pronti */ }
 }, 20000);
+/* --- configurazione obiettivi (admin, in Impostazioni) --- */
+const cardObiettivi = () => {
+  const L = obLista();
+  return `<div class="card" id="card-obiettivi"><h3>🎯 Obiettivi del giorno</h3>
+    <p class="hint" style="margin:0 0 8px">Compiti con fascia oraria e punteggio: li prende in carico una sola persona e i punti arrivano alla conferma.</p>
+    ${L.length ? `<div class="list">${L.map((o, i) => `<div class="li" id="ob-row-${o.id}"><div class="grow"><div class="t">${esc(o.nome)} <span class="pill violet">+${o.pt}</span>${o.on === false ? ' <span class="pill">spento</span>' : ''}</div><div class="d">${obDescr(o)}</div></div>
+      <button class="btn sm ghost" data-act="ob-su" data-id="${o.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="ob-giu" data-id="${o.id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="btn sm ghost" data-act="ob-tgl" data-id="${o.id}">${o.on === false ? 'Accendi' : 'Spegni'}</button><button class="btn sm" data-act="ob-edit" data-id="${o.id}">Modifica</button></div>`).join('')}</div>` : '<p class="hint">Nessun obiettivo configurato.</p>'}
+    <button class="btn amber block" id="btn-ob-nuovo" data-act="ob-edit" data-id="" ${L.length >= OB_MAX ? 'disabled' : ''}>＋ Nuovo obiettivo</button>
+    ${L.length ? '' : `<button class="btn block" id="btn-ob-sugg" data-act="ob-sugg" style="margin-top:8px">Carica obiettivi suggeriti</button>`}
+  </div>`;
+};
+const obSalvaMappa = (M, msg) => G().update({obiettivi: M}).then(() => { closeSheet(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
+const obCopia = () => JSON.parse(JSON.stringify(obMap()));
+A['ob-edit'] = ds => {
+  if(!st.isAdmin) return;
+  const o = ds.id ? obMap()[ds.id] : null; if(ds.id && !o) return;
+  const x = o || {nome: '', freq: 'g', da: 7, a: 12, pt: 5, on: true, dow: -1};
+  openSheet(`<h3>🎯 ${o ? 'Modifica obiettivo' : 'Nuovo obiettivo'}</h3>
+    <label class="f"><span>Descrizione</span><input class="in" id="ob-nome" maxlength="40" value="${esc(x.nome)}" autofocus></label>
+    <label class="f"><span>Frequenza</span>${segOpts('ob-freq', [['g', 'Giornaliero'], ['s', 'Settimanale'], ['m', 'Mensile']], x.freq || 'g')}</label>
+    <label class="f"><span>Giorno (solo settimanale)</span><select class="in" id="ob-dow"><option value="-1">Qualsiasi giorno</option>${[1, 2, 3, 4, 5, 6, 0].map(g => `<option value="${g}" ${x.dow === g ? 'selected' : ''}>${OB_DOW[g]}</option>`).join('')}</select></label>
+    <div class="grid2"><label class="f"><span>Dalle ore</span><input class="in mono" id="ob-da" inputmode="numeric" value="${x.da}"></label>
+    <label class="f"><span>Alle ore</span><input class="in mono" id="ob-a" inputmode="numeric" value="${x.a}"></label></div>
+    <label class="f"><span>Punteggio</span><input class="in mono" id="ob-pt" inputmode="numeric" value="${x.pt}"></label>
+    <label class="check"><input type="checkbox" id="ob-on" ${x.on !== false ? 'checked' : ''}><b style="flex:1;font-size:14px">Obiettivo attivo</b></label>
+    <div class="grid2">${o ? `<button class="btn red" id="btn-ob-del" data-act="ob-del" data-id="${ds.id}">Elimina</button>` : '<button class="btn" data-act="sheet-close">Annulla</button>'}<button class="btn amber" id="btn-ob-salva" data-act="ob-salva" data-id="${ds.id}">Salva</button></div>`);
+};
+A['ob-salva'] = ds => {
+  if(!st.isAdmin) return;
+  const M = obCopia(), nome = val('ob-nome').replace(/\s+/g, ' ').slice(0, 40), freq = radio('ob-freq') || 'g';
+  const da = Math.floor(Number(val('ob-da'))), a = Math.floor(Number(val('ob-a'))), pt = Math.floor(Number(val('ob-pt')));
+  const dow = freq === 's' ? Math.floor(Number(val('ob-dow'))) : -1, inR = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+  if(nome.length < 2) return toast('Scrivi la descrizione', 'err');
+  if(!['g', 's', 'm'].includes(freq) || !inR(da, 0, 23) || !inR(a, 1, 24) || da >= a) return toast('Fascia oraria non valida (dalle 0–23, alle 1–24)', 'err');
+  if(!inR(pt, 0, 500)) return toast('Punteggio non valido (0–500)', 'err');
+  if(!inR(dow, -1, 6)) return toast('Giorno non valido', 'err');
+  const id = ds.id || ('o' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 4));
+  if(!ds.id && Object.keys(M).length >= OB_MAX) return toast('Massimo ' + OB_MAX + ' obiettivi', 'err');
+  const ord = ds.id && M[ds.id] ? (M[ds.id].ord || 0) : Math.max(0, ...Object.keys(M).map(k => M[k].ord || 0)) + 1;
+  M[id] = {nome, freq, da, a, pt, dow, on: !!($('ob-on') && $('ob-on').checked), ord};
+  obSalvaMappa(M, 'Obiettivo salvato');
+};
+A['ob-del'] = ds => {
+  if(!st.isAdmin || !obMap()[ds.id]) return;
+  if(!confirm('Eliminare questo obiettivo?\n\nIl suo storico di punti resta; non sarà più disponibile.')) return;
+  const M = obCopia(); delete M[ds.id]; obSalvaMappa(M, 'Obiettivo eliminato');
+};
+A['ob-tgl'] = ds => {
+  if(!st.isAdmin || !obMap()[ds.id]) return;
+  const M = obCopia(); M[ds.id].on = M[ds.id].on === false; obSalvaMappa(M, M[ds.id].on ? 'Obiettivo acceso' : 'Obiettivo spento');
+};
+function obSposta(id, dir){
+  if(!st.isAdmin) return;
+  const L = obLista(), i = L.findIndex(o => o.id === id), j = i + dir; if(i < 0 || j < 0 || j >= L.length) return;
+  const M = obCopia(); L.forEach((o, k) => { M[o.id].ord = k + 1; });
+  const t = M[L[i].id].ord; M[L[i].id].ord = M[L[j].id].ord; M[L[j].id].ord = t;
+  obSalvaMappa(M, 'Ordine aggiornato');
+}
+A['ob-su'] = ds => obSposta(ds.id, -1);
+A['ob-giu'] = ds => obSposta(ds.id, 1);
+A['ob-sugg'] = () => {
+  if(!st.isAdmin || obLista().length) return;
+  obSalvaMappa({
+    obsecchio: {nome: 'Svuotare il secchio', freq: 'g', da: 7, a: 12, pt: 5, dow: -1, on: true, ord: 1},
+    obgenerale: {nome: 'Pulizia generale della saletta', freq: 's', da: 0, a: 24, pt: 50, dow: -1, on: true, ord: 2}
+  }, 'Obiettivi suggeriti caricati');
+};
 /* --- regala crediti (immediato, senza approvazione) --- */
 function rgAggiorna(){
   if(!$('rg-q')) return;
@@ -3230,7 +3340,7 @@ A['carica-archivio'] = async () => {
 
 /* --- storno ed esiti (admin) --- */
 function compactMov(m){
-  return clean({tipo:m.tipo, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id});
+  return clean({tipo:m.tipo, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -3577,7 +3687,8 @@ A['tessera'] = () => {
     <button class="btn green block big" id="btn-riscatta-punti" data-act="riscatta-punti" ${ok ? '' : 'disabled'}>🎉 Riscatta punti</button>
     <div id="regola-punti" style="margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:14px">
       <b style="font-size:16px;display:block;margin-bottom:6px">Regolamento Punti Collega Modello: come maturare punti</b>
-      ${[['☕', 'Ogni caffè', ptCaffe()], ['🍫', 'Ogni snack', ptSnack()], ['🧾', 'Ogni spesa convalidata', ptSpesa()], ['🧹', 'Pulizia generale', ptPulSala()], ['☕', 'Pulizia macchinetta', ptPulMacc()], ['🪣', 'Svuota il secchio', ptPulSecchio()], ['👏', 'Ogni «Ben fatto» ricevuto', ptBenFatto()]].map(([e, l, n]) => `<div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>${e} ${l}</span><b class="mono amber" style="font-size:18px;white-space:nowrap">+${n} ${n === 1 ? 'punto' : 'punti'}</b></div>`).join('')}
+      ${[['☕', 'Ogni caffè', ptCaffe()], ['🍫', 'Ogni snack', ptSnack()], ['🧾', 'Ogni spesa convalidata', ptSpesa()], ['☕', 'Pulizia macchinetta', ptPulMacc()], ['👏', 'Ogni «Ben fatto» ricevuto', ptBenFatto()]].map(([e, l, n]) => `<div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>${e} ${l}</span><b class="mono amber" style="font-size:18px;white-space:nowrap">+${n} ${n === 1 ? 'punto' : 'punti'}</b></div>`).join('')}
+      <div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>🎯 Ogni obiettivo del giorno</span><b class="mono amber" style="font-size:15px;white-space:nowrap">punti indicati</b></div>
       <div style="margin-top:12px;padding:12px;border-radius:12px;background:rgba(52,211,153,.12);text-align:center;font-size:16.5px;font-weight:800;line-height:1.35" class="green">Ogni ${r} punti = ${cr} ${cr === 1 ? 'credito' : 'crediti'} (${eur(cr * 100)})</div>
       <p class="tx2" style="font-size:14px;line-height:1.5;margin:10px 0 0">Riscattare i punti non cambia la tua posizione in classifica.</p></div>`);
 };
@@ -3631,10 +3742,10 @@ A['bf-invia'] = () => {
 };
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSnack: n('rp-snack'), ptSpesa: n('rp-spesa'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn'),
-    ptPulMacc: n('rp-pm'), pulMaccCaffe: n('rp-pmc'), ptPulSecchio: n('rp-ps'), pulSecchioFine: n('rp-pse'), pulSecchioInizio: n('rp-psi'), ptPulSala: n('rp-psa'), pulGruppoN: n('rp-pulg')};
+    ptPulMacc: n('rp-pm'), pulMaccCaffe: n('rp-pmc')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
   const ok = inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptSnack, 0, 100) && inR(v.ptSpesa, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.bfN, 1, 20)
-    && inR(v.ptPulMacc, 0, 500) && inR(v.ptPulSecchio, 0, 500) && inR(v.ptPulSala, 0, 500) && inR(v.pulMaccCaffe, 1, 200) && inR(v.pulSecchioFine, 1, 24) && inR(v.pulSecchioInizio, 0, 23) && v.pulSecchioInizio < v.pulSecchioFine && inR(v.pulGruppoN, 1, 20);
+    && inR(v.ptPulMacc, 0, 500) && inR(v.pulMaccCaffe, 1, 200);
   if(!ok) return toast('Valori non validi', 'err');
   const sw = {ptOn: !!($('rp-on') && $('rp-on').checked)};
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
@@ -3643,11 +3754,11 @@ A['salva-punti'] = () => {
 /* passaggio alla scala punti ×10: una sola scrittura sul documento del gruppo (scalaDa + valori espliciti); i movimenti vecchi si rivalutano in memoria */
 A['scala10'] = () => {
   if(!st.isAdmin || scalaDa()) return;
-  if(!confirm('Passare alla scala punti ×10?\n\nValori: soglia 300 punti = 1 credito · caffè 10 · snack 10 · spesa 20 · «Ben fatto» 20 · macchinetta 10 · secchio 5 · generale 50.\nI punti già maturati vengono moltiplicati per 10 (i vecchi turni di pulizia valgono 50). L\'operazione non si annulla.')) return;
+  if(!confirm('Passare alla scala punti ×10?\n\nValori: soglia 300 punti = 1 credito · caffè 10 · snack 10 · spesa 20 · «Ben fatto» 20 · macchinetta 10.\nI punti già maturati vengono moltiplicati per 10 (i vecchi turni di pulizia valgono 50). L\'operazione non si annulla.')) return;
   // i campi della pagina conservano il testo digitato tra un render e l'altro: li aggiorno subito, altrimenti «Salva le regole» riscriverebbe i valori vecchi
-  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-spesa': 20, 'rp-bf': 20, 'rp-pm': 10, 'rp-ps': 5, 'rp-psa': 50, 'rp-pmc': 20, 'rp-pse': 12, 'rp-psi': 7}, prima = {};
+  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-spesa': 20, 'rp-bf': 20, 'rp-pm': 10, 'rp-pmc': 20}, prima = {};
   Object.keys(campi).forEach(id => { const e = $(id); if(e){ prima[id] = e.value; e.value = campi[id]; } });
-  G().set({scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: creditiSoglia(), ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, ptPulSecchio: 5, ptPulSala: 50, pulMaccCaffe: 20, pulSecchioFine: 12, pulSecchioInizio: 7}, {merge: true})
+  G().set({scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: creditiSoglia(), ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, pulMaccCaffe: 20}, {merge: true})
     .then(() => toast('Scala ×10 attiva'))
     .catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
 };
