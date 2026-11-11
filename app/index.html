@@ -67,6 +67,18 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .btn.red{background:#be123c;border-color:#be123c;color:#fff}
 .btn.violet{background:#7c3aed;border-color:#7c3aed;color:#fff}
 .btn.ghost{background:transparent;border-color:var(--line)}
+.pbar{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 14px;margin-bottom:10px}
+.pbar.on{border-color:rgba(52,211,153,.55);background:linear-gradient(135deg,var(--card),rgba(16,185,129,.11))}
+.pbr1{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14.5px}
+.pbg{height:6px;border-radius:99px;background:rgba(255,255,255,.09);margin:9px 0;overflow:hidden}
+.pbg i{display:block;height:100%;border-radius:99px;background:var(--mut);transition:width .6s ease}
+.pbar.on .pbg i{background:linear-gradient(90deg,#10b981,#34d399)}
+.pbar.done .pbg i{background:#7c3aed}
+.pbr3{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pbs{flex:1;min-width:0;font-size:12.5px;line-height:1.3;color:var(--tx2)}
+.pulbtn{white-space:nowrap;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:0;box-shadow:0 3px 10px rgba(16,185,129,.35)}
+.pulbtn:active{transform:scale(.93)}
+.pulbtn:disabled{background:var(--card2);color:var(--mut);box-shadow:none;border:1px solid var(--line)}
 .btn.regalo,.btn.acquisto{color:#fff;border:0;padding:14px 10px;font-size:14px;line-height:1.25;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .btn.regalo{background:linear-gradient(135deg,#ec4899,#e11d48)}
 .btn.acquisto{background:linear-gradient(135deg,#0ea5e9,#0d9488)}
@@ -365,6 +377,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
   <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
   <symbol id="i-banknote" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
@@ -382,7 +395,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.28.0';
+const VERSION = '1.29.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -768,6 +781,7 @@ const bfPeriodo = () => (st.gruppo && st.gruppo.bfPeriodo) === 'mese' ? 'mese' :
 const ptPulMacc = () => cfgN('ptPulMacc', 10), ptPulSecchio = () => cfgN('ptPulSecchio', 5), ptPulSala = () => cfgN('ptPulSala', 50);
 const pulMaccCaffe = () => Math.min(200, Math.max(1, cfgN('pulMaccCaffe', 20)));
 const pulSecchioFine = () => Math.min(24, Math.max(1, cfgN('pulSecchioFine', 12)));
+const pulSecchioInizio = () => Math.min(pulSecchioFine() - 1, Math.max(0, cfgN('pulSecchioInizio', 7)));
 /* scala punti ×10: scalaDa = istante del passaggio (scritto dall'admin). I movimenti e le chiusure PRECEDENTI si rivalutano solo in memoria:
    caffè, snack, spesa, «Ben fatto», riscatti ×10; i vecchi turni di pulizia valgono PUL_LEGACY (come la nuova «Pulizia generale») */
 const PUL_LEGACY = 50;
@@ -873,7 +887,7 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie sala','sparkles'], saletta:['Saletta','sparkles'], classifiche:['Classifiche e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifiche e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
@@ -924,10 +938,11 @@ function doRender(){
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s); sb.dataset.p = av ? 'registro' : 'crediti'; sb.setAttribute('aria-label', av ? 'Saldo' : 'Saldo: tocca per ricaricare');
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['classifiche','Statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['classifiche','Statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['pulizie','Pulizie','brush'],['notifiche','Notifiche','bell']];
+  const nPul = !av ? nPulDisp() : 0;
   const nb = av ? cn.fondo : cn.pers;
   if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}${p === 'pulizie' && nPul ? `<span class="tb" id="tb-pulizie">${nPul}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
@@ -1201,7 +1216,6 @@ function pBar(d){
       <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
       <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
-      ${(() => { const pi = pulHomeInfo(); return `<button class="gbtn" id="btn-pulizie" data-act="go" data-p="pulizie" style="grid-column:1/-1;min-height:0;flex-direction:row;gap:16px;padding:18px"><span class="em">✨</span><span style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left">Pulizie<small>${pi.t}</small></span>${pi.n ? `<span class="tb" id="badge-pulizie" style="top:12px;right:16px;min-width:22px;height:22px;font-size:12px">${pi.n}</span>` : ''}</button>`; })()}
     </div>
   </div>
 
@@ -1635,7 +1649,7 @@ function pRegolamento(){
     'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità. Per il caffè l\'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.',
     'Gli amministratori fanno verifiche fisiche periodiche: sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.'])}
   ${sez('8. Pulizie', [
-    `Tre compiti oggettivi, registrati subito (nessuna data passata): <b>🧹 Pulizia generale</b> +${ptPulSala()} punti, ${pulGruppoN()} ${pulGruppoN() === 1 ? 'volta' : 'volte'} a settimana (lunedì-domenica) per tutto il gruppo · <b>☕ Pulizia macchinetta</b> +${ptPulMacc()} punti, si sblocca ogni <b>${pulMaccCaffe()}</b> caffè registrati dal gruppo · <b>🪣 Svuota il secchio</b> +${ptPulSecchio()} punti, una sola volta al giorno per tutta la saletta, entro le ${pulSecchioFine()}:00.`,
+    `Tre compiti oggettivi, registrati subito (nessuna data passata): <b>🧹 Pulizia generale</b> +${ptPulSala()} punti, ${pulGruppoN()} ${pulGruppoN() === 1 ? 'volta' : 'volte'} a settimana (lunedì-domenica) per tutto il gruppo · <b>☕ Pulizia macchinetta</b> +${ptPulMacc()} punti, si sblocca ogni <b>${pulMaccCaffe()}</b> caffè registrati dal gruppo · <b>🪣 Svuota il secchio</b> +${ptPulSecchio()} punti, una sola volta al giorno per tutta la saletta, dalle ${pulSecchioInizio()}:00 alle ${pulSecchioFine()}:00.`,
     'Gli amministratori possono stornare registrazioni indebite: punti azzerati e compito di nuovo disponibile.'])}
   ${sez('9. Tasso di Onestà del caffè', [
     `Il controllo è automatico: nessuno deve aprire o chiudere buste. Per il periodo scelto in <b>Classifiche e statistiche</b> l'app confronta i caffè registrati dai colleghi con gli acquisti di caffè in grani convalidati nello stesso periodo. Stima standard: 1 kg di caffè in grani ≈ <b>${CAFFE_PER_KG} caffè</b>.`,
@@ -1653,34 +1667,38 @@ function pRegolamento(){
 }
 
 /* ---------- PULIZIE ---------- */
-const PUL_DEF = {macc: ['☕', 'Pulizia macchinetta del caffè'], secchio: ['🪣', "Svuota il secchio dell'acqua"], sala: ['🧹', 'Pulizia generale della sala']};
-function pulCard(k, ps, me){
-  const t = ps[k], disp = pulDisp(ps)[k], [em, nome] = PUL_DEF[k], chi = x => esc(nomeBreve(x.mid) || nomeM(x.mid));
-  let stato = '', extra = '';
+const PUL_DEF = {macc: ['☕', 'Macchinetta caffè'], secchio: ['🪣', 'Secchio acqua'], sala: ['🧹', 'Pulizia sala']};
+function pulBarra(k, ps, me){
+  const t = ps[k], disp = pulDisp(ps)[k], [em, nome] = PUL_DEF[k], now = Date.now(), chi = x => esc(nomeBreve(x.mid) || nomeM(x.mid));
+  let pct = 0, stato = '', fatto = false;
   if(k === 'macc'){
-    const pct = Math.min(100, Math.round(t.n / t.soglia * 100));
-    stato = t.pronto ? '✅ La macchinetta è da pulire' : `Mancano <b>${t.soglia - t.n}</b> caffè alla prossima pulizia`;
-    extra = `<div class="bar" style="margin:8px 0 4px"><i style="width:${pct}%"></i></div><small class="mut mono" id="pul-macc-conta">${Math.min(t.n, t.soglia)} / ${t.soglia} caffè dall'ultima pulizia</small>`;
+    pct = Math.min(100, Math.round(t.n / t.soglia * 100));
+    stato = `${Math.min(t.n, t.soglia)}/${t.soglia} caffè · ${t.pronto ? '<b>Pronta!</b>' : `Mancano <b>${t.soglia - t.n}</b>`}`;
   } else if(k === 'secchio'){
-    stato = t.fatto ? `✅ Svuotato oggi da <b>${chi(t.fatto)}</b>` : t.aperto ? `Da svuotare oggi, entro le ${t.fine}:00` : `Disponibile da domani mattina (fino alle ${t.fine}:00)`;
+    fatto = !!t.fatto;
+    if(t.fatto){ pct = 100; stato = `✅ Svuotato oggi da <b>${chi(t.fatto)}</b> · riapre tra ${pulCount(t.prossima - now)}`; }
+    else if(t.aperto){ pct = 100; stato = `Da svuotare · chiude tra ${pulCount(t.chiude - now)}`; }
+    else { pct = Math.max(0, Math.min(100, Math.round((now - t.prev) / Math.max(1, t.prossima - t.prev) * 100))); stato = `Disponibile tra <b>${pulCount(t.prossima - now)}</b>`; }
   } else {
-    const u = t.w[t.w.length - 1];
-    stato = t.bloccato ? `✅ Fatta questa settimana${u ? ` da <b>${chi(u)}</b> (${quando(u.t)})` : ''} · di nuovo da ${pulRinnovo()}` : (pulGruppoN() > 1 ? `Disponibile (${t.w.length} su ${pulGruppoN()} questa settimana)` : 'Disponibile questa settimana');
+    const u = t.w[t.w.length - 1], N = pulGruppoN();
+    fatto = t.bloccato;
+    pct = Math.min(100, Math.round(t.w.length / N * 100));
+    stato = t.bloccato ? `✅ Eseguita questa settimana${u ? ` da <b>${chi(u)}</b>` : ''} · riapre tra ${pulCount(t.rinnovo - now)}` : `Disponibile (${t.w.length}/${N})`;
   }
-  const ult = t.ult ? `<p class="hint" style="margin:8px 0 0" id="pul-ult-${k}">Ultima volta: <b>${chi(t.ult)}</b> · ${quando(t.ult.t)}${st.isAdmin && t.ult.id ? ` · <button class="btn link" style="padding:0" id="btn-storna-${k}" data-act="storno" data-id="${t.ult.id}">Storna</button>` : ''}</p>` : '';
-  return `<div class="card" id="pul-card-${k}" style="background:linear-gradient(135deg,var(--card),rgba(124,58,237,${disp ? '.14' : '.05'}));border-color:rgba(167,139,250,${disp ? '.4' : '.18'})">
-    <div class="between"><b style="font-size:15px">${em} ${nome}</b><span class="pill violet">+${t.pt} punti</span></div>
-    <p class="tx2" style="font-size:13.5px;margin:8px 0 0" id="pul-stato-${k}">${stato}</p>${extra}
-    <button class="btn violet block" style="margin-top:10px" id="btn-pul-${k}" data-act="pul" data-k="${k}" ${disp && me ? '' : 'disabled'}>${ic('check','s')} ${disp ? 'Registra' : 'Non disponibile ora'}</button>${ult}</div>`;
+  const adm = st.isAdmin && t.ult && t.ult.id ? `<p class="hint" style="margin:6px 0 0;font-size:11px" id="pul-ult-${k}">Ultima: <b>${chi(t.ult)}</b> · ${quando(t.ult.t)} · <button class="btn link" style="padding:0;font-size:11px" id="btn-storna-${k}" data-act="storno" data-id="${t.ult.id}">Storna</button></p>` : '';
+  return `<div class="pbar ${disp ? 'on' : fatto ? 'done' : ''}" id="pul-card-${k}">
+    <div class="pbr1"><b>${em} ${nome}</b><span class="pill violet">+${t.pt} pt</span></div>
+    <div class="pbg"><i style="width:${pct}%"></i></div>
+    <div class="pbr3"><span class="pbs" id="pul-stato-${k}">${stato}</span>
+      <button class="btn sm pulbtn" id="btn-pul-${k}" data-act="pul" data-k="${k}" ${disp && me ? '' : 'disabled'}>${disp ? 'Riscatta punti' : '⏳ Non attivo'}</button></div>${adm}</div>`;
 }
 function pPulizie(d){
-  const av = adminView(), me = st.mid, ps = pulStato();
-  const back = av ? '' : `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button>`;
+  const me = st.mid, ps = pulStato();
   const scala = st.isAdmin && !scalaDa() ? `<div class="banner amber" id="pul-scala">${ic('alert')}<div class="grow">La scala punti ×10 non è ancora attiva: i punti dei compiti sono già nel nuovo formato.</div><button class="btn sm amber" data-act="go" data-p="regole">Regole</button></div>` : '';
   const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || (d.S.turni[b.id]||0) - (d.S.turni[a.id]||0) || a.nome.localeCompare(b.nome));
-  return `${back}<h2>${ic('sparkles')} Pulizie</h2><p class="sub">Tre compiti, un punteggio oggettivo: registra quello che hai fatto.</p>
+  return `<h2>${ic('brush')} Pulizie</h2><p class="sub" style="margin-bottom:12px">Fai il tuo compito e riscatta i punti.</p>
   ${scala}
-  ${['macc', 'secchio', 'sala'].map(k => pulCard(k, ps, me)).join('')}
+  ${['macc', 'secchio', 'sala'].map(k => pulBarra(k, ps, me)).join('')}
   <div class="card" id="classifica-pulizie"><h3>🏆 Mastro Lindo · Classifica Punti Pulizia</h3>
     <table><thead><tr><th>#</th><th>Collega</th><th class="c">Punti</th><th class="c">Compiti</th></tr></thead><tbody>
     ${classifica.map((m,i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(m.nome)}</b>${m.id === me ? ' <span class="pill violet">tu</span>' : ''}</td><td class="c mono violet"><b>${d.S.punti[m.id]||0}</b></td><td class="c mono">${d.S.turni[m.id]||0}</td></tr>`).join('')}
@@ -2477,7 +2495,8 @@ const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Mode
     </div>
     <div class="grid2">
       <label class="f"><span>🪣 Secchio: punti</span><input class="in mono" id="rp-ps" inputmode="numeric" value="${ptPulSecchio()}"></label>
-      <label class="f"><span>…entro le ore</span><input class="in mono" id="rp-pse" inputmode="numeric" value="${pulSecchioFine()}"></label>
+      <div class="grid2" style="gap:8px"><label class="f"><span>…dalle ore</span><input class="in mono" id="rp-psi" inputmode="numeric" value="${pulSecchioInizio()}"></label>
+      <label class="f"><span>…alle ore</span><input class="in mono" id="rp-pse" inputmode="numeric" value="${pulSecchioFine()}"></label></div>
     </div>
     <div class="grid2">
       <label class="f"><span>🧹 Pulizia generale: punti</span><input class="in mono" id="rp-psa" inputmode="numeric" value="${ptPulSala()}"></label>
@@ -2667,7 +2686,7 @@ A['crea'] = async () => {
   try {
     const gid = newCode(), g = db.collection('saletta').doc(gid);
     const me = g.collection('membri').doc();
-    await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1, scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: 1, ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, ptPulSecchio: 5, ptPulSala: 50, pulMaccCaffe: 20, pulSecchioFine: 12, pulGruppoN: 1});
+    await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1, scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: 1, ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, ptPulSecchio: 5, ptPulSala: 50, pulMaccCaffe: 20, pulSecchioFine: 12, pulSecchioInizio: 7, pulGruppoN: 1});
     await g.collection('segreti').doc('pin').set({pin});
     await g.collection('admin').doc(st.uid).set({pin, nome: io, ts: TS()});
     const b = db.batch();
@@ -2972,46 +2991,49 @@ function pulCafCalc(base, list){
   });
   return Math.max(0, n);
 }
+const pulCount = ms => { const m = Math.max(1, Math.ceil(ms / 60000)), g = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mi = m % 60; return g ? `${g}g ${h}h` : h ? `${h}h ${mi}m` : `${mi}m`; };
+const pulOra = (base, h) => new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, 0, 0, 0).getTime();   // ore h del giorno di base (24 = mezzanotte successiva)
 function pulStato(){
-  const d = derived(), ini = pulInizioSettimana(), oggi0 = pulInizioGiorno(), tutti = tuttiMov();
+  const d = derived(), ini = pulInizioSettimana(), now = new Date(), tn = now.getTime(), oggi0 = pulInizioGiorno(), tutti = tuttiMov();
   const base = st.isAdmin ? (ultimaChiusura() || {}) : ((st.estratto && st.estratto.mp) || {});
   const live = tutti.filter(m => m.tipo === 'pulizia' && !d.stornati.has(m.id)).map(m => ({mid: m.mid, t: m.t, id: m.id, k: m.task || 'sala'}));
   const pre = (base.pulRec || []).map(x => ({mid: x.m, t: x.t, k: x.k || 'sala'}));   // pulizie recenti prima dell'ultima chiusura
   const all = pre.concat(live).sort((a, b) => a.t - b.t), ult = k => { const a = all.filter(x => x.k === k); return a[a.length - 1] || null; };
   const sala = all.filter(x => x.k === 'sala' && x.t >= ini), sec = all.filter(x => x.k === 'secchio' && x.t >= oggi0);
-  const n = pulCafCalc(base.pulCaf || 0, tutti), soglia = pulMaccCaffe(), fine = pulSecchioFine();
+  const n = pulCafCalc(base.pulCaf || 0, tutti), soglia = pulMaccCaffe(), inizio = pulSecchioInizio(), fine = pulSecchioFine();
+  const apre = pulOra(now, inizio), chiude = pulOra(now, fine), dom = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), ieri = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const fatto = sec[sec.length - 1] || null, aperto = tn >= apre && tn < chiude;
+  const prossima = (fatto || tn >= chiude) ? pulOra(dom, inizio) : apre;                       // prossima apertura del secchio
+  const prev = fatto ? fatto.t : (tn >= chiude ? chiude : pulOra(ieri, fine));                  // da quando si attende (per la barra)
+  const sett = new Date(ini), rinnovo = new Date(sett.getFullYear(), sett.getMonth(), sett.getDate() + 7).getTime();
   return {
     macc: {n, soglia, pronto: n >= soglia, ult: ult('macc'), pt: ptPulMacc()},
-    secchio: {fatto: sec[sec.length - 1] || null, aperto: new Date().getHours() < fine, fine, ult: ult('secchio'), pt: ptPulSecchio()},
-    sala: {w: sala, bloccato: sala.length >= pulGruppoN(), ult: ult('sala'), pt: ptPulSala()}
+    secchio: {fatto, aperto, apre, chiude, prossima, prev, inizio, fine, ult: ult('secchio'), pt: ptPulSecchio()},
+    sala: {w: sala, bloccato: sala.length >= pulGruppoN(), rinnovo, ult: ult('sala'), pt: ptPulSala()}
   };
 }
 const pulDisp = ps => ({macc: ps.macc.pronto, secchio: !ps.secchio.fatto && ps.secchio.aperto, sala: !ps.sala.bloccato});
 function pulMsg(ps, k){
   if(k === 'macc') return `Mancano ${ps.macc.soglia - ps.macc.n} caffè alla prossima pulizia`;
-  if(k === 'secchio') return ps.secchio.fatto ? `Svuotato oggi da ${nomeBreve(ps.secchio.fatto.mid) || nomeM(ps.secchio.fatto.mid)}` : `Disponibile da domani mattina (fino alle ${ps.secchio.fine}:00)`;
+  if(k === 'secchio') return ps.secchio.fatto ? `Svuotato oggi da ${nomeBreve(ps.secchio.fatto.mid) || nomeM(ps.secchio.fatto.mid)}` : `Disponibile tra ${pulCount(ps.secchio.prossima - Date.now())}`;
   const u = ps.sala.w[ps.sala.w.length - 1];
   return `La saletta è già stata pulita${u ? ` da ${nomeBreve(u.mid) || nomeM(u.mid)} (${quando(u.t)})` : ''}. Di nuovo da ${pulRinnovo()}`;
 }
-function pulHomeInfo(){
-  if(!st.mid) return {n: 0, t: ''};
-  const x = pulDisp(pulStato()), l = [];
-  if(x.macc) l.push('macchinetta'); if(x.secchio) l.push('secchio'); if(x.sala) l.push('pulizia generale');
-  return {n: l.length, t: l.length ? 'Da fare: ' + l.join(' · ') : 'tutto a posto'};
-}
+const nPulDisp = () => st.mid ? Object.values(pulDisp(pulStato())).filter(Boolean).length : 0;   // badge della scheda Pulizie
 const ptPulK = k => ({macc: ptPulMacc, secchio: ptPulSecchio, sala: ptPulSala}[k] || (() => 0))();
+/* «Riscatta punti»: registrazione immediata del compito, alla data/ora corrente */
 A['pul'] = ds => {
   const k = ds.k; if(!PUL_DEF[k] || !st.mid) return;
   const ps = pulStato(); if(!pulDisp(ps)[k]) return toast(pulMsg(ps, k), 'err');
-  openSheet(`<h3>${PUL_DEF[k][0]} ${PUL_DEF[k][1]}</h3><p class="sub">Confermi di averlo fatto adesso? Ricevi <b>+${ptPulK(k)} punti</b>.</p>
-    <div class="grid2"><button class="btn" data-act="sheet-close">Annulla</button><button class="btn violet" id="btn-pul-ok" data-act="pul-ok" data-k="${k}">Registra</button></div>`);
-};
-A['pul-ok'] = ds => {
-  const k = ds.k; if(!PUL_DEF[k] || !st.mid) return;
-  const ps = pulStato(); if(!pulDisp(ps)[k]){ closeSheet(); return toast(pulMsg(ps, k), 'err'); }
   addMov({tipo: 'pulizia', task: k, mid: st.mid, mids: [st.mid], punti: ptPulK(k), giorno: oggiISO()});
-  closeSheet(); toast(`${PUL_DEF[k][1]}: +${ptPulK(k)} punti ✨`);
+  toast(`${PUL_DEF[k][1]}: +${ptPulK(k)} punti ✨`);
 };
+/* countdown e badge: aggiornati ogni 20 s sui dati in memoria (nessuna lettura Firestore); si ridisegna solo se cambia qualcosa */
+let pulSig = '';
+setInterval(() => {
+  if(!st.mid || !st.gid || document.hidden) return;
+  try { const x = pulDisp(pulStato()), sig = [x.macc, x.secchio, x.sala].join() + '|' + (st.page === 'pulizie' ? Math.floor(Date.now() / 60000) : ''); if(sig !== pulSig){ pulSig = sig; render(); } } catch(e){ /* dati non ancora pronti */ }
+}, 20000);
 /* --- regala crediti (immediato, senza approvazione) --- */
 function rgAggiorna(){
   if(!$('rg-q')) return;
@@ -3516,10 +3538,10 @@ A['bf-invia'] = () => {
 };
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSnack: n('rp-snack'), ptSpesa: n('rp-spesa'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn'),
-    ptPulMacc: n('rp-pm'), pulMaccCaffe: n('rp-pmc'), ptPulSecchio: n('rp-ps'), pulSecchioFine: n('rp-pse'), ptPulSala: n('rp-psa'), pulGruppoN: n('rp-pulg')};
+    ptPulMacc: n('rp-pm'), pulMaccCaffe: n('rp-pmc'), ptPulSecchio: n('rp-ps'), pulSecchioFine: n('rp-pse'), pulSecchioInizio: n('rp-psi'), ptPulSala: n('rp-psa'), pulGruppoN: n('rp-pulg')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
   const ok = inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptSnack, 0, 100) && inR(v.ptSpesa, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.bfN, 1, 20)
-    && inR(v.ptPulMacc, 0, 500) && inR(v.ptPulSecchio, 0, 500) && inR(v.ptPulSala, 0, 500) && inR(v.pulMaccCaffe, 1, 200) && inR(v.pulSecchioFine, 1, 24) && inR(v.pulGruppoN, 1, 20);
+    && inR(v.ptPulMacc, 0, 500) && inR(v.ptPulSecchio, 0, 500) && inR(v.ptPulSala, 0, 500) && inR(v.pulMaccCaffe, 1, 200) && inR(v.pulSecchioFine, 1, 24) && inR(v.pulSecchioInizio, 0, 23) && v.pulSecchioInizio < v.pulSecchioFine && inR(v.pulGruppoN, 1, 20);
   if(!ok) return toast('Valori non validi', 'err');
   G().set({...v, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
@@ -3528,9 +3550,9 @@ A['scala10'] = () => {
   if(!st.isAdmin || scalaDa()) return;
   if(!confirm('Passare alla scala punti ×10?\n\nValori: soglia 300 punti = 1 credito · caffè 10 · snack 10 · spesa 20 · «Ben fatto» 20 · macchinetta 10 · secchio 5 · generale 50.\nI punti già maturati vengono moltiplicati per 10 (i vecchi turni di pulizia valgono 50). L\'operazione non si annulla.')) return;
   // i campi della pagina conservano il testo digitato tra un render e l'altro: li aggiorno subito, altrimenti «Salva le regole» riscriverebbe i valori vecchi
-  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-spesa': 20, 'rp-bf': 20, 'rp-pm': 10, 'rp-ps': 5, 'rp-psa': 50, 'rp-pmc': 20, 'rp-pse': 12}, prima = {};
+  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-spesa': 20, 'rp-bf': 20, 'rp-pm': 10, 'rp-ps': 5, 'rp-psa': 50, 'rp-pmc': 20, 'rp-pse': 12, 'rp-psi': 7}, prima = {};
   Object.keys(campi).forEach(id => { const e = $(id); if(e){ prima[id] = e.value; e.value = campi[id]; } });
-  G().set({scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: creditiSoglia(), ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, ptPulSecchio: 5, ptPulSala: 50, pulMaccCaffe: 20, pulSecchioFine: 12}, {merge: true})
+  G().set({scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: creditiSoglia(), ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, ptPulSecchio: 5, ptPulSala: 50, pulMaccCaffe: 20, pulSecchioFine: 12, pulSecchioInizio: 7}, {merge: true})
     .then(() => toast('Scala ×10 attiva'))
     .catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
 };
