@@ -395,7 +395,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.29.0';
+const VERSION = '1.30.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -887,9 +887,9 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifiche e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], pulizie:['Pulizie','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
-  regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
+  regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Classifica e statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
 
 // Modello prepagato: la quota non genera piu' addebiti sul saldo. Resta la funzione (vuota) per i punti di chiamata.
@@ -932,23 +932,24 @@ function doRender(){
   $('syncdot').className = 'dot ' + ({ok:'ok', off:'off', err:'err'}[st.sync] || '');
   $('hdr-sub').textContent = st.sync === 'err' ? 'Errore: ' + st.syncErr : st.sync === 'off' ? 'Offline · si sincronizza dopo' : st.sync === 'ok' ? (st.gruppo.nome || 'Saletta') : 'Collegamento…';
   if(!pagineConsentite().includes(st.page)) st.page = 'bar';
+  if(st.page === 'statistiche'){ st.page = 'classifiche'; st.clMod = 'stat'; }
   const av = adminView();
   document.body.classList.toggle('adm', av);
   const cn = contatori(d);
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s); sb.dataset.p = av ? 'registro' : 'crediti'; sb.setAttribute('aria-label', av ? 'Saldo' : 'Saldo: tocca per ricaricare');
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['classifiche','Statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['pulizie','Pulizie','brush'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['pulizie','Pulizie','brush'],['notifiche','Notifiche','bell']];
   const nPul = !av ? nPulDisp() : 0;
   const nb = av ? cn.fondo : cn.pers;
-  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
+  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['classifiche','Classifica e statistiche','chart']);
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}${p === 'pulizie' && nPul ? `<span class="tb" id="tb-pulizie">${nPul}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, statistiche:pStatistiche, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, pulizie:pPulizie, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide');
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
@@ -1347,7 +1348,7 @@ function pAdminHome(d, forza){
       <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>${cercaVuoto('soci-lista')}
     <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button><button class="btn sm ghost" data-act="go" data-p="membri">${ic('users','s')} Tutti i colleghi</button></div>
   </div>
-  <button class="btn amber block big" id="adm-classifiche" data-act="go" data-p="classifiche" style="margin-top:10px">📊 Classifiche e statistiche</button>`;
+  <button class="btn amber block big" id="adm-classifiche" data-act="go" data-p="classifiche" style="margin-top:10px">📊 Classifica e statistiche</button>`;
   const magaz = `  <div class="card"><h3>${ic('bean','s')} Caffè</h3>
     <div class="row" style="align-items:flex-end;gap:8px"><label class="f" style="flex:1;margin:0"><span>Prezzo tazzina €</span><input class="in mono" id="mg-caffe" inputmode="decimal" value="${(pcf/100).toFixed(2).replace('.',',')}"></label><button class="btn amber" data-act="salva-prezzo-caffe">Salva</button></div>
     <div class="between" style="font-size:13px;margin:12px 0 8px"><span class="tx2">Buste disponibili</span><b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b></div>
@@ -1619,7 +1620,7 @@ function pRegolamento(){
     'Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.',
     '<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.',
     '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
-    '<b>Classifiche:</b> «Classifiche e statistiche» è visibile a tutti; i punti sono totali accumulati (vedi sezione 11)', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
+    '<b>Classifiche:</b> «Classifica e statistiche» è visibile a tutti; i punti sono totali accumulati (vedi sezione 11)', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
   ${sez('2. Il saldo unico', [
     'Ogni membro ha un solo saldo di <b>crediti prepagati</b>: si ricarica prima e si consuma dopo.',
     '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
@@ -1652,7 +1653,7 @@ function pRegolamento(){
     `Tre compiti oggettivi, registrati subito (nessuna data passata): <b>🧹 Pulizia generale</b> +${ptPulSala()} punti, ${pulGruppoN()} ${pulGruppoN() === 1 ? 'volta' : 'volte'} a settimana (lunedì-domenica) per tutto il gruppo · <b>☕ Pulizia macchinetta</b> +${ptPulMacc()} punti, si sblocca ogni <b>${pulMaccCaffe()}</b> caffè registrati dal gruppo · <b>🪣 Svuota il secchio</b> +${ptPulSecchio()} punti, una sola volta al giorno per tutta la saletta, dalle ${pulSecchioInizio()}:00 alle ${pulSecchioFine()}:00.`,
     'Gli amministratori possono stornare registrazioni indebite: punti azzerati e compito di nuovo disponibile.'])}
   ${sez('9. Tasso di Onestà del caffè', [
-    `Il controllo è automatico: nessuno deve aprire o chiudere buste. Per il periodo scelto in <b>Classifiche e statistiche</b> l'app confronta i caffè registrati dai colleghi con gli acquisti di caffè in grani convalidati nello stesso periodo. Stima standard: 1 kg di caffè in grani ≈ <b>${CAFFE_PER_KG} caffè</b>.`,
+    `Il controllo è automatico: nessuno deve aprire o chiudere buste. Per il periodo scelto in <b>Classifica e statistiche</b> l'app confronta i caffè registrati dai colleghi con gli acquisti di caffè in grani convalidati nello stesso periodo. Stima standard: 1 kg di caffè in grani ≈ <b>${CAFFE_PER_KG} caffè</b>.`,
     '<b>Tasso di Onestà = caffè registrati ÷ (kg acquistati × 130) × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che si beve più caffè di quanti ne vengano registrati; su periodi brevi (es. «Oggi») il dato può essere poco significativo.',
     'Il caffè in grani viene riconosciuto dal nome dell\'articolo o dalla descrizione della spesa convalidata (es. «Caffè in grani 2 kg»): se indichi i kg il calcolo è preciso, altrimenti si assume 1 kg per acquisto.'])}
   ${sez('10. Chiusure, backup e trasparenza', [
@@ -1765,7 +1766,7 @@ async function caricaArcMov(){
   catch(e){ st.arcMov = []; }
   st.arcLoading = false; render();
 }
-/* ---------- Classifiche e statistiche ----------
+/* ---------- Classifica e statistiche ----------
    Tutto si calcola in memoria dai movimenti già caricati (nessuna lettura aggiuntiva da Firestore):
    periodo corrente = movimenti dall'ultima chiusura; periodi chiusi = riepiloghi salvati nell'estratto (storico). */
 const STORICO_MAX = 24;
@@ -2106,6 +2107,54 @@ function clClassifica(d, R, T, c){
   ${albo}`;
 }
 function pClassifiche(d){
+  const mod = st.clMod === 'stat' ? 'stat' : 'classifica';
+  const sw = `<div class="grid2" id="cl-mod" style="gap:8px;margin:0 0 12px">
+    <button id="cl-mod-classifica" class="btn block ${mod === 'classifica' ? 'amber' : 'ghost'}" data-act="cl-mod" data-v="classifica">🏆 Classifica</button>
+    <button id="cl-mod-stat" class="btn block ${mod === 'stat' ? 'amber' : 'ghost'}" data-act="cl-mod" data-v="stat">📊 Statistiche</button></div>`;
+  return `<h2>${ic('chart')} Classifica e statistiche</h2>${sw}${mod === 'stat' ? pStatConsumi(d) : pClassificaPunti(d)}`;
+}
+A['cl-mod'] = ds => { st.clMod = ds.v === 'stat' ? 'stat' : 'classifica'; st.scSel = null; render(); };
+/* --- modalità «Statistiche»: pagamenti/consumi (caffè e snack) per ambito e periodo, tutto dai movimenti già in memoria --- */
+const SC_PER = [['ieri', 'Ieri'], ['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['mese', 'Questo mese']];
+const scPer = () => SC_PER.some(x => x[0] === st.scP) ? st.scP : 'oggi';
+function scRange(){
+  const p = scPer();
+  if(p === 'ieri'){ const o = new Date(), da = new Date(o.getFullYear(), o.getMonth(), o.getDate() - 1).getTime(); return {p, da, a: new Date(o.getFullYear(), o.getMonth(), o.getDate()).getTime() - 1, label: `Ieri (${dBr(da)})`}; }
+  return rpRange(p);
+}
+const scChips = (id, act, cur, opz) => `<div class="chips" id="${id}">${opz.map(([v, l]) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
+function pStatConsumi(d){
+  const amb = st.scA === 'io' ? 'io' : 'saletta', r = scRange(), io = amb === 'io';
+  const R = consumiRange(r, io ? st.mid : null), Rs = io ? consumiRange(r) : R;
+  const ultima = ultimaChiusura(), cut = st.isAdmin ? (ultima ? ultima.fino.toMillis() : 0) : (st.estratto && st.estratto.fino && st.estratto.fino.toMillis ? st.estratto.fino.toMillis() : 0);
+  const nota = st.isAdmin ? hintArc(r) : (cut && r.da < cut ? `<p class="hint" style="margin:0 0 8px" id="sc-nota">Il periodo comprende movimenti archiviati con l'ultima chiusura (${dBr(cut)}): non sono inclusi.</p>` : '');
+  const filtri = `<div class="card" id="sc-filtri">
+    ${scChips('sc-amb', 'sc-amb', amb, [['saletta', '👥 Saletta'], ['io', '👤 I miei pagamenti']])}
+    <div style="margin-top:8px">${scChips('sc-per', 'sc-per', scPer(), SC_PER)}</div>
+    <p class="sub" style="margin:8px 0 0">${esc(r.label)}</p></div>`;
+  const tot = `<div class="card" id="sc-riepilogo"><h3><span>${io ? '👤 I miei pagamenti' : '☕ Pagamenti e consumi della saletta'}</span></h3>${nota}
+    <div class="grid2" style="margin-bottom:8px">
+      <div class="stat"><small>☕ Caffè</small><b class="mono amber" id="sc-caffe">${R.caffe}</b><small>${eur(R.caffeE)}</small></div>
+      <div class="stat"><small>🍫 Snack e bibite</small><b class="mono" id="sc-snack">${R.snack}</b><small>${eur(R.snackE)}</small></div></div>
+    <div class="stat"><small>Totale pagato</small><b class="mono green" id="sc-tot" style="font-size:26px">${eur(R.tot)}</b></div>
+    ${!io && st.isAdmin ? `<button class="btn amber block big" style="margin-top:10px" id="btn-st-img" data-act="st-img">📸 Condividi Resoconto Consumi (Immagine)</button>` : ''}</div>`;
+  if(io){
+    const pos = Rs.righe.findIndex(x => x.mid === st.mid), MAXL = 30, lista = R.mov.slice().sort((a, b) => b.t - a.t);
+    const nomeP = m => m.tipo === 'snack' ? '🍫 ' + esc((prodotto(m.pid) || {}).nome || 'Snack') : m.tipo === 'caffe_pagato' ? '☕ Caffè (pagato subito)' : '☕ Caffè';
+    return filtri + tot + `<div class="card" id="sc-miei"><h3><span>I miei movimenti</span>${pos >= 0 ? `<span class="pill amber">${pos + 1}° su ${Rs.righe.length} per spesa</span>` : ''}</h3>
+      ${lista.length ? `<div class="list">${lista.slice(0, MAXL).map(m => `<div class="li"><div class="grow"><div class="t" style="font-size:13.5px">${nomeP(m)}${m.qta > 1 ? ` ×${m.qta}` : ''}</div><div class="d">${quando(m.t)}</div></div><b class="mono">${eur(m.importo || 0)}</b></div>`).join('')}</div>
+        ${lista.length > MAXL ? `<p class="hint" style="margin:6px 0 0">…e altri ${lista.length - MAXL} movimenti nel periodo.</p>` : ''}`
+        : '<div class="empty">Nessun pagamento nel periodo scelto.</div>'}</div>`;
+  }
+  return filtri + tot + `<div class="card" id="sc-classifica"><h3><span>🏅 Classifica pagamenti</span></h3>
+    ${R.righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">☕</th><th class="c">🍫</th><th class="c">Pagato</th></tr></thead><tbody>
+      ${R.righe.map((x, i) => `<tr><td class="mono">${['🥇', '🥈', '🥉'][i] || i + 1}</td><td><b>${esc(x.nome)}</b>${x.mid === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.s}</td><td class="c mono"><b>${eur(x.e)}</b></td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty">Nessun pagamento nel periodo scelto.</div>'}
+    ${infoBtn(`Pagamenti di caffè e snack/bibite nel periodo scelto, in ordine di importo. Calcolati sui movimenti già caricati: nessuna lettura aggiuntiva.`, 'Come funziona')}</div>`;
+}
+A['sc-amb'] = ds => { st.scA = ds.v === 'io' ? 'io' : 'saletta'; render(); };
+A['sc-per'] = ds => { if(!SC_PER.some(x => x[0] === ds.v)) return; st.scP = ds.v; render(); };
+function pClassificaPunti(d){
   const amb = st.clAmb === 'io' ? 'io' : 'saletta', per = clPerKey();
   const R = clRighe(d), r = R.r, c = R.M, T = clTitoli(d, r);
   const chip = (act, cur, v, l) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
@@ -2114,8 +2163,7 @@ function pClassifiche(d){
     <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'oggi', 'Oggi')}${chip('cl-per', per, 'settimana', 'Questa settimana')}${chip('cl-per', per, 'mese', 'Mese corrente')}</div>
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
-  return `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button><h2>${ic('chart')} Classifiche e statistiche</h2>
-  ${filtri}${clHero(R.righe, R.pos, T, r)}
+  return `${filtri}${clHero(R.righe, R.pos, T, r)}
   ${amb === 'io' ? clIo(R.righe, c) : clClassifica(d, R, T, c)}`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
@@ -2348,42 +2396,24 @@ function pQuote(d){
 }
 
 /* ---------- STATISTICHE ---------- */
-const ST_PER = [['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['mese', 'Questo mese'], ['corrente', 'Periodo corrente']];
-const stPer = () => ST_PER.some(x => x[0] === st.stPer) ? st.stPer : 'oggi';
-/* consumi pagati nel periodo (caffe, caffe_pagato, snack) dai movimenti gia' in memoria; gli storni li stornano */
-function consumiRange(r){
-  const R = {caffe: 0, caffeE: 0, snack: 0, snackE: 0, per: {}};
-  const per = mid => R.per[mid] || (R.per[mid] = {c: 0, s: 0, e: 0});
+/* consumi pagati nel periodo (caffe, caffe_pagato, snack) dai movimenti gia' in memoria; uno storno vale nel periodo del movimento originale */
+function consumiRange(r, mid){
+  const R = {caffe: 0, caffeE: 0, snack: 0, snackE: 0, per: {}, mov: []}, stor = derived().stornati;
+  const per = x => R.per[x] || (R.per[x] = {c: 0, s: 0, e: 0});
   const pass = (m, sg) => {
     if(m.tipo === 'storno'){ if(m.orig) pass(m.orig, -sg); return; }
-    if(m.stato === 'annullata') return;
+    if(m.stato === 'annullata' || (mid && m.mid !== mid)) return;
     if(m.tipo === 'caffe' || m.tipo === 'caffe_pagato'){ const p = per(m.mid); R.caffe += sg * (m.qta || 0); R.caffeE += sg * (m.importo || 0); p.c += sg * (m.qta || 0); p.e += sg * (m.importo || 0); }
     else if(m.tipo === 'snack'){ const p = per(m.mid); R.snack += sg * (m.qta || 0); R.snackE += sg * (m.importo || 0); p.s += sg * (m.qta || 0); p.e += sg * (m.importo || 0); }
+    else return;
+    if(sg > 0 && !stor.has(m.id)) R.mov.push(m);
   };
-  (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a).forEach(m => pass(m, 1));
-  R.righe = Object.entries(R.per).filter(([, v]) => v.c > 0 || v.s > 0 || v.e > 0).map(([mid, v]) => ({mid, nome: nomeM(mid), c: v.c, s: v.s, e: v.e}))
+  (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => { const t = m.tipo === 'storno' && m.orig ? m.orig.t : m.t; return t >= r.da && t <= r.a; }).forEach(m => pass(m, 1));
+  R.righe = Object.entries(R.per).filter(([, v]) => v.c > 0 || v.s > 0 || v.e > 0).map(([id, v]) => ({mid: id, nome: nomeM(id), c: v.c, s: v.s, e: v.e}))
     .sort((a, b) => b.e - a.e || (b.c + b.s) - (a.c + a.s) || a.nome.localeCompare(b.nome));
   R.tot = R.caffeE + R.snackE;
   return R;
 }
-function pStatistiche(d){
-  const r = rpRange(stPer()), R = consumiRange(r);
-  return `<h2>${ic('chart')} Statistiche ${infoBtn(`Solo consumi pagati (caffè, snack e bibite) nel periodo scelto: nessun dato di cassa o di fondo. Calcolati sui movimenti già caricati, senza letture aggiuntive.`)}</h2>
-  <div class="card" id="stat-consumi"><h3><span>☕ Consumi</span><span class="mut" style="font-weight:500;text-transform:none;letter-spacing:0">${esc(r.label)}</span></h3>
-    ${periodoChips(r, 'st-per', ST_PER)}
-    ${hintArc(r)}
-    <div class="grid2" style="margin-bottom:8px">
-      <div class="stat"><small>☕ Caffè</small><b class="mono amber" id="st-caffe">${R.caffe}</b><small>${eur(R.caffeE)}</small></div>
-      <div class="stat"><small>🍫 Snack e bibite</small><b class="mono" id="st-snack">${R.snack}</b><small>${eur(R.snackE)}</small></div></div>
-    <div class="stat" style="margin-bottom:10px"><small>Totale speso per consumi</small><b class="mono green" id="st-tot" style="font-size:26px">${eur(R.tot)}</b></div>
-    <button class="btn amber block big" id="btn-st-img" data-act="st-img">📸 Condividi Resoconto Consumi (Immagine)</button></div>
-  <div class="card" id="stat-tab"><h3><span>Consumi per collega</span></h3>
-    ${R.righe.length ? `<table><thead><tr><th>Collega</th><th class="c">Caffè</th><th class="c">Snack/Bibite</th><th class="c">Totale pagato</th></tr></thead><tbody>
-      ${R.righe.map(x => `<tr><td>${esc(x.nome)}</td><td class="c mono">${x.c}</td><td class="c mono">${x.s}</td><td class="c mono"><b>${eur(x.e)}</b></td></tr>`).join('')}
-      <tr><td><b>Totale</b></td><td class="c mono"><b>${R.caffe}</b></td><td class="c mono"><b>${R.snack}</b></td><td class="c mono"><b>${eur(R.tot)}</b></td></tr></tbody></table>`
-      : '<div class="empty">Nessun consumo nel periodo scelto.</div>'}</div>`;
-}
-A['st-per'] = ds => { if(!ST_PER.some(x => x[0] === ds.v)) return; st.stPer = ds.v; render(); };
 /* Scheda Resoconto Consumi: immagine PNG disegnata su canvas */
 function disegnaConsumi(r, R){
   const W = 1080, P = 56, F = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', M = 'ui-monospace, Menlo, Consolas, monospace';
@@ -2422,7 +2452,7 @@ function disegnaConsumi(r, R){
   return cv;
 }
 A['st-img'] = async () => {
-  const r = rpRange(stPer()), R = consumiRange(r);
+  const r = scRange(), R = consumiRange(r);
   const cv = disegnaConsumi(r, R);
   const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
   if(!blob) return toast('Impossibile creare l\'immagine', 'err');
