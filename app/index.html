@@ -67,6 +67,9 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .btn.red{background:#be123c;border-color:#be123c;color:#fff}
 .btn.violet{background:#7c3aed;border-color:#7c3aed;color:#fff}
 .btn.ghost{background:transparent;border-color:var(--line)}
+.btn.regalo,.btn.acquisto{color:#fff;border:0;padding:14px 10px;font-size:14px;line-height:1.25;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.btn.regalo{background:linear-gradient(135deg,#ec4899,#e11d48)}
+.btn.acquisto{background:linear-gradient(135deg,#0ea5e9,#0d9488)}
 .btn.link{background:none;border:0;padding:4px 6px;color:var(--amber);font-size:12.5px}
 .btn.big{padding:16px;font-size:15px;border-radius:16px}
 .btn.giro{background:linear-gradient(90deg,#6366f1,#9333ea);color:#fff;border:0}
@@ -379,7 +382,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.26.0';
+const VERSION = '1.27.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1156,7 +1159,7 @@ function pBar(d){
       <button class="btn amber block" id="btn-ricarica" data-act="ricarica-nuova">➕ Ricarica</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
     </div>
-    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn ghost block" id="btn-regala-home" data-act="regala">🎁 Regala crediti</button><button class="btn ghost block" id="btn-acquista-home" data-act="acquista">🤝 Acquista crediti da un collega</button></div>
+    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn regalo block" id="btn-regala-home" data-act="regala">🎁 Regala crediti</button><button class="btn acquisto block" id="btn-acquista-home" data-act="acquista">🤝 Acquista crediti da un collega</button></div>
     ${(() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
@@ -1255,7 +1258,7 @@ function pCrediti(d){
   <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
-    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn block ghost" id="btn-regala" data-act="regala">🎁 Regala crediti</button><button class="btn block ghost" id="btn-acquista" data-act="acquista">🤝 Acquista crediti da un collega</button></div></div>
+    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn regalo block" id="btn-regala" data-act="regala">🎁 Regala crediti</button><button class="btn acquisto block" id="btn-acquista" data-act="acquista">🤝 Acquista crediti da un collega</button></div></div>
   ${scambiRicevuti(d)}${scambiInviati(d)}
   ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
   ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l\'amministratore conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché l\'amministratore non ti paga.<br><br><b>Tra colleghi:</b> «Regala crediti» è immediato e senza approvazioni; «Acquista crediti da un collega» richiede che il venditore confermi di aver ricevuto il denaro.', 'Come funzionano ricariche e riscatti')}`;
