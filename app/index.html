@@ -202,6 +202,8 @@ main.wide{max-width:980px}
 .rk .v{flex:none;text-align:right;font-size:20px;font-weight:800;color:var(--amber)}.rk .v small{display:block;font-size:10.5px;font-weight:600;color:var(--mut)}
 
 .pbar.off{opacity:.75}.pbar.off .pbs{color:var(--amber,#f5a524)}
+.rg{margin:0;padding-left:18px}.rg li{font-size:13.5px;line-height:1.45;color:var(--tx2);margin:0 0 6px}.rg li b{color:var(--tx)}
+.rdot{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px #0b1020}
 .tessera{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left;background:transparent;color:inherit;cursor:pointer}
 .tessera.ok{border-color:var(--green);background:rgba(52,211,153,.10)}
 .tessera.ok .bar i{background:var(--green)}
@@ -332,6 +334,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 
 <header id="hdr" class="hidden">
   <button class="iconbtn" id="hdr-menu" data-act="drawer" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
+  <button class="iconbtn" id="hdr-reg" style="width:36px;margin-right:-2px" data-act="go" data-p="regolamento" aria-label="Regolamento" title="Regolamento"><span style="font-size:20px;line-height:1">📜</span><span class="rdot hidden" id="hdr-reg-dot"></span></button>
   <div class="brand" data-act="go" data-p="bar" style="cursor:pointer" role="button" aria-label="Home">
     <b id="hdr-name"><svg class="i s"><use href="#i-coffee"/></svg>Armieri 5.0</b>
     <small><span class="dot" id="syncdot"></span><span id="hdr-sub"></span></small>
@@ -406,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.32.0';
+const VERSION = '1.33.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -944,6 +947,10 @@ function doRender(){
     offertaAdminAperta = true; LS.del('offriAdmin_' + st.gid); setTimeout(() => A['offri-admin'](), 400);
   }
 
+  if(!regModalAperto && !LS.get(REG_KEY) && st.mid && st.ready.m && st.ready.mv){   // avviso «Regolamento aggiornato» (solo localStorage, nessuna scrittura su Firestore)
+    regModalAperto = true; setTimeout(() => { if(!$('sheet').classList.contains('on') && !LS.get(REG_KEY) && st.page !== 'regolamento') A['reg-avviso'](); }, 700);
+  }
+
   let d = derived();
   assicuraQuote(d); d = derived();
   // header
@@ -959,6 +966,8 @@ function doRender(){
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s); sb.dataset.p = av ? 'registro' : 'crediti'; sb.setAttribute('aria-label', av ? 'Saldo' : 'Saldo: tocca per ricaricare');
   aggiornaPillola(d, av);
+  if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
+  $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden');
   const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['pulizie','Pulizie','brush'],['notifiche','Notifiche','bell']];
   const nPul = !av ? nPulDisp() : 0;
@@ -1635,57 +1644,55 @@ function pFeed(d){
 /* ---------- REGOLAMENTO ---------- */
 function pRegolamento(){
   const g = st.gruppo || {};
-  const sez = (t, righe) => `<div class="card"><h3>${t}</h3>${righe.map(r => `<p class="tx2" style="font-size:13.5px;line-height:1.5;margin:0 0 9px">${r}</p>`).join('')}</div>`;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">Norme di gestione di ${esc(g.nome || 'Armieri 5.0')} · versione 3.3 · novembre 2026</p>
-  ${sez('1. Finalità e principi', [
-    'Armieri 5.0 gestisce le risorse condivise della saletta relax: caffè e snack, cassa comune, inventario, quota annuale, turni di pulizia e ricorrenze.',
-    '<b>Auto-responsabilità:</b> ognuno registra da solo e subito ogni consumo personale.',
-    '<b>Contabilità, non denaro:</b> l\'app non incassa nulla. Registra solo crediti e debiti; i soldi veri passano in contanti o Revolut, fuori dall\'app.',
-    '<b>Classifiche:</b> «Classifica e statistiche» è visibile a tutti; i punti sono totali accumulati (vedi sezione 11)', '<b>Trasparenza:</b> tutti i membri possono consultare il Registro movimenti completo del fondo (con filtri), oltre al listino e alle attività comuni. I saldi degli altri non sono mostrati, ma i movimenti sono pubblici nel gruppo. Gli amministratori vedono in più la tenuta complessiva (cassa, fondo netto).'])}
-  ${sez('2. Il saldo unico', [
-    'Ogni membro ha un solo saldo di <b>crediti prepagati</b>: si ricarica prima e si consuma dopo.',
-    '<b>1 credito = 1,00 €.</b> Niente sconti, sovrapprezzi o commissioni nelle compravendite.',
-    '<b>Saldo mai sotto zero:</b> caffè e snack si registrano solo se il saldo copre il prezzo («Credito insufficiente: ricarica per consumare»). Lo stesso vale per regali e vendite di crediti. Chi ha un debito del vecchio modello resta bloccato finché una ricarica non lo copre e porta il saldo almeno al prezzo del prodotto.'])}
-  ${sez('3. Ruoli e poteri', [
-    '<b>Modifica delle regole:</b> il regolamento e i parametri (prezzi di listino, valore dei Punti Pulizia, quota annuale) possono essere attivati, cambiati e revocati <b>solo dagli amministratori</b>.',
-    '<b>Collega:</b> registra caffè e snack (annullabili entro 10 minuti), anticipa spese per la saletta (da convalidare), ricarica i propri crediti e li riscatta dal Fondo Gruppo (un amministratore conferma), registra le proprie pulizie e converte i propri Punti Pulizia, regala o trasferisce crediti ai colleghi (subito, senza approvazione e senza annullo), aggiunge eventi, apre le buste di caffè, cambia il nickname, può chiedere di diventare amministratore. Non vede cassa, statistiche né i saldi degli altri. Riceve notifiche personali (spese, ricariche e riscatti esaminati, accrediti).',
-    '<b>Amministratore:</b> dispone di due modalità, selezionabili dall\'interruttore in alto: <b>Profilo Utente</b> (si comporta come un normale collega, con saldo e notifiche personali) e <b>Amministrazione Fondo</b> (cassa, fondo netto, spese in attesa, registro globale con storno). In amministrazione approva o rifiuta le richieste in attesa (spese, versamenti in cassa, nuovi iscritti), gestisce inventario e listino, tesoreria (contanti, Revolut, giroconti), storni e rettifiche motivate, il pagamento dei riscatti dalla cassa, chiusure di periodo, backup e rendiconti. Nomina e rimuove altri amministratori.',
-    '<b>Creatore del gruppo:</b> ha tutte le funzioni di amministratore e non può essere revocato, archiviato, espulso o cancellato dagli altri (vincolo imposto anche dalle regole del database). Può lasciare il ruolo solo per sua scelta.',
-    '<b>Continuità:</b> il gruppo deve avere almeno due amministratori e custodire PIN e codice del gruppo anche fuori dall\'app.'])}
-  ${sez('4. Quota annuale', [
-    `La quota (${eur(g.quotaAnnua || 0)}) è un contributo al fondo, <b>separato dal saldo</b>: non genera debiti e non blocca i consumi.`,
-    'Finché non è registrata, in Home compare l\'avviso «Quota saletta non ancora saldata». La registra un amministratore dopo il versamento (contanti, Revolut o già versata fuori app).',
-    'L\'amministratore sceglie se accreditarla <b>anche come crediti consumabili</b> (SÌ) o solo come contributo al fondo (NO).'])}
-  ${sez('5. Ricarica e riscatto dei crediti', [
-    '<b>Ricarica:</b> il pulsante «Ricarica» invia una richiesta al Fondo Gruppo con importo e modalità di versamento (contanti in cassetta o Revolut). Quando un amministratore conferma l\'incasso, i crediti arrivano sul tuo saldo. Il pulsante è sempre attivo, anche con saldo positivo.',
-    '<b>Riscatto:</b> chi ha crediti liberi può chiederne la restituzione in denaro al Fondo Gruppo, indicando importo e preferenza (contanti o Revolut). L\'importo richiesto resta riservato (non si può spendere né regalare) finché un amministratore non lo paga dalla cassa e solo allora il saldo scende. Se la cassa non ha liquidità la richiesta può essere rifiutata e rifatta per un importo minore.',
-    '<b>Regalo:</b> «Regala crediti» è una donazione gratuita ai colleghi scelti: è immediata, senza approvazione e senza annullo (solo un amministratore può stornarla).',
-    '<b>Acquisto tra colleghi:</b> con «Acquista crediti da un collega» scegli il venditore, i crediti e come paghi (contanti o Revolut, fuori dall\'app). Il venditore riceve una richiesta e, solo dopo aver ricevuto il denaro, conferma: a quel punto i crediti passano a te. Puoi annullare finché è in attesa.',
-    '<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione.'])}
-  ${sez('6. Lista della spesa e rimborsi', [
-    'Chiunque aggiunge alla <b>Lista della spesa</b> ciò che serve alla saletta (caffè, bibite, snack, detergenti). Chi fa la spesa spunta gli articoli che compra e registra l\'acquisto con l\'importo totale e le eventuali note; gli acquisti urgenti non in lista si registrano con <b>Acquisto fuori lista</b>.',
-    'Il rimborso si sceglie così: <b>in crediti</b> (dopo la convalida l\'importo diventa credito personale, la cassa non cambia) oppure <b>in denaro reale</b> (l\'amministratore usa «Convalida e Paga»: il denaro esce dalla cassa, contanti o Revolut, e il saldo del collega non cambia).',
-    'Se l\'amministratore rifiuta la richiesta, o il collega la annulla, gli articoli tornano nella lista. Anche le spese degli amministratori restano in attesa finché non sono convalidate. Gli omaggi e i regali si accreditano a un solo beneficiario, senza toccare la cassa.',
-    'Acquisti istituzionali, macchinari e manutenzioni straordinarie sono registrati direttamente dall\'amministratore come uscita di cassa.'])}
-  ${sez('7. Inventario e listino', [
-    'Snack e bevande hanno prezzo e scorta nell\'inventario; ogni prelievo riduce subito la disponibilità. Per il caffè l\'inventario mostra il prezzo di ogni tazzina e il numero di buste ancora disponibili.',
-    'Gli amministratori fanno verifiche fisiche periodiche: sfridi e ammanchi fisiologici vengono registrati e assorbiti nelle spese generali del fondo.'])}
-  ${sez('8. Pulizie', [
-    `Tre compiti oggettivi, registrati subito (nessuna data passata): <b>🧹 Pulizia generale</b> +${ptPulSala()} punti, ${pulGruppoN()} ${pulGruppoN() === 1 ? 'volta' : 'volte'} a settimana (lunedì-domenica) per tutto il gruppo · <b>☕ Pulizia macchinetta</b> +${ptPulMacc()} punti, si sblocca ogni <b>${pulMaccCaffe()}</b> caffè registrati dal gruppo · <b>🪣 Svuota il secchio</b> +${ptPulSecchio()} punti, una sola volta al giorno per tutta la saletta, dalle ${pulSecchioInizio()}:00 alle ${pulSecchioFine()}:00.`,
-    'Gli amministratori possono stornare registrazioni indebite: punti azzerati e compito di nuovo disponibile.'])}
-  ${sez('9. Tasso di Onestà del caffè', [
-    `Il controllo è automatico: nessuno deve aprire o chiudere buste. Per il periodo scelto in <b>Classifica e statistiche</b> l'app confronta i caffè registrati dai colleghi con gli acquisti di caffè in grani convalidati nello stesso periodo. Stima standard: 1 kg di caffè in grani ≈ <b>${CAFFE_PER_KG} caffè</b>.`,
-    '<b>Tasso di Onestà = caffè registrati ÷ (kg acquistati × 130) × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che si beve più caffè di quanti ne vengano registrati; su periodi brevi (es. «Oggi») il dato può essere poco significativo.',
-    'Il caffè in grani viene riconosciuto dal nome dell\'articolo o dalla descrizione della spesa convalidata (es. «Caffè in grani 2 kg»): se indichi i kg il calcolo è preciso, altrimenti si assume 1 kg per acquisto.'])}
-  ${sez('10. Chiusure, backup e trasparenza', [
-    'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
-    'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
-    'A fine esercizio l\'amministrazione espone il rendiconto: cassa (contanti e Revolut), crediti e debiti, fondo netto e consumi aggregati.'])}
-  ${sez('11. Punti Collega Modello', [
-    `<b>Si guadagnano:</b> ☕ ${ptCaffe()} per caffè · 🍫 ${ptSnack()} per snack · 🧾 ${ptSpesa()} per spesa convalidata · ✨ ${ptPulSala()} pulizia generale, ${ptPulMacc()} macchinetta, ${ptPulSecchio()} secchio · 👏 ${ptBenFatto()} per ogni «Ben fatto» ricevuto.`,
-    `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}), dai Punti Collega Modello. La classifica conta i punti totali: riscattare non la cambia.`,
-    `<b>Ben fatto!</b> riconosce un collega, con motivazione obbligatoria (max 80 caratteri). Chi lo invia non perde punti; ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}.`,
-    'Valori, soglia e gettoni li decidono gli amministratori; i cambi valgono per gli eventi futuri.'])}`;
+  const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
+  const pt = n => `+${n} pt`;
+  const spento = ptMaster() ? ['macc', 'secchio', 'sala'].filter(k => !pulOn(k)).map(k => PUL_DEF[k][1]) : [];
+  const nota = (ok, txt) => ok ? '' : txt;
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.0 · novembre 2026</p>
+  ${sez('🎯 Principi', [
+    '<b>Registra subito</b> ogni consumo: ognuno risponde del proprio.',
+    '<b>Contabilità, non denaro:</b> l\'app tiene crediti e debiti; i soldi passano in contanti o Revolut, fuori dall\'app.',
+    '<b>Trasparenza:</b> il Registro è visibile a tutti; i saldi degli altri no.'])}
+  ${sez('💳 Crediti', [
+    '<b>1 credito = 1,00 €</b>, senza commissioni.',
+    '<b>Ricarica:</b> la chiedi dal pulsante «Ricarica»; i crediti arrivano quando un admin conferma l\'incasso.',
+    '<b>Saldo mai sotto zero:</b> senza credito non si registrano caffè, snack, regali o vendite.',
+    '<b>Riscatto in denaro:</b> l\'importo resta riservato finché un admin non lo paga dalla cassa.',
+    '<b>Regala crediti:</b> immediato e definitivo. <b>Acquista da un collega:</b> il venditore conferma dopo aver ricevuto il denaro.'])}
+  ${sez('☕ Caffè e snack', [
+    `Prezzo da listino (caffè ${eur(g.prezzoCaffe || 0)}), addebitato subito sul saldo.`,
+    `Ti sei sbagliato? <b>Annulla entro ${ANNULLA_MIN} minuti.</b>`,
+    'Ogni prelievo riduce la scorta in inventario.'])}
+  ${sez('🛒 Spesa e rimborsi', [
+    'Chiunque aggiunge alla <b>Lista della spesa</b>; chi compra spunta gli articoli e registra l\'importo.',
+    'Rimborso <b>in crediti</b> o <b>in denaro</b>: vale solo dopo la <b>convalida</b> di un admin.',
+    'Se rifiutata o annullata, gli articoli tornano in lista.'])}
+  ${sez('🧹 Pulizie', [
+    `🧹 <b>Generale:</b> ${pt(ptPulSala())}, ${pulGruppoN()} ${pulGruppoN() === 1 ? 'volta' : 'volte'} a settimana per tutto il gruppo (lun-dom).`,
+    `☕ <b>Macchinetta:</b> ${pt(ptPulMacc())}, si sblocca ogni <b>${pulMaccCaffe()} caffè</b> del gruppo.`,
+    `🪣 <b>Secchio:</b> ${pt(ptPulSecchio())}, una volta al giorno, dalle ${pulSecchioInizio()}:00 alle ${pulSecchioFine()}:00.`,
+    'Si registrano subito, senza date passate. Un admin può stornare registrazioni indebite.',
+    !ptMaster() ? '⚠️ Sistema punti disattivato: nessun accredito.' : spento.length ? `⚠️ Riscatto sospeso dall'admin: ${spento.join(', ')}.` : ''])}
+  ${sez('⭐ Punti Collega Modello', [
+    !ptMaster() ? '⚠️ <b>Sistema punti disattivato dall\'admin:</b> nessun accredito; i punti già maturati restano.' : '',
+    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${ptSnackE()} per snack · 🧾 ${ptSpesaE()} per spesa convalidata · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🧹 pulizie (sopra).`,
+    `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}). La classifica non cambia.`,
+    `<b>Ben fatto!</b> riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
+  ${sez('🏆 Classifica e statistiche', [
+    '<b>Classifica:</b> punti di oggi, settimana o mese. La pillola in alto mostra la tua posizione del mese.',
+    '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
+    `<b>Tasso di Onestà:</b> caffè registrati ÷ (kg acquistati × ${CAFFE_PER_KG}). Verde da 85%, rosso sotto 70%.`])}
+  ${sez('🔑 Ruoli', [
+    '<b>Collega:</b> registra consumi, spese, pulizie, ricariche e regali; riceve notifiche personali.',
+    '<b>Amministratore:</b> conferma ricariche, spese e riscatti; gestisce inventario, listino, cassa, regole punti, storni e chiusure.',
+    '<b>Creatore:</b> non può essere revocato. Il gruppo tiene almeno due admin.',
+    'Solo gli admin cambiano regole e parametri.'])}
+  ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
+    `${eur(g.quotaAnnua)} di contributo al fondo, <b>separato dal saldo</b>: non crea debiti né blocca i consumi.`,
+    'La registra un admin dopo il versamento; fino ad allora in Home compare un avviso.']) : ''}
+  ${sez('🗂️ Chiusure e backup', [
+    'L\'admin chiude i periodi: i dati vanno nell\'Archivio (solo admin) e i saldi ripartono.',
+    'Backup (.json e .csv) almeno ogni 7 giorni.'])}`;
 }
 
 /* ---------- PULIZIE ---------- */
@@ -3675,6 +3682,17 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
+const REG_KEY = 'regolamento_letto_v5';   // memorizzato come ps_regolamento_letto_v5: si cambia suffisso a ogni nuova versione del regolamento
+let regModalAperto = false;
+A['reg-avviso'] = () => {
+  openSheet(`<h3>📜 Regolamento Aggiornato</h3>
+    <p class="tx2" style="font-size:15px;line-height:1.5;margin:0 0 12px">È disponibile il nuovo regolamento della saletta. Puoi consultarlo in qualsiasi momento toccando l'icona accanto al tuo nome in alto a sinistra.</p>
+    <button class="btn link" id="btn-reg-leggi" style="padding:0;margin:0 0 14px;font-size:15px" data-act="reg-leggi">📖 Leggi il regolamento adesso</button>
+    <label class="check"><input type="checkbox" id="reg-mai"><b style="flex:1;font-size:14px">Non mostrare più</b></label>
+    <button class="btn amber block big" id="btn-reg-ok" data-act="reg-ok" style="margin-top:6px">Ho letto e compreso</button>`);
+};
+A['reg-ok'] = () => { const mai = $('reg-mai') && $('reg-mai').checked; if(mai) LS.set(REG_KEY, 1); closeSheet(); if(mai) render(); };
+A['reg-leggi'] = () => { closeSheet(); A['go']({p: 'regolamento'}); };
 A['offri-admin'] = () => openSheet(`<h3>${ic('shield')} Eri amministratore?</h3><p class="sub">Su questo telefono il ruolo non è attivo. Se eri amministratore, inserisci il PIN amministratore per riattivarlo.</p>
   <label class="f"><span>PIN amministratore</span><input class="in" id="oa-pin" type="password" autocomplete="off" autocapitalize="off" autofocus></label>
   <button class="btn amber block big" data-act="offri-admin-ok">Riattiva il ruolo</button>
