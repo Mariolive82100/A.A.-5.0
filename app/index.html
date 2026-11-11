@@ -199,16 +199,17 @@ main.wide{max-width:980px}
 .banner.amber{background:rgba(245,165,36,.1);border:1px solid rgba(245,165,36,.3);color:#fde68a}
 .banner.red{background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.3);color:#fecdd3}
 .banner.sky{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);color:#bae6fd}
-.avv{position:relative;display:block;text-align:center;margin:0 0 12px;padding:18px 22px;border-radius:22px;border:1.5px solid var(--avc);background:var(--avb);color:var(--avt);animation:avv-respiro 2.6s ease-in-out infinite}
-.avv .avv-t{font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.95}
-.avv .avv-m{margin-top:6px;font-size:16px;font-weight:700;line-height:1.4;word-break:break-word}
-.avv .avv-a{margin-top:8px;font-size:11.5px;opacity:.75}
-.avv .iconbtn{position:absolute;top:8px;right:8px;width:32px;height:32px}
+.avv{position:relative;display:block;width:100%;text-align:center;margin:0 0 8px;padding:8px 14px;border-radius:18px;border:1.5px solid var(--avc);background:var(--avb);color:var(--avt);font:inherit;animation:avv-respiro 2.6s ease-in-out infinite}
+button.avv{cursor:pointer}
+.avv .avv-t{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;opacity:.9;line-height:1.3}
+.avv .avv-m{margin-top:3px;font-size:14.5px;font-weight:700;line-height:1.3;word-break:break-word}
+.avv .iconbtn{position:absolute;top:4px;right:6px;width:30px;height:30px}
 .avv.amber{--avc:rgba(245,165,36,.75);--avb:rgba(245,165,36,.14);--avt:#fde68a;--avg:245,165,36}
 .avv.red{--avc:rgba(251,113,133,.75);--avb:rgba(251,113,133,.14);--avt:#fecdd3;--avg:251,113,133}
 .avv.sky{--avc:rgba(56,189,248,.75);--avb:rgba(56,189,248,.13);--avt:#bae6fd;--avg:56,189,248}
 .avv.green{--avc:rgba(16,185,129,.8);--avb:rgba(16,185,129,.15);--avt:#a7f3d0;--avg:16,185,129}
-@keyframes avv-respiro{0%,100%{opacity:.82;box-shadow:0 0 0 0 rgba(var(--avg),0)}50%{opacity:1;box-shadow:0 0 22px 3px rgba(var(--avg),.38)}}
+.avv.violet{--avc:rgba(167,139,250,.8);--avb:rgba(167,139,250,.14);--avt:#ddd6fe;--avg:167,139,250}
+@keyframes avv-respiro{0%,100%{opacity:.82;box-shadow:0 0 0 0 rgba(var(--avg),0)}50%{opacity:1;box-shadow:0 0 18px 2px rgba(var(--avg),.36)}}
 @media (prefers-reduced-motion:reduce){.avv{animation:none}}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -233,6 +234,10 @@ textarea.in{min-height:96px;resize:vertical}
 .seg label.off{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}.seg label .nd{display:block;font-size:10.5px;font-weight:700;margin-top:2px}
 .rvsw{display:flex;align-items:center;gap:12px;width:100%;text-align:left}.rvsw .trk{flex:none;width:46px;height:26px;border-radius:99px;background:var(--line2);position:relative;transition:background .2s}.rvsw .trk::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}.rvsw.on .trk{background:var(--green)}.rvsw.on .trk::after{transform:translateX(20px)}
 .cerca{display:flex;gap:6px;margin:0 0 10px}.cerca .in{flex:1;min-width:0;padding:9px 12px;font-size:14px}[data-q][hidden]{display:none!important}.cerca-vuoto{padding:10px;font-size:13px}
+.ibtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;margin-left:6px;border-radius:50%;border:1.5px solid var(--mut);background:transparent;color:var(--tx2);font:italic 700 13px/1 Georgia,serif;cursor:pointer;vertical-align:middle;padding:0;text-transform:none;letter-spacing:0}
+.hint-i{display:inline-flex;align-items:center;gap:6px;margin:2px 0 10px;padding:2px 0;background:none;border:0;color:var(--mut);font-size:12.5px;cursor:pointer}.hint-i .ibtn{margin:0}
+#infopop{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(0,0,0,.55)}#infopop.on{display:flex}
+.ip-card{max-width:420px;max-height:80vh;overflow:auto;background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:16px 18px;font-size:14px;line-height:1.5;color:var(--tx2);box-shadow:0 12px 40px rgba(0,0,0,.5)}
 .check{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);background:var(--bg2);border-radius:13px;margin-bottom:7px;cursor:pointer}
 .check input{width:19px;height:19px;accent-color:var(--violet)}
 .hint{font-size:12px;color:var(--mut);margin:-4px 0 12px}
@@ -372,7 +377,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.19.0';
+const VERSION = '1.20.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -532,6 +537,7 @@ function connect(gid){
    il collega scarica solo i propri movimenti e il proprio estratto (saldo all'ultima chiusura). */
 let dataUnsubs = [], modeKey = null;
 function stopData(){
+  sondStop();
   dataUnsubs.forEach(u => u()); dataUnsubs = [];
   if(movUnsub){ movUnsub(); movUnsub = null; }
   if(movUnsubD){ movUnsubD(); movUnsubD = null; }
@@ -802,11 +808,12 @@ function toast(msg, kind, action){
 
 /* ---------- sheet (finestre dal basso) ---------- */
 function openSheet(html){
+  sondStop();
   $('sheet').innerHTML = '<div class="grab"></div>' + html;
   $('sheet').classList.add('on'); $('sheet-ov').classList.add('on');
   const f = $('sheet').querySelector('[autofocus]'); if(f) setTimeout(() => f.focus(), 250);
 }
-function closeSheet(){ $('sheet').classList.remove('on'); $('sheet-ov').classList.remove('on'); }
+function closeSheet(){ sondStop(); $('sheet').classList.remove('on'); $('sheet-ov').classList.remove('on'); }
 const val = id => { const e = $(id); return e ? e.value.trim() : ''; };
 const radio = name => { const e = document.querySelector(`input[name="${name}"]:checked`); return e ? e.value : null; };
 function segOpts(name, opts, sel, off){
@@ -876,7 +883,7 @@ function doRender(){
   const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = av ? cn.fondo : cn.pers;
   if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti();
@@ -890,6 +897,7 @@ function doRender(){
   restore();
   rimettiScroll();
   perleSync();
+  sondRegPianifica();
 }
 
 function renderDrawer(){
@@ -1227,16 +1235,13 @@ function inboxAdmin(d){
 }
 function pCrediti(d){
   const s = saldo(st.mid) || 0, mie = d.pendenti.filter(m => m.mid === st.mid && ['ricarica', 'riscatto'].includes(m.tipo));
-  return `<h2>${ic('wallet')} Crediti</h2><p class="sub">1 credito = 1 €. I soldi passano fuori dall'app e un amministratore conferma.</p>
+  return `<h2>${ic('wallet')} Crediti ${infoBtn(`1 credito = 1 €. I soldi passano fuori dall'app e un amministratore conferma.`)}</h2>
   <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
     <button class="btn block ghost" id="btn-regala" data-act="regala" style="margin-top:8px">🎁 Regala / Trasferisci crediti</button></div>
   ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
-  <div class="card"><h3>Come funziona</h3>
-    <p class="hint" style="margin:0 0 6px"><b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l'amministratore conferma l'incasso, i crediti arrivano sul saldo.</p>
-    <p class="hint" style="margin:0 0 6px"><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l'importo resta riservato finché l'amministratore non ti paga.</p>
-    <p class="hint" style="margin:0"><b>Tra colleghi:</b> usa «Regala / Trasferisci crediti»; è immediato, senza approvazioni.</p></div>`;
+  ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l\'amministratore conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché l\'amministratore non ti paga.<br><br><b>Tra colleghi:</b> usa «Regala / Trasferisci crediti»; è immediato, senza approvazioni.', 'Come funzionano ricariche e riscatti')}`;
 }
 
 /* ---------- tesoreria / home amministratore ---------- */
@@ -1292,7 +1297,7 @@ function pAdminHome(d, forza){
     ${prods.length ? `<div class="list">${prods.map(p => { const sk = giacenza(d, p); return `<div class="li"><button class="grow" style="text-align:left" data-act="prodotto" data-id="${p.id}"><div class="t">${esc(p.emoji || '')} ${esc(p.nome)}</div><div class="d mono">${eur(p.prezzo)}</div></button>
       <span class="stepper"><button data-act="carico" data-id="${p.id}" data-v="-1">−</button><b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b><button data-act="carico" data-id="${p.id}" data-v="1">+</button></span></div>`; }).join('')}</div>`
       : '<div class="empty">Nessun articolo in listino.</div>'}
-    <p class="hint" style="margin:8px 0 0">Palette, zucchero, bicchieri e detersivi non si contano: registrali con «Registra spesa».</p>
+    ${infoBtn(`Palette, zucchero, bicchieri e detersivi non si contano: registrali con «Registra spesa».`, 'Come funziona')}
   </div>
 `;
   return `${bannerBackup()}${avvisiHome()}${avvisoAdminBtn()}
@@ -1485,9 +1490,8 @@ function feedLista(d){
 function pFeed(d){
   const f = st.feedFiltro;
   const last = ultimaChiusura(), av = adminView();
-  return `<h2>${ic('receipt')} Cassa e registro</h2>
-  <div class="stat" style="margin:0 0 12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
-  <p class="sub">Il saldo è la cassa comune (contanti + conto). Qui sotto tutta la storia del fondo, visibile a tutti${last ? ' · dal ' + dataOra(last.fino.toMillis()) : ''}.</p>
+  return `<h2>${ic('receipt')} Cassa e registro ${infoBtn(`Il saldo è la cassa comune (contanti + conto). Qui sotto tutta la storia del fondo, visibile a tutti${last ? ' · dal ' + dataOra(last.fino.toMillis()) : ''}.`)}</h2>
+  <div class="stat" style="margin:0 0 12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot" style="font-size:28px;line-height:1.2">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
   <div class="chips">${[['tutti','Tutti'],['miei','Miei'],['bar','Caffè & Snack'],['cassa','Cassa & Spese'],['attesa','In attesa']].map(([v,l]) => `<button class="${f===v?'on':''}" data-act="feed-filtro" data-v="${v}">${l}</button>`).join('')}</div>
   <label class="f" style="margin:0 0 10px"><span>Cerca per collega</span><div class="row" style="gap:6px"><input class="in" id="feed-q" type="search" inputmode="search" autocomplete="off" placeholder="Nome o nickname…" data-chg="feed-q" value="${esc(st.feedQ || '')}" style="flex:1"><button class="btn sm ghost" id="feed-q-x" data-act="feed-q-x" ${st.feedQ ? '' : 'hidden'}>✕</button></div></label>
   <div class="card" id="feed-list">${feedLista(d)}</div>
@@ -1599,12 +1603,20 @@ const backSaletta = () => adminView() ? '' : `<button class="btn link" style="pa
 /* lista della spesa: articoli ancora da comprare (badge su pulsanti e schede) */
 const nSpesa = () => (st.listaSpesa || []).filter(x => x.stato === 'da_comprare').length;
 const badgeSpesa = () => nSpesa() ? `<span class="tb tbi" id="badge-spesa">${nSpesa()}</span>` : '';
+/* eventi nuovi (aggiunti da altri) dall'ultima visita alla pagina Eventi: stato "letto" solo in locale, nessuna lettura */
+function nEventiNuovi(){
+  if(!st.gid) return 0;
+  const k = 'evVisti_' + st.gid, v = LS.get(k, null);
+  if(v == null){ LS.set(k, Date.now()); return 0; }
+  return (st.eventi || []).filter(e => e.uid !== st.uid && tms(e.ts) > v).length;
+}
+const badgeEventi = () => { const n = nEventiNuovi(); return n ? `<span class="tb" id="badge-eventi" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${n}</span>` : ''; };
 const badgeSpesaAbs = () => nSpesa() ? `<span class="tb" id="badge-spesa" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${nSpesa()}</span>` : '';
 function pSaletta(d){
   return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Pulizie, eventi, scorte e un po' di svago.</p>
   <div class="grid2" style="gap:12px">
     <button class="gbtn sm" id="sal-pulizie" data-act="go" data-p="pulizie"><span class="em">✨</span>Pulizie sala</button>
-    <button class="gbtn sm" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi</button>
+    <button class="gbtn sm" id="sal-eventi" data-act="go" data-p="eventi"><span class="em">📅</span>Eventi${badgeEventi()}</button>
     <button class="gbtn sm" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
     <button class="gbtn sm" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Chi paga il caffè?</button>
     <button class="gbtn sm" id="sal-ruota" data-act="go" data-p="ruota"><span class="em">☕</span>Ruota del Barista<small>Chi fa i caffè?</small></button>
@@ -1860,7 +1872,7 @@ function viewPag(R, ch){
     ${rigaTot('💸', 'Uscite registrate', eur(t.uscite || 0))}
     ${rigaTot('🔁', 'Giroconti', eur(t.giro || 0), 'tra contanti e conto')}
     <div class="between" style="padding:10px 0 0;font-size:14px"><b>Flusso netto di cassa</b><b class="mono ${netto < 0 ? 'red' : 'green'}">${eurS(netto)}</b></div>
-    <p class="hint" style="margin:6px 0 0">Ricariche + quote + entrate − spese dalla cassa − riscatti − uscite. I giroconti non cambiano il totale.</p>`}
+    ${infoBtn(`Ricariche + quote + entrate − spese dalla cassa − riscatti − uscite. I giroconti non cambiano il totale.`, 'Come funziona')}`}
     ${R.legacy ? `<div class="hint" style="margin-top:6px">Per questo periodo è disponibile solo il totale delle ricariche.</div>` : ''}</div>
   ${R.bfRic ? `<div class="card"><h3><span>👏 Ben fatto ricevuti</span><b class="mono violet">${sumo(R.bfRic)}</b></h3>${rankList(st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.bfRic, m.id))})), v => v, 'Nessun «Ben fatto» in questo periodo.')}</div>` : ''}
   ${R.legacy ? '' : `<div class="card"><h3><span>🎁 Chi ha regalato di più</span><b class="mono green">${eur(t.regali || 0)}</b></h3>${rankList(reg, eur, 'Nessun regalo in questo periodo.')}</div>`}
@@ -1943,7 +1955,7 @@ function clClassifica(d){
   const cur = new Date().toISOString().slice(0, 7);
   const sel = `<label class="f" style="margin:0 0 8px"><span>Periodo</span><select class="in" data-chg="clpc">${opt('sempre', 'Sempre (totale accumulato)')}${opt('mese', 'Questo mese')}${opt('anno', 'Quest\'anno')}${opt('mesi', 'Per mesi…')}</select></label>
     ${pc === 'mesi' ? `<div class="grid2" style="margin:0 0 8px"><label class="f" style="margin:0"><span>Dal mese</span><input class="in" type="month" id="cl-m-da" data-chg="clmesi" max="${cur}" value="${esc(st.clMDa || cur)}"></label><label class="f" style="margin:0"><span>Al mese</span><input class="in" type="month" id="cl-m-a" data-chg="clmesi" max="${cur}" value="${esc(st.clMA || cur)}"></label></div>` : ''}
-    ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}${M ? noteChiusi(M) + (M.noPt ? '<p class="hint" style="margin:0 0 10px">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : '') : ''}`;
+    ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}${M ? noteChiusi(M) + (M.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : '') : ''}`;
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
   const chips = [['tot', 'Tutti'], ['c', '☕ Consumi'], ['p', '✨ Pulizie'], ['s', '🧾 Spese'], ['b', '👏 Ben fatto']];
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
@@ -1956,12 +1968,12 @@ function clClassifica(d){
   const albo = `<div class="card" id="cl-albo"><h3><span>🏅 Albo d'onore</span></h3>
     ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
       <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(m => esc(nomeBreve(m) || nomeM(m)) + (m === st.mid ? ' (tu)' : '')).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
-    <p class="hint" style="margin:8px 0 0">Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.${r ? '' : ' Con «Sempre» contano gli ultimi ' + STORICO_MAX + ' periodi chiusi più quello aperto.'}</p></div>`;
+    ${infoBtn(`Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.${r ? '' : ' Con «Sempre» contano gli ultimi ' + STORICO_MAX + ' periodi chiusi più quello aperto.'}`, 'Come funziona')}</div>`;
   return `${clHero(righe, pos, T, r)}
   <div class="card"><h3><span>🏆 La classifica</span></h3>${sel}${chipsH}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    <p class="hint" style="margin:8px 0 0">Tocca un filtro per ordinare. Consumi: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. ${r ? 'Punti guadagnati nel periodo scelto (comprese eventuali rettifiche).' : 'Sono punti totali accumulati: riscattarli non ti fa scendere.'}</p>
-    ${r ? (st.isAdmin ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : '<p class="hint" style="margin:6px 0 0">Per i periodi scelti contano i movimenti dall\'ultima chiusura di periodo; "Sempre" include tutto lo storico.</p>') : ''}</div>
+    ${infoBtn(`Tocca un filtro per ordinare. Consumi: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. ${r ? 'Punti guadagnati nel periodo scelto (comprese eventuali rettifiche).' : 'Sono punti totali accumulati: riscattarli non ti fa scendere.'}`, 'Come funziona')}
+    ${r ? (st.isAdmin ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : infoBtn(`Per i periodi scelti contano i movimenti dall\'ultima chiusura di periodo; "Sempre" include tutto lo storico.`, 'Come funziona')) : ''}</div>
   ${albo}`;
 }
 
@@ -1978,7 +1990,7 @@ function bustaWidget(){
     return `<div class="between" style="font-size:13.5px"><span>☕ Busta aperta</span><b class="mono">${n} / ${BUSTA_CAFFE}</b></div><div class="bar"><i style="width:${pct}%"></i></div>${st.mid ? `<p class="hint" style="margin:6px 0 0">Caffè tuoi da questa busta: <b>${mio}</b></p>` : ''}`; })() : '<p class="hint" style="margin:0">Nessuna busta aperta al momento.</p>';
   const tasso = l ? (() => { const t = tassoBusta(l), cls = t >= 85 ? 'green' : t < 70 ? 'red' : 'amber', dt = l.chiusaTs ? ' · chiusa il ' + dBreve(tms(l.chiusaTs)) : '';
     return `<div class="between" style="font-size:13.5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)"><span>Tasso di Onestà <span class="mut" style="font-size:11.5px">ultima busta${dt}</span></span><b class="mono ${cls}" id="busta-tasso">${t}%</b></div>
-      <p class="hint" style="margin:4px 0 0">${l.n || 0} caffè registrati su ${BUSTA_CAFFE} attesi. Verde da 85%, rosso sotto il 70%.</p>`; })() : '';
+      <p class="hint" style="margin:6px 0 10px">${l.n || 0} caffè registrati su ${BUSTA_CAFFE} attesi. Verde da 85%, rosso sotto il 70%.</p>`; })() : '';
   return `<div class="card" id="busta-widget">${aperta}${tasso}</div>`;
 }
 /* "I miei consumi" nel periodo corrente: solo movimenti già in memoria */
@@ -2049,14 +2061,14 @@ function pSpesa(d){
       <div class="av">${on ? '☑' : '☐'}</div><div class="grow"><div class="t" style="white-space:normal;font-size:14px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.richiestoDa) || '(sconosciuto)')} · ${x.ts ? quando(tms(x.ts)) : 'ora'}</div></div></button>
       ${puoDel ? `<button class="iconbtn" style="width:32px;height:32px" data-act="spesa-del" data-id="${x.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div>`;
   };
-  return `${backHome()}<h2>🛒 Lista della spesa</h2><p class="sub">Cosa serve alla saletta. Chi fa la spesa spunta gli articoli e registra l'acquisto: l'amministratore lo rimborsa.</p>
+  return `${backHome()}<h2>🛒 Lista della spesa ${infoBtn(`Cosa serve alla saletta. Chi fa la spesa spunta gli articoli e registra l'acquisto: l'amministratore lo rimborsa.`)}</h2>
   <div class="card"><div class="row" style="gap:8px;align-items:flex-end"><label class="f" style="flex:1;margin:0"><span>Cosa serve?</span><input class="in" id="sp-nome" maxlength="60" placeholder="es. Caffè in grani" autocomplete="off"></label>
     <button class="btn amber" id="btn-spesa-add" data-act="spesa-aggiungi">${ic('plus','s')} Aggiungi</button></div></div>
   <div class="card"><h3><span>Da comprare</span><b class="mono amber">${attivi.length}</b></h3>
     ${attivi.length ? `<div class="list">${attivi.map(riga).join('')}</div>` : '<div class="empty">Niente da comprare. 🎉</div>'}
     <button class="btn green block big" id="btn-spesa-registra" data-act="spesa-registra" style="margin-top:12px" ${sel.length ? '' : 'disabled'}>${ic('receipt','s')} Registra acquisto per il fondo${sel.length ? ' (' + sel.length + ')' : ''}</button>
     <button class="btn block ghost" id="btn-fuori-lista" data-act="spesa" style="margin-top:8px">Acquisto fuori lista</button>
-    <p class="hint" style="margin:8px 0 0">Spunta ciò che hai comprato; per un acquisto urgente non in lista usa «Acquisto fuori lista».</p>
+    ${infoBtn(`Spunta ciò che hai comprato; per un acquisto urgente non in lista usa «Acquisto fuori lista».`, 'Come funziona')}
   </div>
   ${miei.length ? `<div class="card"><h3><span>${ic('clock','s')} I tuoi in rimborso</span><b class="mono">${miei.length}</b></h3><div class="list">${miei.map(x => { const orfano = st.ready.mv && !d.movs.some(m => m.id === x.richiestaId && m.stato !== 'annullata' && m.stato !== 'rifiutata'); return `<div class="li"><div class="av">⏳</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${esc(x.nome)}</div><div class="d">${orfano ? 'richiesta non inviata' : 'in attesa di convalida'}</div></div>${orfano ? `<button class="btn sm ghost" data-act="spesa-rilascia" data-id="${x.id}">Rimetti in lista</button>` : ''}</div>`; }).join('')}</div>
     <p class="hint" style="margin:8px 0 0">Per annullare la richiesta vai in Notifiche → In attesa.</p></div>` : ''}
@@ -2088,7 +2100,7 @@ A['spesa-registra'] = () => {
     <label class="f"><span>Importo totale speso €</span><input class="in mono" id="sl-imp" inputmode="decimal" placeholder="12,50" autofocus></label>
     <label class="f"><span>Note (facoltative)</span><input class="in" id="sl-note" maxlength="200" placeholder="es. scontrino nel cassetto"></label>
     <label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('sl-rimb', [['crediti','🪙 In crediti'],['denaro','💶 Denaro reale']], 'crediti')}</label>
-    <p class="hint">In crediti: l'importo diventa un credito per te. In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia.</p>
+    ${infoBtn(`In crediti: l'importo diventa un credito per te. In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia.`, 'Come funziona')}
     <button class="btn green block big" data-act="conferma-spesa-lista">Invia richiesta di rimborso</button>`);
 };
 A['conferma-spesa-lista'] = async () => {
@@ -2128,9 +2140,9 @@ const GIOCO0 = () => ({fase:'setup', min:0, max:500, sel:null, ord:[], i:0, secr
 function giocoSt(){ if(!st.gioco) st.gioco = GIOCO0(); if(!st.gioco.sel) st.gioco.sel = {}; return st.gioco; }   // all'apertura nessuno e' spuntato
 function pGioco(d){
   const g = giocoSt(), nome = id => esc(nomeBreve(id) || nomeM(id));
-  const head = `${backSaletta()}<h2>🎲 Chi paga il caffè?</h2>`;
+  const head = `${backSaletta()}<h2>🎲 Chi paga il caffè? ${infoBtn('Si sceglie un numero segreto: a turno ognuno prova a indovinarlo. Chi lo indovina perde e paga il caffè! Si gioca passandosi il telefono.')}</h2>`;
   if(g.fase === 'setup'){
-    return `${head}<p class="sub">Si sceglie un numero segreto: a turno ognuno prova a indovinarlo. Chi lo indovina perde e paga il caffè!</p>
+    return `${head}
     <div class="card"><h3>Numero massimo</h3>
       <label class="f" style="margin:0"><span>Il numero segreto va da 0 a…</span><select class="in mono" id="gm-max">${[100, 500, 1000].map(v => `<option value="${v}" ${g.max === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
     <div class="card"><h3><span>Chi gioca <span class="mut" style="text-transform:none;letter-spacing:0">(${Object.values(g.sel).filter(Boolean).length} scelti)</span></span><span class="row" style="gap:6px"><button class="btn sm ghost" id="gm-tutti" data-act="gioco-tutti" data-v="1">Tutti</button><button class="btn sm ghost" id="gm-nessuno" data-act="gioco-tutti" data-v="0">Nessuno</button></span></h3>${cercaBox('gm-lista')}<div class="list" id="gm-lista">${membriAttivi().map(m => `<button class="li" data-q="${qMem(m)}" data-act="gioco-toggle" data-id="${m.id}" style="width:100%;text-align:left;${g.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${g.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(m.id))}</div></div></button>`).join('')}</div>${cercaVuoto('gm-lista')}</div>
@@ -2181,9 +2193,9 @@ function pCassa(d){
   const movC = d.movs.filter(m => descMov(m).cassa || (m.tipo === 'spesa')).reverse();
   return `<h2>${ic('wallet')} Registro cassa</h2><p class="sub">Liquidità del fondo e movimenti contabili.</p>
   <div class="grid3" style="margin-bottom:10px">
-    <div class="stat"><small>Revolut</small><b class="mono sky">${eur(c.revolut||0)}</b></div>
-    <div class="stat"><small>Contanti</small><b class="mono green">${eur(c.contanti||0)}</b></div>
-    <div class="stat"><small>Totale</small><b class="mono">${eur(tot)}</b></div>
+    <div class="stat"><small>Revolut</small><b class="mono sky" style="font-size:18px">${eur(c.revolut||0)}</b></div>
+    <div class="stat"><small>Contanti</small><b class="mono green" style="font-size:18px">${eur(c.contanti||0)}</b></div>
+    <div class="stat"><small>Totale</small><b class="mono" id="cassa-totale" style="font-size:23px">${eur(tot)}</b></div>
   </div>
   <div class="card">
     <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Crediti prepagati dei colleghi</span><b class="mono">${eur(cred)}</b></div>
@@ -2302,7 +2314,7 @@ function labelChiusura(c){
 
 /* ---------- COLLEGHI (elenco membri) ---------- */
 function pMembri(d){
-  return `<h2>${ic('users')} Colleghi</h2><p class="sub">Tutti i membri del gruppo. Tocca un nome per modificarlo, accreditare, nominarlo amministratore o archiviarlo.</p>
+  return `<h2>${ic('users')} Colleghi ${infoBtn(`Tutti i membri del gruppo. Tocca un nome per modificarlo, accreditare, nominarlo amministratore o archiviarlo.`)}</h2>
   <div class="card"><h3><span>Colleghi</span><button class="btn link" data-act="membro" data-id="">${ic('plus','s')} Aggiungi</button></h3>
     ${cercaBox('mb-lista')}<div class="list" id="mb-lista">${membriAttivi().map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
       <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t ${m.attivo === false ? 'strike' : ''}">${esc(m.nome)}</div><div class="d">${m.nick ? '“' + esc(m.nick) + '” · ' : ''}${m.attivo === false ? 'non attivo' : st.utenti.filter(u => u.mid === m.id).length + ' telefono/i'}${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
@@ -2319,7 +2331,7 @@ function pAdmin(d){
   if(!st.isAdmin) return `<h2>${ic('lock')} Amministrazione</h2><p class="sub">Riservata agli amministratori del gruppo.</p>
     <div class="card"><label class="f"><span>PIN amministratore</span><input class="in mono" id="a-pin" type="password" autocomplete="current-password" placeholder="PIN"></label>
     <button class="btn amber block" data-act="diventa-admin" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Accedi come amministratore'}</button>
-    <p class="hint" style="margin:10px 0 0">Il PIN te lo dà chi gestisce la saletta. Vale per questo telefono finché non esci dal ruolo.</p></div>`;
+    <p class="hint" style="margin:6px 0 10px">Il PIN te lo dà chi gestisce la saletta. Vale per questo telefono finché non esci dal ruolo.</p></div>`;
   return pImpostazioni();
 }
 
@@ -2330,11 +2342,11 @@ const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
     <label class="f"><span>Quota annua €</span><input class="in mono" id="ad-quota" inputmode="decimal" value="${(st.gruppo.quotaAnnua/100).toFixed(2).replace('.',',')}"></label>
     <label class="f"><span>Nome gruppo</span><input class="in" id="ad-nome" value="${esc(st.gruppo.nome||'')}" maxlength="40"></label>
     <button class="btn amber block" data-act="salva-gruppo">Salva</button>
-    <p class="hint" style="margin:10px 0 0">Il prezzo del caffè e il listino si gestiscono dalla scheda Magazzino dell'Amministrazione. Le regole dei punti sono nel menu, alla voce Regole Punti e Saletta.</p>
+    ${infoBtn(`Il prezzo del caffè e il listino si gestiscono dalla scheda Magazzino dell'Amministrazione. Le regole dei punti sono nel menu, alla voce Regole Punti e Saletta.`, 'Come funziona')}
   </div>
 `;
 const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Modello</h3>
-    <p class="hint" style="margin:0 0 8px">Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.</p>
+    ${infoBtn(`Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.`, 'Come funziona')}
     <div class="grid2">
       <label class="f"><span>Soglia riscatto (punti)</span><input class="in mono" id="rp-soglia" inputmode="numeric" value="${sogliaPunti()}"></label>
       <label class="f"><span>Crediti erogati</span><input class="in mono" id="rp-crediti" inputmode="numeric" value="${creditiSoglia()}"></label>
@@ -2365,7 +2377,7 @@ const cardAdmins = () => `
   <div class="card"><h3>Amministratori</h3>
     <div class="list">${st.admins.map(a => `<div class="li"><div class="av">${ic('shield','s')}</div><div class="grow"><div class="t">${esc(uidNome(a.id) || a.nome || 'telefono')}${protettoUid(a.id) ? ' <span class="pill amber">creatore</span>' : ''}</div><div class="d">${a.id === st.uid ? 'questo telefono' : 'dal ' + (a.ts && a.ts.toMillis ? dataOra(a.ts.toMillis()).slice(0,10) : '')}</div></div>
       ${a.id !== st.uid && !protettoUid(a.id) ? `<button class="btn sm ghost" data-act="revoca" data-id="${a.id}">Rimuovi</button>` : ''}</div>`).join('')}</div>
-    <p class="hint" style="margin:8px 0 0">Per nominare un nuovo amministratore apri il collega dalla pagina <button class="btn link" style="padding:0" data-act="go" data-p="membri">Colleghi</button>, oppure approva la sua richiesta dalle Notifiche. Il creatore del gruppo non può essere rimosso.</p>
+    ${infoBtn(`Per nominare un nuovo amministratore apri il collega dalla pagina <button class="btn link" style="padding:0" data-act="go" data-p="membri">Colleghi</button>, oppure approva la sua richiesta dalle Notifiche. Il creatore del gruppo non può essere rimosso.`, 'Come funziona')}
     <div class="grid2" style="margin-top:10px">
       <button class="btn sm" data-act="cambia-pin">${ic('lock','s')} Cambia PIN</button>
       <button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia ruolo</button>
@@ -2374,7 +2386,7 @@ const cardAdmins = () => `
 `;
 
 function pRegole(){
-  return `<h2>${ic('sparkles')} Regole Punti e Saletta</h2><p class="sub">Soglie dei Punti Collega Modello, punti per attività e limiti</p>${cardRegolePunti()}`;
+  return `<h2>${ic('sparkles')} Regole Punti e Saletta ${infoBtn(`Soglie dei Punti Collega Modello, punti per attività e limiti`)}</h2>${cardRegolePunti()}`;
 }
 function pBackup(d){
   return `<h2>${ic('download')} Backup & Ripristino</h2><p class="sub">Copia dei dati fuori dall'app.</p>
@@ -2418,7 +2430,7 @@ function pImpostazioni(){
     <div class="code mono" style="margin-bottom:10px">${esc(st.gid)}</div>
     <div class="grid2"><button class="btn sm" data-act="copia" data-v="${esc(st.gid)}">${ic('copy','s')} Copia codice</button>
     <button class="btn sm amber" data-act="condividi" data-v="${esc(link)}">${ic('share','s')} Invia link</button></div>
-    <p class="hint" style="margin:10px 0 0">Mandalo solo ai colleghi. Per installarla: Chrome → menu ⋮ → <i>Aggiungi a schermata Home</i>; iPhone → Safari → Condividi → <i>Aggiungi alla schermata Home</i>.</p></div>` : ''}
+    ${infoBtn(`Mandalo solo ai colleghi. Per installarla: Chrome → menu ⋮ → <i>Aggiungi a schermata Home</i>; iPhone → Safari → Condividi → <i>Aggiungi alla schermata Home</i>.`, 'Come funziona')}</div>` : ''}
   <div class="card"><h3>Stato</h3>
     <div class="between" style="font-size:13px"><span class="mut">Sincronizzazione</span><span class="row" style="gap:6px"><span class="dot ${({ok:'ok',off:'off',err:'err'})[st.sync]||''}"></span>${st.sync === 'ok' ? 'collegato' : st.sync === 'off' ? 'offline' : st.sync === 'err' ? 'errore' : 'in corso'}</span></div>
     <div class="between" style="font-size:13px;margin-top:6px"><span class="mut">Versione</span><span>v${VERSION}</span></div></div>
@@ -2460,7 +2472,7 @@ A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
   <div class="card" style="margin:0 0 10px"><div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Il tuo ruolo</span><b>${st.isAdmin ? 'Amministratore' : 'Collega'}</b></div>
     <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Prezzo caffè</span><b class="mono">${eur(st.gruppo.prezzoCaffe || 0)}</b></div>
     <div class="between" style="font-size:13px"><span class="tx2">Quota fondo annuale</span><b class="mono">${eur(st.gruppo.quotaAnnua || 0)}</b></div></div>
-  <p class="hint">Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un amministratore. Ricariche e pagamenti li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.</p>
+  ${infoBtn(`Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un amministratore. Ricariche e pagamenti li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.`, 'Come funziona')}
   <button class="btn block" data-act="sheet-close">Chiudi</button>`); };
 /* forza l'aggiornamento: svuota cache e service worker, rilegge i file dalla rete e ricarica (dati e accesso restano) */
 A['aggiorna'] = async () => {
@@ -2474,7 +2486,7 @@ A['aggiorna'] = async () => {
 };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
-A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['go'] = ds => { if(ds.p === 'eventi') LS.set('evVisti_' + st.gid, Math.max(Date.now(), ...(st.eventi || []).map(e => tms(e.ts)))); if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
 
 /* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
@@ -2604,9 +2616,9 @@ A['approva'] = ds => {
       <option value="">➕ Nuovo collega: ${esc(r.nome)}</option>
       ${st.membri.map(m => `<option value="${m.id}" ${simile && simile.id === m.id ? 'selected' : ''}>Collega esistente: ${esc(m.nome)}</option>`).join('')}
     </select></label>
-    <p class="hint">Scegli un collega esistente se ha cambiato telefono o se l'avevi già aggiunto tu: mantiene saldo e storico.</p>
+    ${infoBtn(`Scegli un collega esistente se ha cambiato telefono o se l'avevi già aggiunto tu: mantiene saldo e storico.`, 'Come funziona')}
     ${st.gruppo.quotaAnnua > 0 ? `<label class="check"><input type="checkbox" id="ap-quota"><b style="flex:1;font-size:14px">Ha già pagato la quota ${anno()}</b><span class="mut mono" style="font-size:12px">${eur(st.gruppo.quotaAnnua)}</span></label>
-    <p class="hint">Se spunti, la quota risulta pagata. Altrimenti il collega vedrà l'avviso «Quota non ancora saldata». Il saldo parte comunque da zero.</p>` : ''}
+    ${infoBtn(`Se spunti, la quota risulta pagata. Altrimenti il collega vedrà l'avviso «Quota non ancora saldata». Il saldo parte comunque da zero.`, 'Come funziona')}` : ''}
     <div class="grid2"><button class="btn red" data-act="rifiuta-accesso" data-id="${r.id}">Rifiuta</button><button class="btn green" data-act="conferma-approva" data-id="${r.id}">Approva</button></div>`);
 };
 A['conferma-approva'] = ds => {
@@ -2784,7 +2796,7 @@ A['riscatto-paga'] = ds => {
     <div class="banner amber">${ic('wallet')}<div>Liquidità: contanti <b>${eur(c.contanti || 0)}</b> · Revolut <b>${eur(c.revolut || 0)}</b>. Paga solo se c'è capienza.</div></div>
     <label class="f"><span>Da dove escono i soldi</span>${segOpts('rc-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], m.metodo === 'revolut' && revolutOn() ? 'revolut' : 'contanti')}</label>
     <button class="btn amber block big" id="btn-riscatto-paga" data-act="conferma-riscatto-paga" data-id="${m.id}">Ho pagato: conferma</button>
-    <p class="hint">L'importo è quello richiesto. Se non puoi pagarlo per intero, rifiuta la richiesta: il collega potrà rifarla per una cifra minore.</p>`);
+    ${infoBtn(`L'importo è quello richiesto. Se non puoi pagarlo per intero, rifiuta la richiesta: il collega potrà rifarla per una cifra minore.`, 'Come funziona')}`);
 };
 A['conferma-riscatto-paga'] = ds => {
   const m = derived().movs.find(x => x.id === ds.id); if(!m || m.tipo !== 'riscatto' || m.stato !== 'attesa') return closeSheet();
@@ -2803,7 +2815,7 @@ A['spesa'] = () => {
     <label class="f"><span>Descrizione</span><input class="in" id="s-desc" maxlength="80" placeholder="es. Caffè in grani + bicchierini" autofocus></label>
     <label class="f"><span>Importo totale €</span><input class="in mono" id="s-imp" inputmode="decimal" placeholder="12,50"></label>
     <label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('s-rimb', [['crediti','🪙 In crediti'],['denaro','💶 Denaro reale']], 'crediti')}</label>
-    <p class="hint">In crediti: l'importo diventa un credito per te (lo riscatti dal Fondo Gruppo). In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia.</p>
+    ${infoBtn(`In crediti: l'importo diventa un credito per te (lo riscatti dal Fondo Gruppo). In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia.`, 'Come funziona')}
     <button class="btn green block big" data-act="conferma-spesa">Invia</button>`);
 };
 A['conferma-spesa'] = () => {
@@ -2845,7 +2857,7 @@ const pulMsgBlocco = ps => ps.motivo === 'gruppo'
 A['pulizia'] = () => {
   const ps = pulStato(); if(ps.bloccato) return toast(pulMsgBlocco(ps).replace(/<[^>]*>/g, ''), 'err');
   const oggi = oggiISO(), min = new Date(Date.now() - 30*864e5), mi = `${min.getFullYear()}-${pad(min.getMonth()+1)}-${pad(min.getDate())}`;
-  openSheet(`<h3>${ic('sparkles')} Registra pulizia</h3><p class="sub">Hai pulito tu la saletta: ricevi +${puntiPulizia()} Punti Pulizia. Puoi registrare solo i tuoi turni.</p>
+  openSheet(`<h3>${ic('sparkles')} Registra pulizia ${infoBtn(`Hai pulito tu la saletta: ricevi +${puntiPulizia()} Punti Pulizia. Puoi registrare solo i tuoi turni.`)}</h3>
     <label class="f"><span>Quando?</span>${segOpts('pul-q', [['oggi','Oggi'],['altro','Data passata']], 'oggi')}</label>
     <label class="f"><span>Data (se passata)</span><input class="in mono" type="date" id="pul-data" value="${oggi}" min="${mi}" max="${oggi}"></label>
     <button class="btn violet block big" data-act="conferma-pulizia" style="margin-top:6px">Registra</button>`);
@@ -2967,7 +2979,7 @@ function corrAggiorna(){
   if(d){ const ok = Number.isFinite(i.diff) && i.reale >= 0; d.textContent = ok ? (i.diff === 0 ? 'Nessuna differenza' : eurS(i.diff)) : '—'; d.className = 'mono ' + (!ok || i.diff === 0 ? 'mut' : i.diff > 0 ? 'green' : 'red'); }
 }
 A['cassa-corr'] = () => {
-  openSheet(`<h3>${ic('edit')} Correggi saldo cassa</h3><p class="sub">Inserisci quanto c'è davvero: l'app calcola la differenza e la registra come entrata o uscita.</p>
+  openSheet(`<h3>${ic('edit')} Correggi saldo cassa ${infoBtn(`Inserisci quanto c'è davvero: l'app calcola la differenza e la registra come entrata o uscita.`)}</h3>
     <label class="f"><span>Cassa da correggere</span><select class="in" id="cc-fonte" data-chg="corr"><option value="contanti">Contanti in sala</option><option value="revolut">Conto Revolut</option></select></label>
     <div class="between" style="font-size:13px;margin:0 0 8px"><span class="tx2">Saldo in app</span><b class="mono" id="cc-att"></b></div>
     <label class="f"><span>Saldo reale €</span><input class="in mono" id="cc-reale" inputmode="decimal" placeholder="0,00" data-chg="corr" autofocus></label>
@@ -3086,7 +3098,7 @@ A['quota-annulla'] = ds => {
 };
 A['quota-migra'] = () => {
   const mig = quoteMigra(derived()); if(!mig.length) return toast('Niente da azzerare');
-  openSheet(`<h3>${ic('wallet')} Azzera addebiti quota pregressi</h3><p class="sub">Per ogni collega sotto viene accreditato l'importo dell'addebito mai pagato, così il saldo torna com'era. Chi aveva già pagato non viene toccato.</p>
+  openSheet(`<h3>${ic('wallet')} Azzera addebiti quota pregressi ${infoBtn(`Per ogni collega sotto viene accreditato l'importo dell'addebito mai pagato, così il saldo torna com'era. Chi aveva già pagato non viene toccato.`)}</h3>
     <div class="list">${mig.map(x => `<div class="li"><div class="grow"><div class="t">${esc(nomeM(x.mid))}</div><div class="d">quota ${esc(x.y)}</div></div><b class="mono green">+${eur(x.imp)}</b></div>`).join('')}</div>
     <button class="btn amber block big" style="margin-top:10px" id="btn-quota-migra-ok" data-act="conferma-quota-migra">Accredita</button>`);
 };
@@ -3141,7 +3153,7 @@ A['revoca'] = ds => {
   if(!confirm('Togliere il ruolo di amministratore? Se conosce il PIN potrebbe riottenerlo: in quel caso cambia anche il PIN.')) return;
   C('admin').doc(ds.id).delete().then(() => toast('Amministratore rimosso')).catch(e => toast(errMsg(e), 'err'));
 };
-A['cambia-pin'] = () => openSheet(`<h3>${ic('lock')} Cambia PIN</h3><p class="sub">Gli amministratori attuali restano tali. Il nuovo PIN serve per i prossimi.</p>
+A['cambia-pin'] = () => openSheet(`<h3>${ic('lock')} Cambia PIN ${infoBtn(`Gli amministratori attuali restano tali. Il nuovo PIN serve per i prossimi.`)}</h3>
   <label class="f"><span>Nuovo PIN</span><input class="in mono" id="np-1" type="password" autocomplete="new-password" placeholder="almeno 6 caratteri" autofocus></label>
   <label class="f"><span>Ripeti</span><input class="in mono" id="np-2" type="password" autocomplete="new-password"></label>
   <button class="btn amber block big" data-act="conferma-pin">Salva PIN</button>`);
@@ -3225,7 +3237,7 @@ A['ripristina'] = ds => {
   C('membri').doc(m.id).set({attivo: true, espulso: false}, {merge: true}).then(() => toast(`${m.nome} di nuovo attivo. Per usare l'app dovrà chiedere l'accesso: collegalo a questo nome.`)).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
 };
-A['accredito'] = ds => openSheet(`<h3>${ic('plus')} Accredita crediti</h3><p class="sub">Aggiunge credito al saldo del collega senza toccare la cassa (es. omaggio, premio, rimborso già dato).</p>
+A['accredito'] = ds => openSheet(`<h3>${ic('plus')} Accredita crediti ${infoBtn(`Aggiunge credito al saldo del collega senza toccare la cassa (es. omaggio, premio, rimborso già dato).`)}</h3>
   <label class="f"><span>Collega</span>${selMembro('ac-m', ds.id)}</label>
   <label class="f"><span>Importo €</span><input class="in mono" id="ac-imp" inputmode="decimal" placeholder="5,00"></label>
   <label class="f"><span>Motivo</span><input class="in" id="ac-caus" maxlength="80" placeholder="es. caffè offerti per il compleanno"></label>
@@ -3248,11 +3260,11 @@ A['conferma-ricarica-per'] = () => {
   addMov({tipo:'ricarica', mid, importo: imp, metodo: radio('rp-met'), stato:'confermata', esitoDa: myName()});
   closeSheet(); toast(`Ricarica di ${eur(imp)} per ${nomeM(mid)}`);
 };
-A['caffe-fuori'] = ds => openSheet(`<h3>${ic('coffee')} Caffè pagati subito</h3><p class="sub">Caffè pagati direttamente, senza usare l'app: contano nelle statistiche ma non toccano il saldo del collega.</p>
+A['caffe-fuori'] = ds => openSheet(`<h3>${ic('coffee')} Caffè pagati subito ${infoBtn(`Caffè pagati direttamente, senza usare l'app: contano nelle statistiche ma non toccano il saldo del collega.`)}</h3>
   <label class="f"><span>Collega</span>${selMembro('cf-m', ds.id)}</label>
   <label class="f"><span>Numero di caffè</span><input class="in mono" id="cf-q" inputmode="numeric" value="1"></label>
   <label class="f"><span>Dove sono finiti i soldi</span>${segOpts('cf-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut'],['esterno','Già contati']], 'contanti')}</label>
-  <p class="hint">«Già contati»: nessun movimento di cassa (i soldi sono già stati registrati altrove).</p>
+  ${infoBtn(`«Già contati»: nessun movimento di cassa (i soldi sono già stati registrati altrove).`, 'Come funziona')}
   <button class="btn amber block big" data-act="conferma-caffe-fuori">Registra</button>`);
 A['conferma-caffe-fuori'] = () => {
   const mid = val('cf-m'), q = parseInt(val('cf-q'), 10), pc = st.gruppo.prezzoCaffe || 0;
@@ -3434,7 +3446,7 @@ A['rec-scollega'] = ds => {
   const b = db.batch(); b.delete(C('utenti').doc(u.id)); if(st.admins.some(a => a.id === u.id)) b.delete(C('admin').doc(u.id)); b.delete(C('segretiMembri').doc(u.mid));
   b.commit().then(() => { LS.set('recVisti_' + st.gid, recVisti().concat(u.id)); toast('Telefono scollegato e PIN azzerato'); }).catch(e => toast(errMsg(e), 'err'));
 };
-A['punti-adm'] = ds => openSheet(`<h3>${ic('sparkles')} Modifica punti</h3><p class="sub">Aggiunge o toglie punti a un collega (es. correzioni, premi). Usa il meno per togliere.</p>
+A['punti-adm'] = ds => openSheet(`<h3>${ic('sparkles')} Modifica punti ${infoBtn(`Aggiunge o toglie punti a un collega (es. correzioni, premi). Usa il meno per togliere.`)}</h3>
   <label class="f"><span>Collega</span>${selMembro('pa-m', ds.id)}</label>
   <label class="f"><span>Punti da modificare</span>${segOpts('pa-k', [['pulizia','✨ Pulizia'],['caffe','☕🍫 Consumi']], 'pulizia')}</label>
   <label class="f"><span>Variazione (+ / −)</span><input class="in mono" id="pa-n" inputmode="numeric" placeholder="es. 3 oppure -2"></label>
@@ -3448,7 +3460,7 @@ A['conferma-punti-adm'] = () => {
 };
 A['spesa-admin'] = () => {
   const c = derived().S.cassa;
-  openSheet(`<h3>${ic('receipt')} Registra spesa</h3><p class="sub">Acquisto per il fondo già fatto (caffè, palette, zucchero, detersivi…).</p>
+  openSheet(`<h3>${ic('receipt')} Registra spesa ${infoBtn(`Acquisto per il fondo già fatto (caffè, palette, zucchero, detersivi…).`)}</h3>
     <label class="f"><span>Descrizione</span><input class="in" id="sa-desc" maxlength="80" placeholder="es. Palette e bicchierini" autofocus></label>
     <label class="f"><span>Importo €</span><input class="in mono" id="sa-imp" inputmode="decimal" placeholder="12,50"></label>
     <label class="f"><span>Pagata da</span>${segOpts('sa-met', [['contanti','💶 Contanti (' + eur(c.contanti || 0) + ')'],['revolut','📱 Revolut (' + eur(c.revolut || 0) + ')'],['tasca','🙋 Mia, in crediti']], 'contanti')}</label>
@@ -3465,7 +3477,7 @@ A['salva-prezzo-caffe'] = () => {
   if(!(pc >= 0)) return toast('Prezzo non valido', 'err');
   G().set({prezzoCaffe: pc}, {merge: true}).then(() => toast('Prezzo caffè aggiornato')).catch(e => toast(errMsg(e), 'err'));
 };
-A['rettifica'] = ds => openSheet(`<h3>${ic('edit')} Rettifica saldo</h3><p class="sub">Corregge il saldo di un collega senza toccare la cassa (es. saldo iniziale, errori). Usa il meno per addebitare.</p>
+A['rettifica'] = ds => openSheet(`<h3>${ic('edit')} Rettifica saldo ${infoBtn(`Corregge il saldo di un collega senza toccare la cassa (es. saldo iniziale, errori). Usa il meno per addebitare.`)}</h3>
   <label class="f"><span>Collega</span>${selMembro('rt-m', ds.id)}</label>
   <label class="f"><span>Importo € (+ accredita, − addebita)</span><input class="in mono" id="rt-imp" inputmode="decimal" placeholder="-2,50"></label>
   <label class="f"><span>Motivo</span><input class="in" id="rt-caus" maxlength="80" placeholder="es. saldo dal vecchio quaderno"></label>
@@ -3620,7 +3632,7 @@ async function leggiBackup(file){
       <div class="between" style="font-size:13px"><span class="tx2">Cassa da riallineare</span><b class="mono">${piano.cassa.length ? piano.cassa.map(c => c.k + ' ' + eurS(c.diff)).join(', ') : '—'}</b></div>
     </div>
     ${piano.rett.length ? `<div class="list" style="max-height:160px;overflow:auto;margin-bottom:10px">${piano.rett.map(r => `<div class="li"><div class="grow"><div class="t">${esc(r.nome)}</div></div><b class="mono ${r.diff < 0 ? 'red' : 'green'}">${eurS(r.diff)}</b></div>`).join('')}</div>` : ''}
-    <p class="hint">Il ripristino non cancella nulla: aggiunge rettifiche ed entrate/uscite di cassa con causale «Ripristino da backup» per riportare saldi e cassa ai valori del file. Lo storico dei movimenti resta quello attuale (il file JSON conserva l'originale).</p>
+    ${infoBtn(`Il ripristino non cancella nulla: aggiunge rettifiche ed entrate/uscite di cassa con causale «Ripristino da backup» per riportare saldi e cassa ai valori del file. Lo storico dei movimenti resta quello attuale (il file JSON conserva l'originale).`, 'Come funziona')}
     <button class="btn amber block big" data-act="conferma-ripristino">Ripristina</button>`}`);
 }
 A['conferma-ripristino'] = async () => {
@@ -3709,13 +3721,13 @@ function testoRendiconto(o){
 }
 function aggiornaAnteprimaRd(){ const img = $('rd-img'); if(img) img.src = disegnaRendiconto(opzRd()).toDataURL('image/png'); }
 A['rendiconto'] = () => {
-  openSheet(`<h3>${ic('share')} Condividi rendiconto</h3><p class="sub">Immagine con i numeri chiave del fondo, da mandare ai colleghi per trasparenza.</p>
+  openSheet(`<h3>${ic('share')} Condividi rendiconto ${infoBtn(`Immagine con i numeri chiave del fondo, da mandare ai colleghi per trasparenza.`)}</h3>
     <label class="check"><input type="checkbox" id="rd-top" data-chg="rd-opz" checked><b style="flex:1;font-size:14px">Chi ha consumato di più (primi 5)</b></label>
     <label class="check"><input type="checkbox" id="rd-saldi" data-chg="rd-opz"><b style="flex:1;font-size:14px">Saldi di ogni collega (con i nomi)</b></label>
     <img id="rd-img" alt="Anteprima rendiconto" style="width:100%;border-radius:12px;margin:10px 0;border:1px solid var(--line)">
     <button class="btn amber block big" data-act="rd-img">${ic('share','s')} Condividi immagine</button>
     <div class="grid2" style="margin-top:8px"><button class="btn green" data-act="rd-wa">WhatsApp (testo)</button><button class="btn" data-act="rd-png">${ic('download','s')} Scarica PNG</button></div>
-    <p class="hint" style="margin-top:8px">Il testo e l'immagine mostrano i saldi con i nomi solo se spunti la voce qui sopra.</p>`);
+    ${infoBtn(`Il testo e l'immagine mostrano i saldi con i nomi solo se spunti la voce qui sopra.`, 'Come funziona')}`);
   aggiornaAnteprimaRd();
 };
 const rdBlob = () => new Promise(r => disegnaRendiconto(opzRd()).toBlob(r, 'image/png'));
@@ -3772,11 +3784,26 @@ document.addEventListener('input', e => {
   }
 });
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape'){ closeSheet(); A['drawer-close'](); }
+  if(e.key === 'Escape'){ if($('infopop')) A['info-x'](); closeSheet(); A['drawer-close'](); }
   if(e.key === 'Enter' && e.target.id === 'j-code') A['join']();
   if(e.key === 'Enter' && e.target.id === 'sp-nome') A['spesa-aggiungi']();
 });
 setInterval(() => { if(st.page === 'feed' || st.page === 'bar') render(); }, 60000);
+
+/* ---------- Icone (i): spiegazioni a comparsa, si chiudono con un tocco sullo sfondo ---------- */
+const INFOS = {};
+const infoBtn = (h, label) => {
+  let x = 0; for(let i = 0; i < h.length; i++) x = (x * 31 + h.charCodeAt(i)) | 0;
+  const k = 'i' + (x >>> 0).toString(36); INFOS[k] = h;
+  return label ? `<button type="button" class="hint-i" data-act="info" data-k="${k}" aria-label="${label}"><span class="ibtn">i</span>${label}</button>`
+    : `<button type="button" class="ibtn" data-act="info" data-k="${k}" aria-label="Informazioni">i</button>`;
+};
+A['info'] = ds => {
+  const h = INFOS[ds.k]; if(!h) return;
+  let o = $('infopop'); if(!o){ o = document.createElement('div'); o.id = 'infopop'; o.setAttribute('data-act', 'info-x'); document.body.appendChild(o); }
+  o.innerHTML = `<div class="ip-card" role="dialog" aria-modal="true">${h}</div>`; o.classList.add('on');
+};
+A['info-x'] = () => { const o = $('infopop'); if(o) o.classList.remove('on'); };
 
 /* ---------- Cerca collega: filtro istantaneo lato client sui dati gia' in memoria (nessuna lettura) ---------- */
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -3804,6 +3831,9 @@ const cercaTutti = () => document.querySelectorAll('[data-cerca]').forEach(cerca
 A['cerca-x'] = ds => { const i = $(ds.t + '-q'); if(i){ i.value = ''; cercaApplica(i); i.focus(); } };
 
 /* ---------- Avvisi e comunicazioni in Home ---------- */
+const isoLocale = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+/* campo scadenza: '' -> null (nessuna), data nel passato -> false, altrimenti millisecondi */
+const scadInput = id => { const v = val(id); if(!v) return null; const t = new Date(v).getTime(); return Number.isFinite(t) && t > Date.now() ? t : false; };
 const AVV_TIPI = {avviso: ['📢', 'Avviso', 'amber'], attenzione: ['⚠️', 'Attenzione', 'red'], info: ['ℹ️', 'Info', 'sky']};
 /* avvisi automatici di oggi: solo dati gia' in memoria (st.eventi), nessuna lettura ne' scrittura */
 function avvisiAuto(){
@@ -3811,30 +3841,40 @@ function avvisiAuto(){
   return (st.eventi || []).filter(e => e && e.titolo && e.data && prossimaData(e) === oggi)
     .map(e => e.tipo === 'compleanno' ? `🎂 Oggi è il compleanno di <b>${esc(e.titolo)}</b>! Ricordategli i pasticcini 🎉` : `📅 Oggi: <b>${esc(e.titolo)}</b>`);
 }
+const scadVivo = o => !o || !o.scad || Date.now() < o.scad;
 function avvisiHome(){
-  const av = st.gruppo && st.gruppo.avviso, auto = avvisiAuto();
+  const av = st.gruppo && st.gruppo.avviso, auto = avvisiAuto(), so = sondAttivo();
   let h = '';
-  if(av && typeof av.testo === 'string' && av.testo){
+  if(av && typeof av.testo === 'string' && av.testo && scadVivo(av)){
     const [em, lab, col] = AVV_TIPI[av.tipo] || AVV_TIPI.avviso, t = tms(av.ts);
-    h += `<div class="avv ${col}" id="avviso-admin" role="status"><div class="avv-t">${em} ${lab}</div><div class="avv-m">${esc(av.testo)}</div><div class="avv-a">${esc(av.autore || '')}${t ? ' · ' + quando(t) : ''}</div>
+    h += `<div class="avv ${col}" id="avviso-admin" role="status"><div class="avv-t">${em} ${lab}${av.autore ? ' · ' + esc(av.autore) : ''}${t ? ' · ' + quando(t) : ''}</div><div class="avv-m">${esc(av.testo)}</div>
       ${st.isAdmin ? `<button class="iconbtn" id="avviso-rimuovi" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>`;
+  }
+  if(so){
+    const v = sondVoted(so.id);
+    h += `<button class="avv violet" id="avviso-sondaggio" data-act="sond-apri"><div class="avv-t">🗳️ ${so.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'} · ${v ? (so.tipo === 'scelta' ? 'hai risposto · vedi i risultati' : 'risposta inviata') : 'tocca per rispondere (anonimo)'}</div><div class="avv-m">${esc(so.domanda)}</div></button>`;
   }
   auto.forEach((t, i) => { h += `<div class="avv green" id="avviso-auto-${i}" role="status"><div class="avv-m">${t}</div></div>`; });
   return h;
 }
-const avvisoAdminBtn = () => `<button class="btn sm block ghost" id="btn-avviso-nuovo" style="margin-bottom:10px" data-act="avviso-nuovo">📢 ${st.gruppo.avviso ? 'Sostituisci la comunicazione in Home' : 'Pubblica una comunicazione in Home'}</button>`;
-A['revolut-toggle'] = () => {
-  if(!st.isAdmin) return;
-  const on = !revolutOn();
-  G().update({revolutAttivo: on}).then(() => toast(on ? 'Canale Revolut riattivato' : 'Canale Revolut sospeso')).catch(e => toast(errMsg(e), 'err'));
+const scadPill = o => !o.scad ? '<span class="pill green">attivo</span>' : o.scad < Date.now() ? '<span class="pill red">Scaduto</span>' : `<span class="pill green">attivo fino al ${dataOra(o.scad)}</span>`;
+const avvisoAdminBtn = () => {
+  const av = st.gruppo.avviso, so = st.gruppo.sondaggio, tr = (t, n) => esc(t.length > n ? t.slice(0, n - 1) + '…' : t);
+  return `<div class="card" id="com-admin"><h3>📢 Comunicazioni in Home</h3><div class="list">
+    <div class="li"><div class="grow"><div class="t">Avviso</div><div class="d">${av && av.testo ? tr(av.testo, 46) + ' ' + scadPill(av) : 'Nessun avviso'}</div></div>
+      <button class="btn sm" id="btn-avviso-nuovo" data-act="avviso-nuovo">${av ? 'Sostituisci' : 'Nuovo'}</button>${av ? `<button class="iconbtn" style="width:32px;height:32px" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>
+    <div class="li"><div class="grow"><div class="t">Sondaggio / domanda</div><div class="d">${so && so.domanda ? tr(so.domanda, 46) + ' ' + scadPill(so) : 'Nessun sondaggio'}</div></div>
+      ${so ? `<button class="btn sm" id="btn-sond-admin" data-act="sond-admin">Risultati</button>` : `<button class="btn sm" id="btn-sond-nuovo" data-act="sond-nuovo">Nuovo</button>`}</div>
+  </div></div>`;
 };
 A['avviso-nuovo'] = () => {
   if(!st.isAdmin) return;
   const cur = st.gruppo.avviso || {}, tp = AVV_TIPI[cur.tipo] ? cur.tipo : 'avviso';
   st.avvTipo = tp;
-  openSheet(`<h3>📢 Comunicazione in Home</h3><p class="sub">Visibile a tutti i colleghi finché non la rimuovi o la sostituisci. Ne resta una sola attiva.</p>
+  openSheet(`<h3>📢 Comunicazione in Home ${infoBtn(`Visibile a tutti i colleghi finché non la rimuovi o la sostituisci. Ne resta una sola attiva.`)}</h3>
     <div class="chips" id="av-tipi">${Object.entries(AVV_TIPI).map(([k, [e, l]]) => `<button id="av-t-${k}" class="${tp === k ? 'on' : ''}" data-act="avviso-tipo" data-v="${k}">${e} ${l}</button>`).join('')}</div>
     <label class="f"><span>Testo</span><textarea class="in" id="av-testo" maxlength="200" rows="4" placeholder="Es. Domani la saletta è chiusa per pulizie">${esc(cur.testo || '')}</textarea></label>
+    <label class="f"><span>Scadenza (facoltativa)</span><input class="in" type="datetime-local" id="av-scad" value="${cur.scad && cur.scad > Date.now() ? isoLocale(cur.scad) : ''}"></label>
     <button class="btn amber block big" id="btn-avviso-pubblica" data-act="avviso-pubblica">${cur.testo ? 'Sostituisci' : 'Pubblica'}</button>
     ${cur.testo ? `<button class="btn red block" style="margin-top:8px" id="btn-avviso-rimuovi2" data-act="avviso-rimuovi">Rimuovi la comunicazione attiva</button>` : ''}`);
 };
@@ -3843,14 +3883,131 @@ A['avviso-pubblica'] = () => {
   if(!st.isAdmin) return;
   const testo = val('av-testo'), tipo = AVV_TIPI[st.avvTipo] ? st.avvTipo : 'avviso';
   if(testo.length < 3) return toast('Scrivi il testo della comunicazione', 'err');
-  const autore = (nomeBreve(st.mid) || 'Amministratore').slice(0, 40);
-  G().update({avviso: {tipo, testo: testo.slice(0, 200), autore, ts: TS()}}).then(() => toast('Comunicazione pubblicata')).catch(e => toast(errMsg(e), 'err'));
+  const autore = (nomeBreve(st.mid) || 'Amministratore').slice(0, 40), scad = scadInput('av-scad');
+  if(scad === false) return toast('La scadenza deve essere nel futuro', 'err');
+  G().update({avviso: {tipo, testo: testo.slice(0, 200), autore, ts: TS(), ...(scad ? {scad} : {})}}).then(() => toast('Comunicazione pubblicata')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
 };
 A['avviso-rimuovi'] = () => {
   if(!st.isAdmin) return;
   G().update({avviso: firebase.firestore.FieldValue.delete()}).then(() => toast('Comunicazione rimossa')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
+};
+
+/* ---------- Sondaggi e domande anonime ---------- */
+/* domanda nel documento gruppo (gia' in ascolto, 0 letture); registro "ha risposto" separato dalla risposta, che non contiene ne' mid ne' uid ne' data */
+const sondAttivo = () => { const s = st.gruppo && st.gruppo.sondaggio; return s && s.id && s.domanda && scadVivo(s) ? s : null; };
+const sondVotoKey = id => 'sondV_' + st.gid + '_' + id, sondRegKey = id => 'sondReg_' + st.gid + '_' + id;
+const sondVoted = id => !!LS.get(sondVotoKey(id), false);
+const sondCol = id => G().collection('sondaggi').doc(id);
+let sondUnsub = null, sondRegTimer = null;
+function sondStop(){ if(sondUnsub){ sondUnsub(); sondUnsub = null; } }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') sondStop(); });
+/* il registro "ha risposto" si scrive qualche secondo dopo la risposta, per non legare i due documenti con lo stesso orario */
+function sondRegPianifica(){
+  const s = st.gruppo && st.gruppo.sondaggio;
+  if(!s || !s.id || !st.mid || sondRegTimer || !LS.get(sondRegKey(s.id), false)) return;
+  sondRegTimer = setTimeout(() => {
+    sondRegTimer = null; const k = sondRegKey(s.id);
+    sondCol(s.id).collection('voti').doc(st.mid).set({}).then(() => LS.del(k)).catch(e => { if(!(e && /unavailable|network/i.test(e.code + e.message))) LS.del(k); });
+  }, 3000 + Math.floor(Math.random() * 6000));
+}
+function sondRisultati(s, docs, conTesti){
+  if(s.tipo === 'scelta'){
+    const n = docs.length, c = (s.opzioni || []).map(() => 0); docs.forEach(d => { const i = d.s; if(Number.isInteger(i) && c[i] != null) c[i]++; });
+    return `<div class="mut" style="font-size:12px;margin-bottom:6px">${n} ${n === 1 ? 'risposta' : 'risposte'}</div>` + (s.opzioni || []).map((o, i) => { const p = n ? Math.round(c[i] / n * 100) : 0;
+      return `<div style="margin-bottom:10px"><div class="between" style="font-size:13.5px"><span>${esc(o)}</span><b class="mono">${p}% <span class="mut" style="font-weight:500">(${c[i]})</span></b></div><div class="bar"><i style="width:${p}%"></i></div></div>`; }).join('');
+  }
+  const t = docs.filter(d => d.t);
+  return `<div class="mut" style="font-size:12px;margin-bottom:6px">${t.length} ${t.length === 1 ? 'risposta' : 'risposte'}</div>` + (conTesti ? t.map(d => `<div class="perla" style="margin-bottom:8px"><q style="font-size:14px">${esc(d.t)}</q></div>`).join('') || '<div class="empty">Ancora nessuna risposta.</div>' : '');
+}
+A['sond-apri'] = async () => {
+  const s = sondAttivo(); if(!s) return;
+  if(sondVoted(s.id)) return sondMostra(s);
+  openSheet(`<h3>🗳️ ${s.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'}</h3><div class="empty">Controllo…</div>`);
+  try { const r = await sondCol(s.id).collection('voti').doc(st.mid).get(); if(r.exists){ LS.set(sondVotoKey(s.id), true); return sondMostra(s); } } catch(e){}
+  if(!$('sheet').classList.contains('on')) return;
+  openSheet(`<h3>🗳️ ${s.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'}</h3>
+    <p style="font-size:16px;font-weight:700;margin:0 0 12px;word-break:break-word">${esc(s.domanda)}</p>
+    ${s.tipo === 'scelta' ? `<div id="sond-opz">${s.opzioni.map((o, i) => `<label class="check"><input type="radio" name="sond-s" value="${i}"><b style="flex:1;font-size:14px">${esc(o)}</b></label>`).join('')}</div>`
+      : `<label class="f"><span>La tua risposta</span><textarea class="in" id="sond-t" rows="4" maxlength="300" placeholder="Scrivi qui…"></textarea></label>`}
+    <p class="hint" style="margin:6px 0 10px">🔒 Le risposte sono anonime${s.tipo === 'aperta' ? ': attenzione a non inserire riferimenti personali nel testo.' : '.'}</p>
+    <button class="btn amber block big" id="btn-sond-invia" data-act="sond-invia">Invia la risposta</button>`);
+};
+A['sond-invia'] = () => {
+  const s = sondAttivo(); if(!s) { closeSheet(); return toast('Il sondaggio non è più attivo', 'err'); }
+  if(sondVoted(s.id)) return;
+  let p;
+  if(s.tipo === 'scelta'){ const v = radio('sond-s'); if(v == null) return toast('Scegli una risposta', 'err'); p = {s: Number(v)}; }
+  else { const t = val('sond-t').slice(0, 300); if(t.length < 2) return toast('Scrivi la risposta', 'err'); p = {t}; }
+  const kv = sondVotoKey(s.id), kr = sondRegKey(s.id);
+  LS.set(kv, true); LS.set(kr, true);
+  sondCol(s.id).collection('risposte').add(p).catch(e => { LS.del(kv); LS.del(kr); toast('Risposta non inviata (' + errMsg(e) + ')', 'err'); render(); });
+  sondRegPianifica(); render(); sondMostra(s, true);
+};
+function sondMostra(s, appenaInviata){
+  openSheet(`<h3>🗳️ ${s.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'}</h3>
+    <p style="font-size:15px;font-weight:700;margin:0 0 10px;word-break:break-word">${esc(s.domanda)}</p>
+    <div class="banner green">${ic('check')}<div>${appenaInviata ? 'Risposta inviata, grazie!' : 'Hai già risposto.'} È anonima.</div></div>
+    ${s.tipo === 'scelta' ? `<div id="sond-ris"><div class="empty">Carico i risultati…</div></div><button class="btn sm block ghost" data-act="sond-aggiorna">Aggiorna i risultati</button>` : ''}`);
+  if(s.tipo === 'scelta') A['sond-aggiorna']();
+}
+A['sond-aggiorna'] = async () => {
+  const s = st.gruppo && st.gruppo.sondaggio; if(!s || !$('sond-ris')) return;
+  try { const r = await sondCol(s.id).collection('risposte').limit(30).get(); if($('sond-ris')) $('sond-ris').innerHTML = sondRisultati(s, r.docs.map(d => d.data()), false); }
+  catch(e){ if($('sond-ris')) $('sond-ris').innerHTML = `<div class="banner red">${ic('alert')}<div>Risultati non disponibili (${esc(errMsg(e))}).</div></div>`; }
+};
+/* --- admin --- */
+A['sond-nuovo'] = () => {
+  if(!st.isAdmin) return;
+  st.sondTipo = 'scelta';
+  openSheet(`<h3>🗳️ Nuovo sondaggio o domanda</h3>
+    <div class="chips" id="sn-tipi"><button id="sn-t-scelta" class="on" data-act="sond-tipo" data-v="scelta">☑️ Scelta multipla</button><button id="sn-t-aperta" data-act="sond-tipo" data-v="aperta">✍️ Risposta libera</button></div>
+    <label class="f"><span>Domanda</span><input class="in" id="sn-dom" maxlength="120" placeholder="Es. Che giorno preferite per la cena?"></label>
+    <div id="sn-opz">${[0,1,2,3,4,5].map(i => `<label class="f" id="sn-ol-${i}" ${i > 1 ? 'hidden' : ''}><span>Opzione ${i + 1}</span><input class="in" id="sn-o${i}" maxlength="40"></label>`).join('')}
+      <button type="button" class="btn sm ghost" id="sn-piu" data-act="sond-piu">+ Aggiungi opzione</button></div>
+    <label class="f"><span>Scadenza (facoltativa)</span><input class="in" type="datetime-local" id="sn-scad"></label>
+    <button class="btn amber block big" id="btn-sond-pubblica" data-act="sond-pubblica">Pubblica</button>`);
+};
+A['sond-tipo'] = ds => { st.sondTipo = ds.v === 'aperta' ? 'aperta' : 'scelta'; document.querySelectorAll('#sn-tipi button').forEach(b => b.classList.toggle('on', b.dataset.v === st.sondTipo)); const o = $('sn-opz'); if(o) o.hidden = st.sondTipo === 'aperta'; };
+A['sond-piu'] = () => { for(let i = 2; i < 6; i++){ const l = $('sn-ol-' + i); if(l && l.hidden){ l.hidden = false; if(i === 5 && $('sn-piu')) $('sn-piu').hidden = true; return; } } };
+A['sond-pubblica'] = async () => {
+  if(!st.isAdmin) return;
+  const tipo = st.sondTipo === 'aperta' ? 'aperta' : 'scelta', domanda = val('sn-dom');
+  if(domanda.length < 3) return toast('Scrivi la domanda', 'err');
+  const opz = tipo === 'scelta' ? [0,1,2,3,4,5].map(i => val('sn-o' + i)).filter(Boolean) : [];
+  if(tipo === 'scelta' && opz.length < 2) return toast('Servono almeno 2 opzioni', 'err');
+  const scad = scadInput('sn-scad'); if(scad === false) return toast('La scadenza deve essere nel futuro', 'err');
+  const old = st.gruppo.sondaggio;
+  if(old && !confirm('Esiste già un sondaggio: verrà sostituito e le sue risposte cancellate. Continuare?')) return;
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  closeSheet();
+  try {
+    if(old && old.id) await sondPulisci(old.id);
+    await G().update({sondaggio: {id, tipo, domanda: domanda.slice(0, 120), ...(tipo === 'scelta' ? {opzioni: opz.map(o => o.slice(0, 40))} : {}), autore: (nomeBreve(st.mid) || 'Amministratore').slice(0, 40), ts: TS(), ...(scad ? {scad} : {})}});
+    toast('Sondaggio pubblicato');
+  } catch(e){ toast(errMsg(e), 'err'); }
+};
+async function sondPulisci(pid){
+  const col = sondCol(pid);
+  for(let i = 0; i < 3; i++){ const r = await col.collection('risposte').limit(30).get(); if(r.empty) break; const b = db.batch(); r.docs.forEach(d => b.delete(d.ref)); await b.commit(); }
+  const b = db.batch(); st.membri.forEach(m => b.delete(col.collection('voti').doc(m.id))); await b.commit();
+}
+A['sond-admin'] = () => {
+  const s = st.gruppo.sondaggio; if(!st.isAdmin || !s) return;
+  openSheet(`<h3>🗳️ ${s.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'} ${scadPill(s)}</h3>
+    <p style="font-size:15px;font-weight:700;margin:0 0 10px;word-break:break-word">${esc(s.domanda)}</p>
+    <div id="sond-ris" class="card"><div class="empty">Carico…</div></div>
+    ${infoBtn(`Risultati in tempo reale (prime 30 risposte). Chiudendo il foglio l'aggiornamento si ferma.`, 'Come funziona')}
+    <button class="btn red block" id="btn-sond-elimina" data-act="sond-elimina">Chiudi e rimuovi il sondaggio</button>`);
+  sondStop();
+  sondUnsub = sondCol(s.id).collection('risposte').limit(30).onSnapshot(r => { if($('sond-ris')) $('sond-ris').innerHTML = sondRisultati(s, r.docs.map(d => d.data()), true); }, e => { if($('sond-ris')) $('sond-ris').innerHTML = `<div class="banner red">${ic('alert')}<div>${esc(errMsg(e))}</div></div>`; });
+};
+A['sond-elimina'] = async () => {
+  const s = st.gruppo.sondaggio; if(!st.isAdmin || !s) return;
+  if(!confirm('Rimuovere il sondaggio e cancellare tutte le risposte?')) return;
+  closeSheet();
+  try { await sondPulisci(s.id); await G().update({sondaggio: firebase.firestore.FieldValue.delete()}); toast('Sondaggio rimosso'); } catch(e){ toast(errMsg(e), 'err'); }
 };
 
 /* ---------- Saletta: Ruota del Barista (solo client) e Bacheca delle Perle ---------- */
@@ -3875,12 +4032,12 @@ function pRuota(d){
   const ruota = ids.length >= 2 ? `<div class="ruota-box"><div class="ruota-pt"></div><svg viewBox="0 0 300 300" id="ruota-svg" style="${anim}" role="img" aria-label="Ruota con ${ids.length} colleghi">${ruotaSvg(ids, nome)}</svg></div>`
     : '<div class="empty">Spunta almeno 2 colleghi presenti e gira la ruota.</div>';
   const esito = r.vinc && !r.gira ? `<div class="card" id="ruota-esito" style="text-align:center;border-color:var(--amber)"><div style="font-size:40px;line-height:1.1">☕</div><div style="font-size:22px;font-weight:800;margin:4px 0">Tocca a ${esc(nome(r.vinc))}!</div><div class="mut" style="font-size:13px">Alla macchinetta a fare i caffè per tutti.</div></div>` : '';
-  return `${backSaletta()}<h2>☕ La Ruota del Barista</h2><p class="sub">Chi si mette alla macchinetta? Scegli i presenti e lascia decidere alla sorte.</p>
+  return `${backSaletta()}<h2>☕ La Ruota del Barista ${infoBtn(`Chi si mette alla macchinetta? Scegli i presenti e lascia decidere alla sorte.`)}</h2>
   ${ruota}${esito}
   <button class="btn amber block big" id="ruota-gira" data-act="ruota-gira" ${sel.length >= 2 && !r.gira ? '' : 'disabled'}>${r.gira ? 'Gira…' : r.vinc ? '🔁 Rigira la ruota' : '🎡 Gira la ruota!'}</button>
   <div class="card" style="margin-top:12px"><h3><span>Chi c'è</span><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="ruota-tutti" data-v="1" ${r.gira ? 'disabled' : ''}>Tutti</button><button class="btn sm ghost" data-act="ruota-tutti" data-v="0" ${r.gira ? 'disabled' : ''}>Nessuno</button></span></h3>
     ${cercaBox('ruota-lista')}<div class="list" id="ruota-lista">${att.map(m => `<button class="li" data-q="${qMem(m)}" data-act="ruota-toggle" data-id="${m.id}" ${r.gira ? 'disabled' : ''} style="width:100%;text-align:left;${r.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${r.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:14px">${esc(nome(m.id))}${m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div></button>`).join('')}</div>
-    ${cercaVuoto('ruota-lista')}<p class="hint" style="margin:8px 0 0">Estrazione casuale e uniforme: ognuno ha la stessa probabilità. Non viene salvato nulla.</p></div>`;
+    ${cercaVuoto('ruota-lista')}${infoBtn(`Estrazione casuale e uniforme: ognuno ha la stessa probabilità. Non viene salvato nulla.`, 'Come funziona')}</div>`;
 }
 A['ruota-toggle'] = ds => { const r = ruotaSt(); if(r.gira) return; r.sel[ds.id] = !r.sel[ds.id]; r.vinc = null; render(); };
 A['ruota-tutti'] = ds => { const r = ruotaSt(); if(r.gira) return; cercaFiltra('ruota-lista', membriAttivi()).forEach(m => { if(ds.v === '1') r.sel[m.id] = true; else delete r.sel[m.id]; }); r.vinc = null; render(); };
@@ -3925,7 +4082,7 @@ function pPerle(d){
 A['perle-altre'] = () => { st.perleN = 30; render(); };
 A['perla-nuova'] = () => {
   const nomi = membriAttivi().map(m => nomeBreve(m.id) || m.nome);
-  openSheet(`<h3>💬 Nuova perla</h3><p class="sub">Una frase da ricordare, sentita in saletta o durante il turno.</p>
+  openSheet(`<h3>💬 Nuova perla ${infoBtn(`Una frase da ricordare, sentita in saletta o durante il turno.`)}</h3>
     <label class="f"><span>Chi l'ha detta</span><input class="in" id="pe-aut" maxlength="40" list="pe-nomi" autocomplete="off" placeholder="es. Marco" autofocus><datalist id="pe-nomi">${nomi.map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></label>
     <label class="f"><span>La frase</span><textarea class="in" id="pe-txt" maxlength="280" rows="3" placeholder="Scrivi la citazione"></textarea></label>
     <label class="f"><span>Data o contesto (facoltativo)</span><input class="in" id="pe-ctx" maxlength="60" placeholder="es. riunione del lunedì"></label>
@@ -3956,6 +4113,7 @@ function backArma(){
 }
 /* true se l'Indietro e' stato assorbito dall'app (qualcosa da chiudere o una pagina da cui tornare) */
 function indietro(){
+  if($('infopop') && $('infopop').classList.contains('on')){ A['info-x'](); return true; }
   if($('sheet').classList.contains('on')){ closeSheet(); return true; }
   if($('drawer').classList.contains('on')){ A['drawer-close'](); return true; }
   if(!inAppOra()){ if(st.entry){ st.entry = null; render(); return true; } return false; }
