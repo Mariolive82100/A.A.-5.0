@@ -379,7 +379,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.24.0';
+const VERSION = '1.25.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -773,6 +773,21 @@ function giorniLavorativi(da, a){
   let n = 0; while(x < f){ x.setDate(x.getDate() + 1); const w = x.getDay(); if(w !== 0 && w !== 6) n++; } return n;
 }
 const msDoc = r => r && r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now();
+/* acquisto di crediti da un collega (movimento 'scambio'): i crediti passano solo quando il venditore conferma di aver ricevuto il denaro */
+const scambiPerMe = d => d.scambiAttesa.filter(m => m.daMid === st.mid);
+const scambiMiei = d => d.scambiAttesa.filter(m => m.mid === st.mid);
+const vendibile = (mid, d) => Math.max(0, (saldo(mid) - riservato(mid)) - d.scambiAttesa.filter(m => m.daMid === mid).reduce((a, m) => a + m.importo, 0));
+function scambiRicevuti(d){
+  const l = scambiPerMe(d); if(!l.length) return '';
+  return `<div class="card" id="card-scambi" style="border-color:var(--amber)"><h3><span>🤝 Richieste di acquisto crediti</span><span class="pill red">${l.length}</span></h3>
+    ${l.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px"><b>${esc(nomeM(m.mid))}</b> vuole comprare <b>${m.importo / 100} ${m.importo === 100 ? 'credito' : 'crediti'}</b> da te · pagamento: ${esc(FONTI[m.metodo] || m.metodo)} (fuori dall'app)</div>
+      <div class="mut" style="font-size:12px;margin:2px 0 8px">Conferma solo dopo aver ricevuto il denaro: i crediti passano subito a lui.</div>
+      <div class="row" style="gap:6px"><button class="btn sm green" id="sc-ok-${m.id}" data-act="scambio-esito" data-id="${m.id}" data-v="confermata">✓ Ho ricevuto il denaro</button><button class="btn sm ghost" data-act="scambio-esito" data-id="${m.id}" data-v="rifiutata">Rifiuta</button></div></div>`).join('')}</div>`;
+}
+function scambiInviati(d){
+  const l = scambiMiei(d); if(!l.length) return '';
+  return `<div class="card" id="card-scambi-miei"><h3>${ic('clock','s')} Acquisti in attesa</h3><div class="list">${l.map(m => `<div class="li"><div class="av">🤝</div><div class="grow"><div class="t" style="font-size:13px">${m.importo / 100} ${m.importo === 100 ? 'credito' : 'crediti'} da ${esc(nomeM(m.daMid))} · ${esc(FONTI[m.metodo] || m.metodo)}</div><div class="d">In attesa che ${esc(nomeBreve(m.daMid) || nomeM(m.daMid))} confermi di aver ricevuto il denaro</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>`;
+}
 function creditoLibero(){ return Math.max(0, (derived().S.saldi[st.mid] || 0) - riservato(st.mid)); }
 
 /* ---------- scritture ---------- */
@@ -1130,7 +1145,9 @@ function pBar(d){
   const quotaDa = st.gruppo.quotaAnnua > 0 && st.ready.mv && sq !== 'pagata';
   const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0);
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
+  const scRic = scambiPerMe(d).length;
   return `
+  ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
   ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un amministratore: la registrerà lui.</div></div>` : ''}
   <div class="card" style="text-align:center">
     <small class="mut">Il tuo saldo</small>
@@ -1139,7 +1156,7 @@ function pBar(d){
       <button class="btn amber block" id="btn-ricarica" data-act="ricarica-nuova">➕ Ricarica</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
     </div>
-    <button class="btn link" style="margin-top:6px" id="btn-regala-home" data-act="regala">🎁 Regala / Trasferisci crediti</button>
+    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn ghost block" id="btn-regala-home" data-act="regala">🎁 Regala crediti</button><button class="btn ghost block" id="btn-acquista-home" data-act="acquista">🤝 Acquista crediti da un collega</button></div>
     ${(() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
@@ -1194,17 +1211,18 @@ const recVisti = () => LS.get('recVisti_' + st.gid, []);
 const recuperiNuovi = () => { const v = recVisti(); return st.utenti.filter(u => u.recuperato && u.id !== st.uid && !v.includes(u.id) && (tms(u.ts) || Date.now()) > Date.now() - 7 * 864e5); };
 function contatori(d){
   const seen = notifSeen();
-  const pers = notifiche(d).filter(n => n.t > seen).length;
-  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + recuperiNuovi().length : 0;
+  const sc = scambiPerMe(d).length;
+  const pers = notifiche(d).filter(n => n.t > seen).length + sc;
+  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + recuperiNuovi().length + sc : 0;
   return {pers, fondo};
 }
 function pNotifiche(d){
   if(adminView()){
-    return pAdminHome(d, 'inbox');
+    return scambiRicevuti(d) + pAdminHome(d, 'inbox');
   }
   const list = notifiche(d), seen = notifSeen();
   return `<h2>${ic('bell')} Notifiche</h2><p class="sub">Richieste da gestire ed esiti che ti riguardano.</p>
-  ${richiesteUtente(d) || ''}
+  ${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
   ${storicoRichieste(d)}
   <div class="card"><h3><span>Esiti e accrediti</span><button class="btn link" data-act="notif-letti">Segna tutte come lette</button></h3>
     ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>`;
@@ -1237,9 +1255,10 @@ function pCrediti(d){
   <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
-    <button class="btn block ghost" id="btn-regala" data-act="regala" style="margin-top:8px">🎁 Regala / Trasferisci crediti</button></div>
+    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn block ghost" id="btn-regala" data-act="regala">🎁 Regala crediti</button><button class="btn block ghost" id="btn-acquista" data-act="acquista">🤝 Acquista crediti da un collega</button></div></div>
+  ${scambiRicevuti(d)}${scambiInviati(d)}
   ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
-  ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l\'amministratore conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché l\'amministratore non ti paga.<br><br><b>Tra colleghi:</b> usa «Regala / Trasferisci crediti»; è immediato, senza approvazioni.', 'Come funzionano ricariche e riscatti')}`;
+  ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l\'amministratore conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché l\'amministratore non ti paga.<br><br><b>Tra colleghi:</b> «Regala crediti» è immediato e senza approvazioni; «Acquista crediti da un collega» richiede che il venditore confermi di aver ricevuto il denaro.', 'Come funzionano ricariche e riscatti')}`;
 }
 
 /* ---------- tesoreria / home amministratore ---------- */
@@ -1514,7 +1533,8 @@ function pRegolamento(){
   ${sez('5. Ricarica e riscatto dei crediti', [
     '<b>Ricarica:</b> il pulsante «Ricarica» invia una richiesta al Fondo Gruppo con importo e modalità di versamento (contanti in cassetta o Revolut). Quando un amministratore conferma l\'incasso, i crediti arrivano sul tuo saldo. Il pulsante è sempre attivo, anche con saldo positivo.',
     '<b>Riscatto:</b> chi ha crediti liberi può chiederne la restituzione in denaro al Fondo Gruppo, indicando importo e preferenza (contanti o Revolut). L\'importo richiesto resta riservato (non si può spendere né regalare) finché un amministratore non lo paga dalla cassa e solo allora il saldo scende. Se la cassa non ha liquidità la richiesta può essere rifiutata e rifatta per un importo minore.',
-    '<b>Tra colleghi:</b> per passarsi crediti di persona c\'è «Regala / Trasferisci crediti»: è immediato, senza approvazione e senza annullo (solo un amministratore può stornarlo). Se avviene contro denaro si spunta «È uno scambio»: non conta come regalo nelle classifiche.',
+    '<b>Regalo:</b> «Regala crediti» è una donazione gratuita ai colleghi scelti: è immediata, senza approvazione e senza annullo (solo un amministratore può stornarla).',
+    '<b>Acquisto tra colleghi:</b> con «Acquista crediti da un collega» scegli il venditore, i crediti e come paghi (contanti o Revolut, fuori dall\'app). Il venditore riceve una richiesta e, solo dopo aver ricevuto il denaro, conferma: a quel punto i crediti passano a te. Puoi annullare finché è in attesa.',
     '<b>Prezzo:</b> 1 credito = 1,00 € fisso, nessuna commissione.'])}
   ${sez('6. Lista della spesa e rimborsi', [
     'Chiunque aggiunge alla <b>Lista della spesa</b> ciò che serve alla saletta (caffè, bibite, snack, detergenti). Chi fa la spesa spunta gli articoli che compra e registra l\'acquisto con l\'importo totale e le eventuali note; gli acquisti urgenti non in lista si registrano con <b>Acquisto fuori lista</b>.',
@@ -2832,17 +2852,55 @@ function rgAggiorna(){
 A['regala'] = () => {
   const col = membriAttivi().filter(m => m.id !== st.mid).slice().sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
   if(!col.length) return toast('Non ci sono altri colleghi', 'err');
-  openSheet(`<h3>🎁 Regala / Trasferisci crediti</h3>
-    <p class="sub">Il trasferimento è immediato: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
+  openSheet(`<h3>🎁 Regala crediti</h3>
+    <p class="sub">Un regalo gratuito: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
     <div class="between" style="margin-bottom:8px"><b style="font-size:13px">Colleghi</b><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="rg-tutti" data-v="1">Seleziona tutti</button><button class="btn sm ghost" data-act="rg-tutti" data-v="0">Deseleziona tutti</button></span></div>
     ${cercaBox('rg-lista')}<div id="rg-lista" style="max-height:34vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="rg-c" value="${m.id}" data-chg="rg-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('rg-lista')}</div>
     <label class="f"><span>Crediti per ogni collega</span><input class="in mono" id="rg-q" inputmode="numeric" maxlength="3" value="1" data-chg="rg-upd"></label>
     <label class="f"><span>Causale (facoltativa)</span><input class="in" id="rg-msg" maxlength="80" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
-    <label class="check" style="margin:4px 0 8px"><input type="checkbox" id="rg-trasf"><b style="flex:1;font-size:13.5px">È uno scambio: ho ricevuto denaro in cambio</b></label>
     <div id="rg-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
     <div id="rg-warn" class="banner red" style="display:none">${ic('alert')}<div><b>Saldo insufficiente</b></div></div>
     <button class="btn green block big" id="rg-send" data-act="rg-invia" disabled>Invia i crediti</button>`);
   rgAggiorna();
+};
+function acAggiorna(){
+  if(!$('ac-q')) return;
+  const r = document.querySelector('#sheet input[name="ac-v"]:checked'), max = r ? +r.dataset.max : 0;
+  const raw = val('ac-q'), qOk = /^\d{1,3}$/.test(raw) && +raw >= 1 && +raw <= 500, q = qOk ? +raw : 0, over = r && qOk && q > max;
+  const t = $('ac-tot');
+  if(t) t.innerHTML = !r ? 'Scegli il collega da cui comprare' : !qOk ? 'Indica quanti crediti vuoi comprare (numero intero)' : over ? `<span class="red">${esc(nomeBreve(r.value) || nomeM(r.value))} può vendere al massimo <b>${max}</b> ${max === 1 ? 'credito' : 'crediti'}</span>` : `Compri <b class="mono green">${q} ${q === 1 ? 'credito' : 'crediti'}</b> da ${esc(nomeBreve(r.value) || nomeM(r.value))} · da pagargli <b class="mono">${eur(q * 100)}</b>`;
+  const b = $('ac-invia'); if(b) b.disabled = !(r && qOk && !over);
+}
+A['acquista'] = () => {
+  const d = derived();
+  const ven = membriAttivi().filter(m => m.id !== st.mid).map(m => ({m, v: vendibile(m.id, d)})).filter(x => x.v >= 100).sort((a, b) => nomeM(a.m.id).localeCompare(nomeM(b.m.id)));
+  if(!ven.length) return toast('Nessun collega ha crediti liberi da vendere', 'err');
+  openSheet(`<h3>🤝 Acquista crediti da un collega</h3>
+    <p class="sub">Ti accordi con il collega e paghi fuori dall'app. I crediti ti arrivano solo quando lui conferma di aver ricevuto il denaro.</p>
+    <b style="font-size:13px">Da chi compri</b>
+    ${cercaBox('ac-lista')}<div id="ac-lista" style="max-height:30vh;overflow:auto;margin:6px 0 10px">${ven.map(x => `<label class="check" data-q="${qMem(x.m)}"><input type="radio" name="ac-v" value="${x.m.id}" data-max="${Math.floor(x.v / 100)}" data-chg="ac-upd"><b style="flex:1;font-size:14px">${esc(nomeM(x.m.id))}</b><span class="mono green" style="font-size:12.5px">${eur(x.v)}</span></label>`).join('')}${cercaVuoto('ac-lista')}</div>
+    <label class="f"><span>Crediti da comprare (1 credito = 1 €)</span><input class="in mono" id="ac-q" inputmode="numeric" maxlength="3" value="1" data-chg="ac-upd"></label>
+    <label class="f"><span>Come paghi (fuori dall'app)</span>${segOpts('ac-met', [['contanti','Contanti'],['revolut','Revolut']], 'contanti')}</label>
+    <div id="ac-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
+    <button class="btn green block big" id="ac-invia" data-act="ac-invia" disabled>Invia la richiesta</button>`);
+  acAggiorna();
+};
+A['ac-invia'] = () => {
+  const r = radio('ac-v'), raw = val('ac-q'), metodo = radio('ac-met');
+  if(!r || !membro(r) || r === st.mid) return toast('Scegli il collega', 'err');
+  if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > 500) return toast('Quantità non valida', 'err');
+  if(!['contanti', 'revolut'].includes(metodo)) return toast('Scegli come paghi', 'err');
+  const q = +raw, imp = q * 100;
+  if(imp > vendibile(r, derived())) return toast('Il collega non ha abbastanza crediti liberi', 'err');
+  addMov({tipo: 'scambio', stato: 'attesa', mid: st.mid, dest: r, daMid: r, aMid: st.mid, importo: imp, metodo});
+  closeSheet(); toast(`🤝 Richiesta inviata a ${nomeBreve(r) || nomeM(r)}: i crediti arrivano quando conferma`);
+};
+A['scambio-esito'] = ds => {
+  const mv = derived().scambiAttesa.find(x => x.id === ds.id);
+  if(!mv || mv.daMid !== st.mid || !['confermata', 'rifiutata'].includes(ds.v)) return;
+  if(ds.v === 'confermata' && (saldo(st.mid) - riservato(st.mid)) < mv.importo) return toast('Non hai abbastanza crediti liberi per confermare', 'err');
+  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS()})
+    .then(() => toast(ds.v === 'confermata' ? `Confermato ✓ ${mv.importo / 100} ${mv.importo === 100 ? 'credito ceduto' : 'crediti ceduti'}` : 'Richiesta rifiutata')).catch(e => toast(errMsg(e), 'err'));
 };
 A['rg-tutti'] = ds => { document.querySelectorAll('#sheet input.rg-c').forEach(x => { const l = x.closest('label'); if(!l || !l.hidden) x.checked = ds.v === '1'; }); rgAggiorna(); };
 A['rg-invia'] = () => {
@@ -2851,9 +2909,8 @@ A['rg-invia'] = () => {
   const q = +raw, imp = q * 100, msg = val('rg-msg').slice(0, 80);
   if(!ids.length) return toast('Seleziona almeno un collega', 'err');
   if(ids.length * imp > creditoLibero()) return toast('Saldo insufficiente', 'err');
-  const trasf = !!($('rg-trasf') && $('rg-trasf').checked);
-  ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {}), ...(trasf ? {trasf: true} : {})}));
-  closeSheet(); toast(`${trasf ? '🤝' : '🎁'} Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
+  ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {})}));
+  closeSheet(); toast(`🎁 Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
 };
 
 /* --- eventi --- */
@@ -3716,12 +3773,14 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
+  if(el && el.dataset.chg === 'ac-upd') acAggiorna();
   if(el && el.dataset.chg === 'bf-upd') bfAggiorna();
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
 document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
+  if(e.target.closest && e.target.closest('[data-chg="ac-upd"]')) acAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="bf-upd"]')) bfAggiorna();
   if(e.target && e.target.dataset && e.target.dataset.cerca) cercaApplica(e.target);
   if(e.target && e.target.id === 'feed-q'){   // filtra la sola lista, senza ricostruire la pagina (la tastiera resta aperta)
