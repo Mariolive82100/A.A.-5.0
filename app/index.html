@@ -379,7 +379,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.23.0';
+const VERSION = '1.24.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2080,7 +2080,7 @@ function aggiornaArticoli(m, ok){
 
 
 /* ---------- Chi paga il caffè?: chi indovina il numero paga il caffè (si gioca passandosi il telefono) ---------- */
-const GIOCO0 = () => ({fase:'setup', min:0, max:500, sel:null, ord:[], i:0, secret:0, lo:0, hi:500, ultimo:null, storia:[], perde:null});
+const GIOCO0 = () => ({fase:'setup', min:1, max:500, sel:null, ord:[], i:0, secret:0, lo:1, hi:500, dlo:1, dhi:500, ultimo:null, storia:[], perde:null});
 function giocoSt(){ if(!st.gioco) st.gioco = GIOCO0(); if(!st.gioco.sel) st.gioco.sel = {}; return st.gioco; }   // all'apertura nessuno e' spuntato
 function pGioco(d){
   const g = giocoSt(), nome = id => esc(nomeBreve(id) || nomeM(id));
@@ -2088,15 +2088,16 @@ function pGioco(d){
   if(g.fase === 'setup'){
     return `${head}
     <div class="card"><h3>Numero massimo</h3>
-      <label class="f" style="margin:0"><span>Il numero segreto va da 0 a…</span><select class="in mono" id="gm-max">${[100, 500, 1000].map(v => `<option value="${v}" ${g.max === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
+      <label class="f" style="margin:0"><span>Il numero segreto va da 1 a…</span><select class="in mono" id="gm-max">${[100, 500, 1000].map(v => `<option value="${v}" ${g.max === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
     <div class="card"><h3><span>Chi gioca <span class="mut" style="text-transform:none;letter-spacing:0">(${Object.values(g.sel).filter(Boolean).length} scelti)</span></span><span class="row" style="gap:6px"><button class="btn sm ghost" id="gm-tutti" data-act="gioco-tutti" data-v="1">Tutti</button><button class="btn sm ghost" id="gm-nessuno" data-act="gioco-tutti" data-v="0">Nessuno</button></span></h3>${cercaBox('gm-lista')}<div class="list" id="gm-lista">${membriAttivi().map(m => `<button class="li" data-q="${qMem(m)}" data-act="gioco-toggle" data-id="${m.id}" style="width:100%;text-align:left;${g.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${g.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(m.id))}</div></div></button>`).join('')}</div>${cercaVuoto('gm-lista')}</div>
     <button class="btn amber block big" id="gm-start" data-act="gioco-start">Inizia la partita</button>`;
   }
   if(g.fase === 'play'){
     const cur = g.ord[g.i], u = g.ultimo;
     return `${head}<div class="card" style="text-align:center">
-      <small class="mut">Il numero segreto è tra</small>
-      <div class="mono amber" id="gm-range" style="font-size:30px;font-weight:800">${g.lo} – ${g.hi}</div>
+      <small class="mut">Intervallo corrente</small>
+      <div class="mono amber" id="gm-range" style="font-size:30px;font-weight:800">[${g.dlo} – ${g.dhi}]</div>
+      ${g.dlo > g.min || g.dhi < g.max ? '<div class="mut" style="font-size:11.5px">gli estremi sono già stati provati: il numero è tra i due</div>' : ''}
       ${u ? `<div id="gm-hint" class="gm-hint ${u.dir}" style="margin:12px 0"><span class="gm-arrow">${u.dir === 'su' ? '⬆️' : '⬇️'}</span><b>${u.dir === 'su' ? 'Troppo basso' : 'Troppo alto'}</b><div class="mut" style="font-size:12px">${nome(u.mid)} ha provato ${u.n}</div></div>` : '<div class="mut" style="margin:12px 0;font-size:13px">Nessun tentativo ancora</div>'}
       <div class="mut" style="font-size:12px">Tocca a</div>
       <div id="gm-turno" style="font-size:24px;font-weight:800;margin-bottom:8px">${nome(cur)}</div>
@@ -2111,7 +2112,8 @@ function pGioco(d){
     <div class="mut" style="font-size:13px">Il numero era <b class="mono amber">${g.secret}</b> · ${g.storia.length} tentativi</div>
     <div class="gm-loser" id="gm-perde">${nome(g.perde)}</div>
     <div style="font-size:20px;font-weight:800">paga il caffè! 😄</div></div>
-    <div class="grid2"><button class="btn amber" id="gm-ancora" data-act="gioco-ancora">Rigioca</button><button class="btn ghost" data-act="gioco-reset">Cambia giocatori</button></div>`;
+    <button class="btn amber block big" id="gm-ruota" data-act="gioco-ruota" style="margin-bottom:10px">🎡 E chi fa i caffè? Ruota del Barista</button>
+    <div class="grid2"><button class="btn ghost" id="gm-ancora" data-act="gioco-ancora">Rigioca</button><button class="btn ghost" data-act="gioco-reset">Cambia giocatori</button></div>`;
 }
 function pEventi(){
   const evs = st.eventi.map(e => ({...e, prossima: prossimaData(e)})).sort((a,b) => a.prossima.localeCompare(b.prossima));
@@ -2574,24 +2576,42 @@ A['gioco-toggle'] = ds => { const g = giocoSt(); g.sel[ds.id] = !g.sel[ds.id]; r
 A['gioco-reset'] = () => { st.gioco = null; render(); };
 function giocoAvvia(g){
   g.ord = Object.keys(g.sel).filter(k => g.sel[k] && membro(k)); for(let k = g.ord.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [g.ord[k], g.ord[j]] = [g.ord[j], g.ord[k]]; }
-  g.fase = 'play'; g.i = 0; g.lo = g.min; g.hi = g.max; g.secret = g.min + Math.floor(Math.random() * (g.max - g.min + 1)); g.ultimo = null; g.storia = []; g.perde = null;
+  g.fase = 'play'; g.i = 0; g.lo = g.min; g.hi = g.max; g.dlo = g.min; g.dhi = g.max; g.secret = g.min + Math.floor(Math.random() * (g.max - g.min + 1)); g.ultimo = null; g.storia = []; g.perde = null;
 }
 A['gioco-start'] = () => {
-  const g = giocoSt(), mn = 0, mx = parseInt(val('gm-max'), 10);
+  const g = giocoSt(), mn = 1, mx = parseInt(val('gm-max'), 10);
   if(![100, 500, 1000].includes(mx)) return toast('Scegli il numero massimo', 'err');
   if(Object.keys(g.sel).filter(k => g.sel[k]).length < 2) return toast('Servono almeno 2 giocatori', 'err');
   g.min = mn; g.max = mx; giocoAvvia(g); render();
 };
+/* dopo la partita: proposta della Ruota del Barista (tutto in memoria, nessuna lettura/scrittura) */
+function giocoChiediRuota(){
+  openSheet(`<h3>☕ Chi fa i caffè?</h3><p class="sub">Vuoi scegliere anche chi fa i caffè con la <b>Ruota del Barista</b>?</p>
+    <div class="grid2"><button class="btn ghost" id="gr-no" data-act="sheet-close">No, grazie</button><button class="btn amber" id="gr-si" data-act="gioco-ruota-si">Sì, scegliamo!</button></div>`);
+}
+A['gioco-ruota'] = () => giocoChiediRuota();
+A['gioco-ruota-si'] = () => {
+  openSheet(`<h3>🎡 Ruota del Barista</h3><p class="sub">Vuoi mantenere gli stessi partecipanti di questo turno?</p>
+    <div class="grid2"><button class="btn ghost" id="gr-altri" data-act="gioco-ruota-vai" data-v="0">No, scelgo io</button><button class="btn amber" id="gr-stessi" data-act="gioco-ruota-vai" data-v="1">Sì, gli stessi</button></div>`);
+};
+A['gioco-ruota-vai'] = ds => {
+  const g = giocoSt(), stessi = ds.v === '1' && g.ord.length >= 2;
+  closeSheet();
+  const r = ruotaSt(); r.vinc = null;
+  if(stessi){ r.sel = Object.fromEntries(g.ord.filter(id => membro(id)).map(id => [id, true])); r.gira = false; }
+  A['go']({p: 'ruota'});
+  if(stessi) setTimeout(() => { if(st.page === 'ruota' && !ruotaSt().gira) A['ruota-gira'](); }, 500);
+};
 A['gioco-ancora'] = () => { const g = giocoSt(); giocoAvvia(g); render(); };
 A['gioco-prova'] = () => {
   const g = giocoSt(), n = parseInt(val('gm-n'), 10);
-  if(!Number.isInteger(n) || n < g.lo || n > g.hi) return toast(`Scrivi un numero tra ${g.lo} e ${g.hi}`, 'err');
+  if(!Number.isInteger(n) || n < g.lo || n > g.hi) return toast(`Scrivi un numero tra ${g.lo} e ${g.hi}${g.dlo > g.min || g.dhi < g.max ? ' (gli estremi sono già stati provati)' : ''}`, 'err');
   const mid = g.ord[g.i];
   const inp = $('gm-n'); if(inp) inp.value = '';   // pronto per il giocatore dopo: campo vuoto e tastiera ancora su
   const rifocus = () => requestAnimationFrame(() => requestAnimationFrame(() => { const x = $('gm-n'); if(x) x.focus(); }));
-  if(n === g.secret){ g.storia.push({mid, n, dir: 'ok'}); g.perde = mid; g.fase = 'fine'; try { navigator.vibrate && navigator.vibrate([120, 60, 120, 60, 300]); } catch(e){} render(); return; }
+  if(n === g.secret){ g.storia.push({mid, n, dir: 'ok'}); g.perde = mid; g.fase = 'fine'; try { navigator.vibrate && navigator.vibrate([120, 60, 120, 60, 300]); } catch(e){} render(); setTimeout(() => { if(st.gioco === g && g.fase === 'fine' && st.page === 'gioco') giocoChiediRuota(); }, 900); return; }
   const dir = n < g.secret ? 'su' : 'giu';
-  if(dir === 'su') g.lo = n + 1; else g.hi = n - 1;
+  if(dir === 'su'){ g.lo = n + 1; g.dlo = n; } else { g.hi = n - 1; g.dhi = n; }
   g.ultimo = {mid, n, dir}; g.storia.push({mid, n, dir}); g.i = (g.i + 1) % g.ord.length; render(); rifocus();
 };
 
