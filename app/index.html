@@ -232,6 +232,7 @@ textarea.in{min-height:96px;resize:vertical}
 .seg input:checked+label{border-color:var(--amber);color:var(--amber);background:rgba(245,165,36,.08)}
 .seg label.off{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}.seg label .nd{display:block;font-size:10.5px;font-weight:700;margin-top:2px}
 .rvsw{display:flex;align-items:center;gap:12px;width:100%;text-align:left}.rvsw .trk{flex:none;width:46px;height:26px;border-radius:99px;background:var(--line2);position:relative;transition:background .2s}.rvsw .trk::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}.rvsw.on .trk{background:var(--green)}.rvsw.on .trk::after{transform:translateX(20px)}
+.cerca{display:flex;gap:6px;margin:0 0 10px}.cerca .in{flex:1;min-width:0;padding:9px 12px;font-size:14px}[data-q][hidden]{display:none!important}.cerca-vuoto{padding:10px;font-size:13px}
 .check{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);background:var(--bg2);border-radius:13px;margin-bottom:7px;cursor:pointer}
 .check input{width:19px;height:19px;accent-color:var(--violet)}
 .hint{font-size:12px;color:var(--mut);margin:-4px 0 12px}
@@ -371,7 +372,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.18.2';
+const VERSION = '1.19.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -846,6 +847,7 @@ function doRender(){
   main.querySelectorAll('input[id]:not([type=file]),textarea[id],select[id]').forEach(e => { keep[e.id] = e.type === 'checkbox' ? e.checked : e.value; });
   const restore = () => {
     for(const id in keep){ const e = $(id); if(e){ if(e.type === 'checkbox') e.checked = keep[id]; else e.value = keep[id]; } }
+    cercaTutti();
     if(foc && $(foc)) $(foc).focus({preventScroll: true});   // senza preventScroll il browser portava in vista il campo (select/input) in cima alla pagina
   };
   if(!inApp){ if(!scFuori) scFuori = Date.now(); main.innerHTML = renderEntry(); restore(); return; }
@@ -1275,9 +1277,9 @@ function pAdminHome(d, forza){
   <button class="btn sm block ghost" style="margin-bottom:8px" data-act="spesa-admin">${ic('receipt','s')} Registra spesa</button>
   <button class="btn sm block ghost" data-act="go" data-p="registro">${ic('receipt','s')} Registro dei movimenti di cassa (con storno)</button>`;
   const sociT = `<button class="card between" style="width:100%;text-align:left" data-act="go" data-p="quote"><span>${ic('wallet','s')} <b>Quote fondo ${a}</b></span><span class="pill ${qPag === soci.length ? 'green' : 'amber'}">${qPag} su ${soci.length} pagate</span></button>
-  <div class="card"><div class="list">${soci.map(m => `<button class="li" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
+  <div class="card">${cercaBox('soci-lista')}<div class="list" id="soci-lista">${soci.map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
       <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">⭐ ${ptDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
-      <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>
+      <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>${cercaVuoto('soci-lista')}
     <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button><button class="btn sm ghost" data-act="go" data-p="membri">${ic('users','s')} Tutti i colleghi</button></div>
   </div>
   <button class="btn amber block big" id="adm-classifiche" data-act="go" data-p="classifiche" style="margin-top:10px">📊 Classifiche e statistiche</button>`;
@@ -2131,7 +2133,7 @@ function pGioco(d){
     return `${head}<p class="sub">Si sceglie un numero segreto: a turno ognuno prova a indovinarlo. Chi lo indovina perde e paga il caffè!</p>
     <div class="card"><h3>Numero massimo</h3>
       <label class="f" style="margin:0"><span>Il numero segreto va da 0 a…</span><select class="in mono" id="gm-max">${[100, 500, 1000].map(v => `<option value="${v}" ${g.max === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
-    <div class="card"><h3><span>Chi gioca <span class="mut" style="text-transform:none;letter-spacing:0">(${Object.values(g.sel).filter(Boolean).length} scelti)</span></span><span class="row" style="gap:6px"><button class="btn sm ghost" id="gm-tutti" data-act="gioco-tutti" data-v="1">Tutti</button><button class="btn sm ghost" id="gm-nessuno" data-act="gioco-tutti" data-v="0">Nessuno</button></span></h3><div class="list">${membriAttivi().map(m => `<button class="li" data-act="gioco-toggle" data-id="${m.id}" style="width:100%;text-align:left;${g.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${g.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(m.id))}</div></div></button>`).join('')}</div></div>
+    <div class="card"><h3><span>Chi gioca <span class="mut" style="text-transform:none;letter-spacing:0">(${Object.values(g.sel).filter(Boolean).length} scelti)</span></span><span class="row" style="gap:6px"><button class="btn sm ghost" id="gm-tutti" data-act="gioco-tutti" data-v="1">Tutti</button><button class="btn sm ghost" id="gm-nessuno" data-act="gioco-tutti" data-v="0">Nessuno</button></span></h3>${cercaBox('gm-lista')}<div class="list" id="gm-lista">${membriAttivi().map(m => `<button class="li" data-q="${qMem(m)}" data-act="gioco-toggle" data-id="${m.id}" style="width:100%;text-align:left;${g.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${g.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:13.5px">${esc(nomeM(m.id))}</div></div></button>`).join('')}</div>${cercaVuoto('gm-lista')}</div>
     <button class="btn amber block big" id="gm-start" data-act="gioco-start">Inizia la partita</button>`;
   }
   if(g.fase === 'play'){
@@ -2250,10 +2252,10 @@ function pQuote(d){
   return `<h2>${ic('users')} Quote fondo ${a}</h2><p class="sub">Quota annuale di ${eur(st.gruppo.quotaAnnua||0)} · pagate ${pagati} su ${list.length}</p>
   <div class="banner sky">${ic('wallet')}<div>La quota è un contributo al fondo, separato dal portafoglio: non crea debiti e non cambia il saldo. Attiva l'interruttore quando la ricevi e scegli se accreditarla anche come crediti consumabili.</div></div>
   ${mig.length ? `<div class="banner amber">${ic('alert')}<div class="grow">${mig.length} ${mig.length === 1 ? 'collega ha' : 'colleghi hanno'} ancora un addebito di quota del vecchio modello non pagato (${eur(mig.reduce((t, x) => t + x.imp, 0))} in meno nei saldi).</div><button class="btn sm amber" id="btn-quota-migra" data-act="quota-migra">Azzera addebiti quota pregressi</button></div>` : ''}
-  <div class="card list">${list.map(m => `<div class="li">
+  <div class="card">${cercaBox('quote-lista')}<div class="list" id="quote-lista">${list.map(m => `<div class="li" data-q="${qMem(m)}">
     <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d mono">saldo ${eurS(saldo(m.id))}${m.sq === 'pagata' && m.qm && typeof m.qm.cred === 'boolean' ? ' · ' + (m.qm.cred ? 'accreditata come crediti' : 'solo fondo') : ''}</div></div>
     <span class="pill ${m.sq === 'pagata' ? 'green' : 'red'}">${m.sq === 'pagata' ? 'pagata' : 'da pagare'}</span>
-    <button class="tgl ${m.sq === 'pagata' ? 'on' : ''}" role="switch" aria-checked="${m.sq === 'pagata'}" aria-label="Quota pagata: ${esc(nomeM(m.id))}" data-act="quota-toggle" data-id="${m.id}"></button></div>`).join('')}</div>`;
+    <button class="tgl ${m.sq === 'pagata' ? 'on' : ''}" role="switch" aria-checked="${m.sq === 'pagata'}" aria-label="Quota pagata: ${esc(nomeM(m.id))}" data-act="quota-toggle" data-id="${m.id}"></button></div>`).join('')}</div>${cercaVuoto('quote-lista')}</div>`;
 }
 
 /* ---------- STATISTICHE ---------- */
@@ -2302,9 +2304,9 @@ function labelChiusura(c){
 function pMembri(d){
   return `<h2>${ic('users')} Colleghi</h2><p class="sub">Tutti i membri del gruppo. Tocca un nome per modificarlo, accreditare, nominarlo amministratore o archiviarlo.</p>
   <div class="card"><h3><span>Colleghi</span><button class="btn link" data-act="membro" data-id="">${ic('plus','s')} Aggiungi</button></h3>
-    <div class="list">${membriAttivi().map(m => `<button class="li" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
+    ${cercaBox('mb-lista')}<div class="list" id="mb-lista">${membriAttivi().map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
       <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t ${m.attivo === false ? 'strike' : ''}">${esc(m.nome)}</div><div class="d">${m.nick ? '“' + esc(m.nick) + '” · ' : ''}${m.attivo === false ? 'non attivo' : st.utenti.filter(u => u.mid === m.id).length + ' telefono/i'}${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
-      <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>
+      <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>${cercaVuoto('mb-lista')}
     ${st.membri.some(m => m.attivo === false) ? `<details style="margin-top:8px"><summary class="mut" style="cursor:pointer;font-size:12.5px;padding:6px 2px">Archiviati ed espulsi (${st.membri.filter(m => m.attivo === false).length})</summary>
       <div class="list">${st.membri.filter(m => m.attivo === false).map(m => `<button class="li" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
         <div class="av">${ic(m.espulso ? 'logout' : 'archive','s')}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d">${m.espulso ? 'espulso' : 'archiviato'}</div></div>
@@ -2625,7 +2627,7 @@ A['rifiuta-accesso'] = ds => {
   C('richieste').doc(ds.id).set({stato: 'rifiutata', esitoDa: myName(), esitoTs: TS()}, {merge: true}).then(() => toast('Richiesta rifiutata')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
 };
-A['gioco-tutti'] = ds => { const g = giocoSt(); g.sel = {}; if(ds.v === '1') membriAttivi().forEach(m => { g.sel[m.id] = true; }); render(); };
+A['gioco-tutti'] = ds => { const g = giocoSt(); cercaFiltra('gm-lista', membriAttivi()).forEach(m => { if(ds.v === '1') g.sel[m.id] = true; else delete g.sel[m.id]; }); render(); };
 A['gioco-toggle'] = ds => { const g = giocoSt(); g.sel[ds.id] = !g.sel[ds.id]; render(); };
 A['gioco-reset'] = () => { st.gioco = null; render(); };
 function giocoAvvia(g){
@@ -2872,7 +2874,7 @@ A['regala'] = () => {
   openSheet(`<h3>🎁 Regala / Trasferisci crediti</h3>
     <p class="sub">Il trasferimento è immediato: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
     <div class="between" style="margin-bottom:8px"><b style="font-size:13px">Colleghi</b><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="rg-tutti" data-v="1">Seleziona tutti</button><button class="btn sm ghost" data-act="rg-tutti" data-v="0">Deseleziona tutti</button></span></div>
-    <div style="max-height:34vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check"><input type="checkbox" class="rg-c" value="${m.id}" data-chg="rg-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}</div>
+    ${cercaBox('rg-lista')}<div id="rg-lista" style="max-height:34vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="rg-c" value="${m.id}" data-chg="rg-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('rg-lista')}</div>
     <label class="f"><span>Crediti per ogni collega</span><input class="in mono" id="rg-q" inputmode="numeric" maxlength="3" value="1" data-chg="rg-upd"></label>
     <label class="f"><span>Causale (facoltativa)</span><input class="in" id="rg-msg" maxlength="80" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
     <label class="check" style="margin:4px 0 8px"><input type="checkbox" id="rg-trasf"><b style="flex:1;font-size:13.5px">È uno scambio: ho ricevuto denaro in cambio</b></label>
@@ -2881,7 +2883,7 @@ A['regala'] = () => {
     <button class="btn green block big" id="rg-send" data-act="rg-invia" disabled>Invia i crediti</button>`);
   rgAggiorna();
 };
-A['rg-tutti'] = ds => { document.querySelectorAll('#sheet input.rg-c').forEach(x => { x.checked = ds.v === '1'; }); rgAggiorna(); };
+A['rg-tutti'] = ds => { document.querySelectorAll('#sheet input.rg-c').forEach(x => { const l = x.closest('label'); if(!l || !l.hidden) x.checked = ds.v === '1'; }); rgAggiorna(); };
 A['rg-invia'] = () => {
   const ids = [...document.querySelectorAll('#sheet input.rg-c:checked')].map(x => x.value).filter(x => x !== st.mid && membro(x));
   const raw = val('rg-q'); if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > 500) return toast('Quantità non valida', 'err');
@@ -3234,7 +3236,7 @@ A['conferma-accredito'] = () => {
   addMov({tipo:'accredito', mid, importo: imp, causale: val('ac-caus').slice(0,80)});
   closeSheet(); toast(`${eur(imp)} accreditati a ${nomeM(mid)}`);
 };
-function selMembro(id, sel){ return `<select class="in" id="${id}">${membriAttivi().map(m => `<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(nomeM(m.id))}</option>`).join('')}</select>`; }
+function selMembro(id, sel){ return `${cercaBox(id)}<select class="in" id="${id}">${membriAttivi().map(m => `<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(nomeM(m.id))}</option>`).join('')}</select>${cercaVuoto(id)}`; }
 A['ricarica-per'] = ds => openSheet(`<h3>${ic('banknote')} Ricarica per un collega</h3><p class="sub">Hai ricevuto tu i soldi: vale subito.</p>
   <label class="f"><span>Collega</span>${selMembro('rp-m', ds.id)}</label>
   <label class="f"><span>Importo €</span><input class="in mono" id="rp-imp" inputmode="decimal" placeholder="10,00"></label>
@@ -3308,7 +3310,7 @@ A['benfatto'] = () => {
   openSheet(`<h3>👏 Ben fatto!</h3>
     <p class="sub">Riconosci un collega meritevole: lui riceve <b>+${ptBenFatto()} punti</b>, tu non perdi nulla.</p>
     <div class="banner ${left > 0 ? 'sky' : 'amber'}">${ic(left > 0 ? 'info' : 'alert')}<div>${left > 0 ? `Gettoni disponibili: <b>${left}</b> su ${n} (${bfPeriodo() === 'mese' ? 'questo mese' : 'questa settimana'}).` : `Gettone già usato: si rinnova ${bfRinnovo()}.`}</div></div>
-    ${col.length ? `<label class="f" style="margin-bottom:6px"><span>A chi?</span></label><div style="max-height:30vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check"><input type="radio" name="bf-dest" value="${m.id}" data-chg="bf-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}</div>` : '<div class="empty">Non ci sono altri colleghi.</div>'}
+    ${col.length ? `<label class="f" style="margin-bottom:6px"><span>A chi?</span></label>${cercaBox('bf-lista')}<div id="bf-lista" style="max-height:30vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="radio" name="bf-dest" value="${m.id}" data-chg="bf-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('bf-lista')}</div>` : '<div class="empty">Non ci sono altri colleghi.</div>'}
     <label class="f"><span>Perché? (obbligatorio) <small id="bf-cnt" class="mut">0/80</small></span><input class="in" id="bf-msg" maxlength="80" data-chg="bf-upd" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
     <button class="btn green block big" id="bf-send" data-act="bf-invia" disabled>Invia 👏</button>`);
 };
@@ -3762,6 +3764,7 @@ document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="bf-upd"]')) bfAggiorna();
+  if(e.target && e.target.dataset && e.target.dataset.cerca) cercaApplica(e.target);
   if(e.target && e.target.id === 'feed-q'){   // filtra la sola lista, senza ricostruire la pagina (la tastiera resta aperta)
     st.feedQ = e.target.value; const l = $('feed-list'), x = $('feed-q-x');
     if(l) l.innerHTML = feedLista(derived());
@@ -3774,6 +3777,31 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Enter' && e.target.id === 'sp-nome') A['spesa-aggiungi']();
 });
 setInterval(() => { if(st.page === 'feed' || st.page === 'bar') render(); }, 60000);
+
+/* ---------- Cerca collega: filtro istantaneo lato client sui dati gia' in memoria (nessuna lettura) ---------- */
+const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const qMem = m => esc(norm((m.nome || '') + ' ' + (m.nick || '')));
+const cercaBox = id => `<div class="cerca"><input class="in" type="search" id="${id}-q" data-cerca="${id}" inputmode="search" autocomplete="off" placeholder="🔍 Cerca collega..." aria-label="Cerca collega"><button type="button" class="btn sm ghost" id="${id}-qx" data-act="cerca-x" data-t="${id}" hidden aria-label="Azzera la ricerca">✕</button></div>`;
+const cercaVuoto = id => `<div class="empty cerca-vuoto" id="${id}-vuoto" hidden>Nessun collega trovato</div>`;
+const cercaTesto = id => { const i = $(id + '-q'); return i ? norm(i.value.trim()) : ''; };
+const cercaFiltra = (id, arr) => { const q = cercaTesto(id); return q ? arr.filter(m => norm((m.nome || '') + ' ' + (m.nick || '')).includes(q)) : arr; };
+function cercaApplica(inp){
+  const id = inp.dataset.cerca, el = $(id); if(!el) return;
+  const q = norm(inp.value.trim());
+  let n = 0, tot = 0;
+  if(el.tagName === 'SELECT'){   // menu a tendina: ricostruisco le voci, tenendo la scelta se ancora visibile
+    const cur = el.value, all = membriAttivi(), ok = q ? all.filter(m => norm(m.nome + ' ' + (m.nick || '')).includes(q)) : all;
+    el.innerHTML = ok.map(m => `<option value="${m.id}">${esc(nomeM(m.id))}</option>`).join('');
+    if(ok.some(m => m.id === cur)) el.value = cur;
+    n = ok.length; tot = all.length;
+  } else {
+    el.querySelectorAll('[data-q]').forEach(x => { const vis = !q || x.dataset.q.includes(q); x.hidden = !vis; tot++; if(vis) n++; });
+  }
+  const v = $(id + '-vuoto'); if(v) v.hidden = n > 0 || !tot;
+  const x = $(id + '-qx'); if(x) x.hidden = !q;
+}
+const cercaTutti = () => document.querySelectorAll('[data-cerca]').forEach(cercaApplica);
+A['cerca-x'] = ds => { const i = $(ds.t + '-q'); if(i){ i.value = ''; cercaApplica(i); i.focus(); } };
 
 /* ---------- Avvisi e comunicazioni in Home ---------- */
 const AVV_TIPI = {avviso: ['📢', 'Avviso', 'amber'], attenzione: ['⚠️', 'Attenzione', 'red'], info: ['ℹ️', 'Info', 'sky']};
@@ -3851,11 +3879,11 @@ function pRuota(d){
   ${ruota}${esito}
   <button class="btn amber block big" id="ruota-gira" data-act="ruota-gira" ${sel.length >= 2 && !r.gira ? '' : 'disabled'}>${r.gira ? 'Gira…' : r.vinc ? '🔁 Rigira la ruota' : '🎡 Gira la ruota!'}</button>
   <div class="card" style="margin-top:12px"><h3><span>Chi c'è</span><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="ruota-tutti" data-v="1" ${r.gira ? 'disabled' : ''}>Tutti</button><button class="btn sm ghost" data-act="ruota-tutti" data-v="0" ${r.gira ? 'disabled' : ''}>Nessuno</button></span></h3>
-    <div class="list">${att.map(m => `<button class="li" data-act="ruota-toggle" data-id="${m.id}" ${r.gira ? 'disabled' : ''} style="width:100%;text-align:left;${r.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${r.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:14px">${esc(nome(m.id))}${m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div></button>`).join('')}</div>
-    <p class="hint" style="margin:8px 0 0">Estrazione casuale e uniforme: ognuno ha la stessa probabilità. Non viene salvato nulla.</p></div>`;
+    ${cercaBox('ruota-lista')}<div class="list" id="ruota-lista">${att.map(m => `<button class="li" data-q="${qMem(m)}" data-act="ruota-toggle" data-id="${m.id}" ${r.gira ? 'disabled' : ''} style="width:100%;text-align:left;${r.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${r.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:14px">${esc(nome(m.id))}${m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div></button>`).join('')}</div>
+    ${cercaVuoto('ruota-lista')}<p class="hint" style="margin:8px 0 0">Estrazione casuale e uniforme: ognuno ha la stessa probabilità. Non viene salvato nulla.</p></div>`;
 }
 A['ruota-toggle'] = ds => { const r = ruotaSt(); if(r.gira) return; r.sel[ds.id] = !r.sel[ds.id]; r.vinc = null; render(); };
-A['ruota-tutti'] = ds => { const r = ruotaSt(); if(r.gira) return; r.sel = {}; if(ds.v === '1') membriAttivi().forEach(m => { r.sel[m.id] = true; }); r.vinc = null; render(); };
+A['ruota-tutti'] = ds => { const r = ruotaSt(); if(r.gira) return; cercaFiltra('ruota-lista', membriAttivi()).forEach(m => { if(ds.v === '1') r.sel[m.id] = true; else delete r.sel[m.id]; }); r.vinc = null; render(); };
 A['ruota-gira'] = () => {
   const r = ruotaSt(); if(r.gira) return;
   const ids = membriAttivi().slice().sort((a, b) => (nomeBreve(a.id) || nomeM(a.id)).localeCompare(nomeBreve(b.id) || nomeM(b.id))).filter(m => r.sel[m.id]).map(m => m.id);
