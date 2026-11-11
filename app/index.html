@@ -38,6 +38,15 @@ header{position:sticky;top:0;z-index:30;background:rgba(11,16,32,.88);backdrop-f
 .iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--tx2);position:relative}
 .iconbtn:active{background:var(--card2)}
 .brand{flex:1;min-width:0}
+header.hasrank{gap:6px}
+header.hasrank .brand{flex:0 1 auto;min-width:64px}
+@media (max-width:399px){.rankpill .rk-t{display:none}}
+header.hasrank #hdr-update{margin-left:0!important}
+.rankpill{margin:0 auto;padding:4px 8px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--tx2);font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer;flex:0 0 auto}
+.rankpill.g1{border-color:rgba(251,191,36,.7);background:linear-gradient(135deg,rgba(251,191,36,.30),rgba(245,165,36,.10));color:#fde68a;box-shadow:0 0 10px rgba(251,191,36,.25)}
+.rankpill.g2{border-color:rgba(203,213,225,.6);background:rgba(203,213,225,.14);color:#e2e8f0}
+.rankpill.g3{border-color:rgba(217,119,6,.6);background:rgba(217,119,6,.16);color:#fdba74}
+.rankpill.idle{font-weight:700;color:var(--mut)}
 .brand b{display:flex;align-items:center;gap:6px;font-size:16px;background:linear-gradient(90deg,var(--amber),#fde68a);-webkit-background-clip:text;background-clip:text;color:transparent}
 .brand b svg{color:var(--amber)}
 .brand small{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -327,6 +336,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
     <b id="hdr-name"><svg class="i s"><use href="#i-coffee"/></svg>Armieri 5.0</b>
     <small><span class="dot" id="syncdot"></span><span id="hdr-sub"></span></small>
   </div>
+  <button class="rankpill hidden" id="hdr-rank" data-act="go" data-p="classifiche" aria-label="La tua posizione in classifica nel mese"></button>
   <button class="iconbtn" id="hdr-update" style="margin-left:auto" data-act="aggiorna" aria-label="Aggiorna all'ultima versione" title="Aggiorna all'ultima versione"><svg class="i"><use href="#i-repeat"/></svg></button>
   <button class="sbadge pos hidden" id="hdr-sb" style="margin-left:6px" data-act="go" data-p="registro" aria-label="Saldo"></button>
 </header>
@@ -396,7 +406,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.31.0';
+const VERSION = '1.32.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -948,6 +958,7 @@ function doRender(){
   const cn = contatori(d);
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s); sb.dataset.p = av ? 'registro' : 'crediti'; sb.setAttribute('aria-label', av ? 'Saldo' : 'Saldo: tocca per ricaricare');
+  aggiornaPillola(d, av);
   $('hdr-menu').classList.remove('hidden');
   const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['pulizie','Pulizie','brush'],['notifiche','Notifiche','bell']];
   const nPul = !av ? nPulDisp() : 0;
@@ -1880,14 +1891,14 @@ function aggMov(G, m, sg){
   }
 }
 function aggrega(list){ const G = nuovoAgg(); list.forEach(m => aggMov(G, m)); return G; }
-let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''};
+let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''}, _aggHd = {d: null, k: ''};
 function aggRange(d, r, slot){
   const k = [r.da, r.a, st.arcMov ? st.arcMov.length : -1, new Date().toDateString()].join('|');
-  const c = slot === 'cl' ? _aggCl : _aggC;
+  const c = slot === 'cl' ? _aggCl : slot === 'hd' ? _aggHd : _aggC;
   if(c.d === d && c.k === k) return c;
   const tutti = (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
   const n = {d, k, r, tutti, G: aggrega(tutti)};
-  if(slot === 'cl') _aggCl = n; else _aggC = n;
+  if(slot === 'cl') _aggCl = n; else if(slot === 'hd') _aggHd = n; else _aggC = n;
   return n;
 }
 function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
@@ -1972,6 +1983,25 @@ const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi pri
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
 const CL_CAT = [['c', '☕', 'Consumi'], ['p', '✨', 'Pulizie'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
 const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
+/* posizione del collegato nella classifica punti del mese corrente (stessa regola e stesso ordine della pagina Classifica; tutto in memoria) */
+function posMese(d){
+  const o = new Date(), M = aggConChiusi(d, {da: new Date(o.getFullYear(), o.getMonth(), 1).getTime(), a: Infinity, label: 'Mese corrente'}, 'hd'), G = M.G;
+  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}));
+  righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
+  const i = righe.findIndex(x => x.id === st.mid);
+  return i < 0 ? null : {pos: i + 1, n: righe.length, tot: righe[i].tot};
+}
+function aggiornaPillola(d, av){
+  const el = $('hdr-rank'), hd = $('hdr'); if(!el || !hd) return;
+  let x = null;
+  if(!av && st.mid && ptMaster()){ try { x = posMese(d); } catch(e){ x = null; } }
+  hd.classList.toggle('hasrank', !!x); el.classList.toggle('hidden', !x);
+  if(!x) return;
+  const med = {1: '🥇 ', 2: '🥈 ', 3: '🥉 '}[x.pos] || '';
+  el.className = 'rankpill ' + (x.tot <= 0 ? 'idle' : ({1: 'g1', 2: 'g2', 3: 'g3'}[x.pos] || ''));
+  el.innerHTML = x.tot <= 0 ? '🏁 In gara' : `${med}${x.pos}°<span class="rk-t"> in classifica</span>`;
+  el.setAttribute('aria-label', x.tot <= 0 ? 'Nessun punto ancora questo mese' : `Sei ${x.pos}° su ${x.n} nella classifica del mese`);
+}
 function clRighe(d){
   const r = clRange(), M = aggConChiusi(d, r, 'cl'), G = M.G;
   const righe = membriAttivi().map(m => { const c = nz(G.ptC, m.id), p = nz(G.ptP, m.id), s = nz(G.ptS, m.id), b = nz(G.ptB, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
@@ -2121,13 +2151,14 @@ function clClassifica(d, R, T, c){
   ${albo}`;
 }
 function pClassifiche(d){
-  const mod = st.clMod === 'stat' ? 'stat' : 'classifica';
-  const sw = `<div class="grid2" id="cl-mod" style="gap:8px;margin:0 0 12px">
-    <button id="cl-mod-classifica" class="btn block ${mod === 'classifica' ? 'amber' : 'ghost'}" data-act="cl-mod" data-v="classifica">🏆 Classifica</button>
-    <button id="cl-mod-stat" class="btn block ${mod === 'stat' ? 'amber' : 'ghost'}" data-act="cl-mod" data-v="stat">📊 Statistiche</button></div>`;
-  return `<h2>${ic('chart')} Classifica e statistiche</h2>${sw}${mod === 'stat' ? pStatConsumi(d) : pClassificaPunti(d)}`;
+  const mod = st.clMod === 'stat' ? 'stat' : (st.clMod === 'arc' && st.isAdmin) ? 'arc' : 'classifica';
+  const sw = `<div id="cl-mod" style="display:grid;grid-template-columns:repeat(${st.isAdmin ? 3 : 2},1fr);gap:${st.isAdmin ? 6 : 8}px;margin:0 0 12px">
+    <button id="cl-mod-classifica" class="btn block ${mod === 'classifica' ? 'amber' : 'ghost'}" style="${st.isAdmin ? 'padding-left:6px;padding-right:6px;font-size:14px' : ''}" data-act="cl-mod" data-v="classifica">🏆 Classifica</button>
+    <button id="cl-mod-stat" class="btn block ${mod === 'stat' ? 'amber' : 'ghost'}" style="${st.isAdmin ? 'padding-left:6px;padding-right:6px;font-size:14px' : ''}" data-act="cl-mod" data-v="stat">📊 Statistiche</button>
+    ${st.isAdmin ? `<button id="cl-mod-arc" class="btn block ${mod === 'arc' ? 'amber' : 'ghost'}" style="padding-left:6px;padding-right:6px;font-size:14px" data-act="cl-mod" data-v="arc">📦 Archivio</button>` : ''}</div>`;
+  return `<h2>${ic('chart')} Classifica e statistiche</h2>${sw}${mod === 'stat' ? pStatConsumi(d) : mod === 'arc' ? pArchivio() : pClassificaPunti(d)}`;
 }
-A['cl-mod'] = ds => { st.clMod = ds.v === 'stat' ? 'stat' : 'classifica'; st.scSel = null; render(); };
+A['cl-mod'] = ds => { st.clMod = ds.v === 'stat' ? 'stat' : (ds.v === 'arc' && st.isAdmin) ? 'arc' : 'classifica'; st.scSel = null; render(); };
 /* --- modalità «Statistiche»: pagamenti/consumi (caffè e snack) per ambito e periodo, tutto dai movimenti già in memoria --- */
 const SC_PER = [['ieri', 'Ieri'], ['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['mese', 'Questo mese']];
 const scPer = () => SC_PER.some(x => x[0] === st.scP) ? st.scP : 'oggi';
@@ -3993,6 +4024,103 @@ function testoRendiconto(o){
   if(o.saldi && D.saldi.length){ L.push('', '*Saldi dei colleghi*'); D.saldi.forEach(x => L.push(`${x.nome}: ${eurS(x.s)}`)); }
   return L.join('\n');
 }
+/* ---------- Archivio (solo admin): report dei periodi chiusi, dai documenti `chiusure` gia' in memoria (nessuna lettura in piu') ---------- */
+const ARC_MAX = 30;
+const sommaV = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
+function datiArchivio(c){
+  const rp = riepScala(riepDaChiusura(c)), T = c.stats || {}, S = c.stato || {}, cassa = S.cassa || {}, saldi = S.saldi || {}, tot = rp.tot || {};
+  let cred = 0, deb = 0;
+  st.membri.forEach(m => { const v = saldi[m.id] || 0; if(v > 0) cred += v; else deb += v; });
+  const rc = (cassa.revolut || 0) + (cassa.contanti || 0);
+  const top = Object.entries(rp.euro || {}).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([mid, v]) => ({nome: nomeM(mid), v}));
+  return {id: c.id, label: labelChiusura(c), gruppo: st.gruppo.nome || 'Saletta', n: c.n || 0, autore: c.autore || '', chiusoIl: c.ts && c.ts.toMillis ? dataOra(c.ts.toMillis()).slice(0, 10) : dataOra(c.fino.toMillis()).slice(0, 10),
+    caffe: sommaV(rp.caffe), snack: rp.snack ? sommaV(rp.snack) : null, consumi: sommaV(rp.euro || T.euroMid),
+    ricariche: tot.ric ?? T.ricariche ?? 0, spese: tot.speseTot ?? T.spese ?? 0, nSpese: rp.speseN ? sommaV(rp.speseN) : null,
+    turni: rp.turni ? sommaV(rp.turni) : null, ptPul: rp.pPul ? sommaV(rp.pPul) : null,
+    revolut: cassa.revolut || 0, contanti: cassa.contanti || 0, cassaTot: rc, cred, deb, netto: rc - cred - deb, top,
+    saldi: st.membri.filter(m => m.attivo !== false).map(m => ({nome: nomeM(m.id), s: saldi[m.id] || 0})).sort((x, y) => y.s - x.s)};
+}
+function pArchivio(){
+  if(!st.isAdmin) return '';
+  const lista = st.chiusure.slice().reverse().slice(0, ARC_MAX), sel = st.arcSel && st.chiusure.find(x => x.id === st.arcSel);
+  if(!st.chiusure.length) return `<div class="card" id="arc-vuoto"><div class="empty">Nessun periodo chiuso: l'archivio si riempie a ogni chiusura periodo.</div></div>`;
+  if(!sel) return `<div class="card" id="arc-lista"><h3>${ic('archive','s')} Periodi chiusi</h3>
+    <div class="list">${lista.map(c => `<button class="li" id="arc-${c.id}" style="width:100%;text-align:left" data-act="arc-apri" data-id="${c.id}"><div class="grow"><div class="t">${esc(labelChiusura(c))}</div><div class="d">${c.n || 0} movimenti${c.autore ? ' · chiuso da ' + esc(c.autore) : ''}</div></div><span class="mut">›</span></button>`).join('')}</div>
+    ${st.chiusure.length > ARC_MAX ? `<p class="hint" style="margin:8px 0 0">Mostro gli ultimi ${ARC_MAX} periodi.</p>` : ''}</div>`;
+  const D = datiArchivio(sel), nd = '<span class="mut">non disponibile</span>';
+  return `<button class="btn link" style="padding:0;margin:0 0 8px" id="arc-indietro" data-act="arc-chiudi">‹ Tutti i periodi</button>
+  <div class="card" id="arc-report"><h3>📦 Periodo ${esc(D.label)}</h3>
+    <p class="hint" style="margin:0 0 8px">Chiuso il ${D.chiusoIl}${D.autore ? ' da ' + esc(D.autore) : ''} · ${D.n} movimenti</p>
+    <b class="amber" style="font-size:12px;letter-spacing:.04em">CONSUMI</b>
+    ${rigaTot('☕', 'Caffè serviti', D.caffe)}${rigaTot('🍫', 'Snack presi', D.snack == null ? nd : D.snack)}${rigaTot('💶', 'Consumi', eur(D.consumi))}
+    <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">SPESE E RICARICHE</b>
+    ${rigaTot('➕', 'Ricariche', eur(D.ricariche))}${rigaTot('🛒', 'Spese per il gruppo', eur(D.spese), D.nSpese ? D.nSpese + (D.nSpese === 1 ? ' spesa' : ' spese') : '')}
+    <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">PULIZIE</b>
+    ${rigaTot('🧹', 'Compiti svolti', D.turni == null ? nd : D.turni)}${D.ptPul == null ? '' : rigaTot('✨', 'Punti pulizia assegnati', D.ptPul)}
+    <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">CASSA ALLA CHIUSURA</b>
+    ${rigaTot('📱', 'Conto Revolut', eur(D.revolut))}${rigaTot('💵', 'Contanti in sala', eur(D.contanti))}${rigaTot('🏦', 'Totale in cassa', eur(D.cassaTot))}${rigaTot('🟢', 'Crediti dei colleghi', eur(D.cred))}${rigaTot('🔴', 'Debiti da incassare', eur(-D.deb))}${rigaTot('⚖️', 'Fondo netto', eur(D.netto))}
+    ${D.top.length ? `<b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">CHI HA CONSUMATO DI PIÙ</b>${D.top.map((x, i) => rigaTot(['🥇', '🥈', '🥉', '4°', '5°'][i], esc(x.nome), eur(x.v))).join('')}` : ''}
+    <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">SALDI DEI COLLEGHI ALLA CHIUSURA</b>
+    ${D.saldi.map(x => rigaTot('👤', esc(x.nome), eurS(x.s))).join('')}
+  </div>
+  <div class="card" id="arc-condividi"><h3>${ic('share','s')} Condividi report</h3>
+    <label class="check"><input type="checkbox" id="ar-top" checked><b style="flex:1;font-size:14px">Chi ha consumato di più (primi 5)</b></label>
+    <label class="check"><input type="checkbox" id="ar-saldi"><b style="flex:1;font-size:14px">Includi saldi dei colleghi (con i nomi)</b></label>
+    <button class="btn amber block big" id="btn-arc-testo" data-act="arc-testo" style="margin-top:8px">📤 Condividi report</button>
+    <button class="btn block" id="btn-arc-img" data-act="arc-img" style="margin-top:8px">🖼️ Condividi immagine PNG</button>
+    <p class="hint" style="margin:8px 0 0">Il report resta privato: lo condividi solo tu. I saldi con i nomi compaiono solo se spunti la voce.</p>
+  </div>`;
+}
+A['arc-apri'] = ds => { if(!st.isAdmin) return; st.arcSel = ds.id; render(); window.scrollTo(0, 0); };
+A['arc-chiudi'] = () => { st.arcSel = null; render(); };
+const opzAr = () => ({top: !!($('ar-top') && $('ar-top').checked), saldi: !!($('ar-saldi') && $('ar-saldi').checked)});
+const chiusuraSel = () => st.isAdmin ? st.chiusure.find(x => x.id === st.arcSel) : null;
+function testoArchivio(D, o){
+  const L = [`☕ *${D.gruppo}* — Report periodo ${D.label}`, `Chiuso il ${D.chiusoIl} · ${D.n} movimenti`, '', '*Consumi*',
+    `Caffè: ${D.caffe}${D.snack == null ? '' : ' · Snack: ' + D.snack} · Consumi: ${eur(D.consumi)}`, '', '*Spese e ricariche*', `Ricariche: ${eur(D.ricariche)} · Spese: ${eur(D.spese)}${D.nSpese ? ' (' + D.nSpese + ')' : ''}`];
+  if(D.turni != null) L.push('', '*Pulizie*', `Compiti svolti: ${D.turni}${D.ptPul == null ? '' : ' · Punti: ' + D.ptPul}`);
+  L.push('', '*Cassa alla chiusura*', `Revolut: ${eur(D.revolut)} · Contanti: ${eur(D.contanti)}`, `Totale in cassa: *${eur(D.cassaTot)}*`, `Crediti dei colleghi: ${eur(D.cred)} · Debiti: ${eur(-D.deb)}`, `Fondo netto: *${eur(D.netto)}*`);
+  if(o.top && D.top.length){ L.push('', '*Chi ha consumato di più*'); D.top.forEach((x, i) => L.push(`${i + 1}. ${x.nome} — ${eur(x.v)}`)); }
+  if(o.saldi && D.saldi.length){ L.push('', '*Saldi dei colleghi*'); D.saldi.forEach(x => L.push(`${x.nome}: ${eurS(x.s)}`)); }
+  return L.join('\n');
+}
+function disegnaArchivio(D, o){
+  const W = 1080, P = 56, righe = [], H = t => righe.push({k: 'h', t}), R = (l, v, col) => righe.push({k: 'r', l, v, col});
+  H('Consumi'); R('Caffè serviti', String(D.caffe)); if(D.snack != null) R('Snack presi', String(D.snack)); R('Consumi', eur(D.consumi));
+  H('Spese e ricariche'); R('Ricariche', eur(D.ricariche), '#34d399'); R('Spese per il gruppo', eur(D.spese), '#fb7185');
+  if(D.turni != null){ H('Pulizie'); R('Compiti svolti', String(D.turni)); if(D.ptPul != null) R('Punti assegnati', String(D.ptPul)); }
+  H('Cassa alla chiusura'); R('Conto Revolut', eur(D.revolut)); R('Contanti in sala', eur(D.contanti)); R('Totale in cassa', eur(D.cassaTot), '#fbbf24'); R('Crediti dei colleghi', eur(D.cred)); R('Debiti da incassare', eur(-D.deb), '#fb7185'); R('Fondo netto', eur(D.netto), D.netto < 0 ? '#fb7185' : '#34d399');
+  if(o.top && D.top.length){ H('Chi ha consumato di più'); D.top.forEach(x => R(x.nome, eur(x.v))); }
+  if(o.saldi && D.saldi.length){ H('Saldi dei colleghi'); D.saldi.slice(0, 30).forEach(x => R(x.nome, eurS(x.s), x.s < 0 ? '#fb7185' : '#34d399')); }
+  const hh = 230, rh = 62, sh = 84, Ht = hh + righe.reduce((a, r) => a + (r.k === 'h' ? sh : rh), 0) + 110;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = Ht;
+  const g = cv.getContext('2d'), grad = g.createLinearGradient(0, 0, 0, Ht); grad.addColorStop(0, '#171a24'); grad.addColorStop(1, '#0d0f16');
+  g.fillStyle = grad; g.fillRect(0, 0, W, Ht);
+  const F = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'; g.textBaseline = 'alphabetic';
+  g.fillStyle = '#f5a524'; g.font = `800 52px ${F}`; g.fillText('☕ ' + D.gruppo.slice(0, 26), P, 100);
+  g.fillStyle = '#e8eaf0'; g.font = `600 32px ${F}`; g.fillText('Report periodo ' + D.label, P, 156);
+  g.fillStyle = '#7b8194'; g.font = `500 26px ${F}`; g.fillText(`Chiuso il ${D.chiusoIl} · ${D.n} movimenti`, P, 198);
+  let y = hh;
+  righe.forEach(r => {
+    if(r.k === 'h'){ y += 54; g.fillStyle = '#f5a524'; g.font = `700 28px ${F}`; g.fillText(r.t.toUpperCase().slice(0, 48), P, y); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, y + 14, W - 2 * P, 2); y += 30; }
+    else { y += rh; g.fillStyle = '#aab0c2'; g.font = `500 30px ${F}`; g.textAlign = 'left'; g.fillText(r.l.slice(0, 34), P, y - 18); g.fillStyle = r.col || '#e8eaf0'; g.font = `700 32px ui-monospace, Menlo, Consolas, monospace`; g.textAlign = 'right'; g.fillText(r.v, W - P, y - 18); g.textAlign = 'left'; }
+  });
+  g.fillStyle = '#586079'; g.font = `500 22px ${F}`; g.fillText('Armieri 5.0 · generato il ' + dataOra(Date.now()), P, Ht - 40);
+  return cv;
+}
+A['arc-testo'] = () => {
+  const c = chiusuraSel(); if(!c) return;
+  const testo = testoArchivio(datiArchivio(c), opzAr());
+  if(navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) navigator.share({title: 'Report periodo', text: testo}).catch(() => {});
+  else window.open('https://wa.me/?text=' + encodeURIComponent(testo), '_blank');
+};
+A['arc-img'] = async () => {
+  const c = chiusuraSel(); if(!c) return;
+  const D = datiArchivio(c), cv = disegnaArchivio(D, opzAr());
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  if(!blob) return toast('Impossibile creare l\'immagine', 'err');
+  await condividiBlob(blob, `report_${D.id}.png`, 'Report periodo ' + D.label, `☕ ${D.gruppo} — Report periodo ${D.label}`, 'Immagine scaricata: allegala al messaggio');
+};
 function aggiornaAnteprimaRd(){ const img = $('rd-img'); if(img) img.src = disegnaRendiconto(opzRd()).toDataURL('image/png'); }
 A['rendiconto'] = () => {
   openSheet(`<h3>${ic('share')} Condividi rendiconto ${infoBtn(`Immagine con i numeri chiave del fondo, da mandare ai colleghi per trasparenza.`)}</h3>
