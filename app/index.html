@@ -379,7 +379,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.22.1';
+const VERSION = '1.23.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -879,9 +879,9 @@ function doRender(){
   document.body.classList.toggle('adm', av);
   const cn = contatori(d);
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
-  const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s);
+  const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s); sb.dataset.p = av ? 'registro' : 'crediti'; sb.setAttribute('aria-label', av ? 'Saldo' : 'Saldo: tocca per ricaricare');
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['crediti','Crediti','wallet'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['classifiche','Statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = av ? cn.fondo : cn.pers;
   if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['statistiche','Statistiche','chart']);
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
@@ -1160,8 +1160,7 @@ function pBar(d){
   </div>
 
   ${recenti.length ? `<div class="card"><h3><span class="row" style="gap:6px">${ic('undo','s')} Preso per sbaglio?</span><span class="mut" style="font-size:10.5px;text-transform:none;letter-spacing:0">annullabile per ${ANNULLA_MIN} min</span></h3>
-    ${righeMov(recenti, d, {compact:true})}</div>` : ''}
-  <button class="btn amber block big" id="btn-classifiche" data-act="go" data-p="classifiche" style="margin-top:6px">📊 Classifiche e statistiche</button>`;
+    ${righeMov(recenti, d, {compact:true})}</div>` : ''}`;
 }
 
 /* ---------- richieste, notifiche, crediti ---------- */
