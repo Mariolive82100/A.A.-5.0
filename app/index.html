@@ -181,8 +181,6 @@ main.wide{max-width:980px}
 .tessera.ok{border-color:var(--green);background:rgba(52,211,153,.10)}
 .tessera.ok .bar i{background:var(--green)}
 .tess-ok{margin-top:8px;font-weight:800;color:var(--green);font-size:13.5px;text-align:center}
-.sala{background:linear-gradient(135deg,rgba(245,165,36,.16),rgba(245,165,36,.05));border:1px solid rgba(245,165,36,.35);border-radius:14px;padding:12px 14px;margin:0 0 12px}
-.sala-l{font-size:13px;font-weight:700;color:var(--tx2)}.sala-v{font-size:34px;font-weight:800;color:var(--amber);line-height:1}
 .bar{height:8px;border-radius:5px;background:var(--card2);overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),#818cf8);border-radius:5px}
 .cols{display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:6px}
@@ -379,8 +377,8 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.22.0';
-const MAXOP = 50000, CAFFE_PER_KG = 130;
+const VERSION = '1.21.0';
+const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
 const SOGLIA_SCORTA = 2;          // giacenza sotto cui un articolo e' "da ricomprare"
@@ -577,6 +575,7 @@ function syncMode(){
   const evMerge = () => { const mp = new Map(); evA.concat(evB).forEach(e => mp.set(e.id, e)); st.eventi = [...mp.values()]; render(); };
   dataUnsubs.push(C('eventi').where('tipo', '==', 'compleanno').limit(30).onSnapshot(s => { evA = docs(s); evMerge(); }, onDataErr));
   dataUnsubs.push(C('eventi').orderBy('data', 'desc').limit(30).onSnapshot(s => { evB = docs(s); evMerge(); }, onDataErr));
+  dataUnsubs.push(C('buste').onSnapshot(s => { st.buste = docs(s); render(); }, onDataErr));
   // lista della spesa: articoli da comprare / in rimborso, più gli ultimi 30 acquistati (nessun indice composito)
   let lsAtt = [], lsSto = [];
   const lsMerge = () => { st.listaSpesa = lsAtt.concat(lsSto); render(); };
@@ -1146,6 +1145,8 @@ function pBar(d){
     ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
   </div>
   ${avvisiHome()}
+  ${(() => { const l = ultimaBustaChiusa(); if(!l || !(l['c_' + st.mid] > 0) || tassoBusta(l) >= 70 || LS.get('bustaVista_' + l.id)) return '';
+    return `<div class="banner red">${ic('alert')}<div class="grow">Tasso di Onestà dell'ultima busta: <b>${tassoBusta(l)}%</b> (${l.n || 0} caffè registrati su ${BUSTA_CAFFE}). Chi beve il caffè deve registrarlo ogni volta!</div><button class="iconbtn" data-act="busta-visto" data-id="${l.id}">${ic('x','s')}</button></div>`; })()}
   ${noCaffe || (noSnack && !snVuoto) ? `<div class="banner amber" id="banner-credito">${ic('alert')}<div class="grow"><b>${MSG_CREDITO}</b>${noCaffe && noSnack && !snVuoto ? ' (caffè e snack)' : noCaffe ? ' (caffè)' : ' (snack)'}${s < 0 ? ` · devi coprire il debito di ${eur(-s)} e arrivare almeno al prezzo del prodotto` : ''}</div><button class="btn sm amber" data-act="go" data-p="crediti" data-t="acq">Ricarica</button></div>` : ''}
   <div class="home" style="min-height:0;justify-content:flex-start;padding:0 0 4px">
     <div class="blob" style="width:200px;height:200px;background:#f5a524;top:4%;left:-40px"></div>
@@ -1290,7 +1291,7 @@ function pAdminHome(d, forza){
   const magaz = `  <div class="card"><h3>${ic('bean','s')} Caffè</h3>
     <div class="row" style="align-items:flex-end;gap:8px"><label class="f" style="flex:1;margin:0"><span>Prezzo tazzina €</span><input class="in mono" id="mg-caffe" inputmode="decimal" value="${(pcf/100).toFixed(2).replace('.',',')}"></label><button class="btn amber" data-act="salva-prezzo-caffe">Salva</button></div>
     <div class="between" style="font-size:13px;margin:12px 0 8px"><span class="tx2">Buste disponibili</span><b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b></div>
-    <button class="btn sm block" data-act="carico-caffe-n">${ic('package','s')} Carico buste…</button>
+    <div class="grid2"><button class="btn sm" data-act="busta-apri">${ic('plus','s')} Apri nuova busta</button><button class="btn sm" data-act="carico-caffe-n">${ic('package','s')} Carico buste…</button></div>
   </div>
   <div class="card"><h3><span>Listino snack e bevande</span><button class="btn link" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button></h3>
     ${prods.length ? `<div class="list">${prods.map(p => { const sk = giacenza(d, p); return `<div class="li"><button class="grow" style="text-align:left" data-act="prodotto" data-id="${p.id}"><div class="t">${esc(p.emoji || '')} ${esc(p.nome)}</div><div class="d mono">${eur(p.prezzo)}</div></button>
@@ -1378,13 +1379,26 @@ function sincronizzaGiacenze(d){
 }
 const giacenza = (d, p) => st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 1);
 
-/* buste di caffe' in scorta = buste caricate dall'admin (articolo speciale 'caffe'); nessuna apertura manuale */
+/* ---------- busta del caffe' ---------- */
+const bustaAperta = () => st.buste.find(b => b.stato === 'aperta');
+const ultimaBustaChiusa = () => st.buste.filter(b => b.stato === 'chiusa').sort((a, b) => tms(b.chiusaTs) - tms(a.chiusaTs))[0];
+const tassoBusta = b => Math.round((b.n || 0) / BUSTA_CAFFE * 1000) / 10;
+function bustaInc(q){
+  const b = bustaAperta(); if(!b) return;
+  const c = 'c_' + st.mid;
+  if(q < 0 && (b[c] || 0) < -q) return;
+  C('buste').doc(b.id).set({n: firebase.firestore.FieldValue.increment(q), [c]: firebase.firestore.FieldValue.increment(q)}, {merge: true}).catch(() => {});
+}
+/* buste di caffe' disponibili = buste caricate dall'admin (articolo speciale 'caffe') meno quelle aperte che le hanno scalate (campo sc) */
 const prodCaffe = () => prodotto(PID_CAFFE);
 function busteCaricate(d){
   const p = prodCaffe(); if(!p) return 0;
   return st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 0);
 }
-const busteDisp = d => Math.max(0, busteCaricate(d));
+const busteDisp = d => Math.max(0, busteCaricate(d) - st.buste.filter(b => b.sc).length);
+function cardBusta(){
+  return `<button class="btn amber block big" id="btn-busta" data-act="busta-apri" style="margin-bottom:12px">${ic('bean')} Apri nuova busta caffè</button>`;
+}
 /* ---------- descrizione movimenti ---------- */
 function descMov(m){
   const n = esc(nomeM(m.mid));
@@ -1528,10 +1542,10 @@ function pRegolamento(){
   ${sez('8. Pulizie', [
     `Ognuno registra solo i propri turni (oggi o in una data passata) e riceve <b>+${pp} punti</b>.`,
     `Limiti a settimana (lunedì-domenica): <b>${pulGruppoN()}</b> ${pulGruppoN() === 1 ? 'pulizia' : 'pulizie'} per tutto il gruppo e <b>${pulUtenteN()}</b> ${pulUtenteN() === 1 ? 'turno' : 'turni'} per collega. Gli amministratori possono stornare registrazioni indebite: punti azzerati e turno di nuovo disponibile.`])}
-  ${sez('9. Tasso di Onestà del caffè', [
-    `Il controllo è automatico: nessuno deve aprire o chiudere buste. Per il periodo scelto in <b>Classifiche e statistiche</b> l'app confronta i caffè registrati dai colleghi con gli acquisti di caffè in grani convalidati nello stesso periodo. Stima standard: 1 kg di caffè in grani ≈ <b>${CAFFE_PER_KG} caffè</b>.`,
-    '<b>Tasso di Onestà = caffè registrati ÷ (kg acquistati × 130) × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che si beve più caffè di quanti ne vengano registrati; su periodi brevi (es. «Oggi») il dato può essere poco significativo.',
-    'Il caffè in grani viene riconosciuto dal nome dell\'articolo o dalla descrizione della spesa convalidata (es. «Caffè in grani 2 kg»): se indichi i kg il calcolo è preciso, altrimenti si assume 1 kg per acquisto.'])}
+  ${sez('9. Busta del caffè e Tasso di Onestà', [
+    `Una busta da 1 kg rende circa <b>${BUSTA_CAFFE} caffè</b>. Chi apre una busta nuova (pulsante <b>Apri nuova busta caffè</b> nell'Inventario) chiude quella precedente e azzera il contatore comune; ogni caffè registrato lo incrementa. La busta aperta viene scalata dalle buste disponibili.`,
+    '<b>Tasso di Onestà = caffè registrati ÷ 130 × 100.</b> Verde da 85% in su, rosso sotto il 70%. Un tasso basso significa che qualcuno beve senza registrare.',
+    'Avvisi e statistiche riguardano solo i colleghi che hanno registrato almeno un caffè in quella busta: chi non beve caffè non è mai coinvolto.'])}
   ${sez('10. Chiusure, backup e trasparenza', [
     'L\'amministratore chiude periodicamente il periodo: archivia il registro e fissa i saldi di ripartenza.',
     'Il backup (file .json e .csv) va fatto con regolarità, meglio ogni 7 giorni.',
@@ -1746,13 +1760,17 @@ function aggRange(d, r, slot){
 }
 function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
 /* periodo della classifica punti: "sempre" = cumulato (null), minimo "questo mese" */
-function clPerKey(){ return ['oggi', 'settimana', 'mese'].includes(st.clP) ? st.clP : 'oggi'; }
 function clRange(){
-  const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = clPerKey();
-  const ini = dt => { dt.setHours(0, 0, 0, 0); return dt.getTime(); };
-  if(p === 'settimana'){ const dow = (o.getDay() + 6) % 7; return {da: ini(new Date(y, m, o.getDate() - dow)), a: Infinity, label: 'Questa settimana'}; }
-  if(p === 'mese') return {da: new Date(y, m, 1).getTime(), a: Infinity, label: 'Mese corrente'};
-  return {da: ini(new Date(y, m, o.getDate())), a: Infinity, label: 'Oggi'};
+  const o = new Date(), y = o.getFullYear(), p = st.clPerC || 'sempre';
+  if(p === 'sempre') return null;
+  if(p === 'mese') return {da: new Date(y, o.getMonth(), 1).getTime(), a: Infinity, label: 'Questo mese'};
+  if(p === 'anno') return {da: new Date(y, 0, 1).getTime(), a: Infinity, label: 'Quest\'anno'};
+  const cur = y + '-' + String(o.getMonth() + 1).padStart(2, '0');
+  let m1 = st.clMDa || cur, m2 = st.clMA || cur;
+  if(m1 > m2){ const t = m1; m1 = m2; m2 = t; }
+  const [y1, a1] = m1.split('-').map(Number), [y2, a2] = m2.split('-').map(Number);
+  const nm = (yy, mm) => new Date(yy, mm - 1, 1).toLocaleDateString('it-IT', {month: 'short', year: 'numeric'});
+  return {da: new Date(y1, a1 - 1, 1).getTime(), a: new Date(y2, a2, 0, 23, 59, 59, 999).getTime(), label: m1 === m2 ? nm(y1, a1) : nm(y1, a1) + ' → ' + nm(y2, a2)};
 }
 /* storico dei periodi chiusi: i colleghi lo leggono dal proprio estratto, l'admin lo ricava dalle chiusure (nessuna lettura in più) */
 function riepDaChiusura(c){
@@ -1822,13 +1840,75 @@ function rankList(items, fmt, vuoto){
 const rigaTot = (e, l, v, sub) => `<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span>${e} ${l}${sub ? ` <span class="mut" style="font-size:11.5px">${sub}</span>` : ''}</span><b class="mono">${v}</b></div>`;
 const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi prima della versione 1.10.0.</div>';
 
+/* R ha la forma di un aggregato: lo stesso per il periodo corrente e per un riepilogo salvato; ch = grafici (solo periodo corrente) */
+function viewAcq(R, ch){
+  const cons = st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.caffe, m.id) + nz(R.snack, m.id)), sub: `☕ ${nz(R.caffe, m.id)}${R.snack ? ` · 🍫 ${nz(R.snack, m.id)}` : ''} · ${eur(nz(R.euro, m.id))}`}));
+  const tot = cons.reduce((a, x) => a + x.v, 0);
+  const spese = R.spese ? st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.spese, m.id)), sub: `${nz(R.speseN, m.id)} ${nz(R.speseN, m.id) === 1 ? 'richiesta' : 'richieste'}`})) : null;
+  return `<div class="card"><h3><span>☕ Classifica consumi</span><b class="mono amber">${tot}</b></h3>
+    ${rankList(cons, v => v, 'Nessun consumo in questo periodo.')}${R.snack ? '' : '<p class="hint" style="margin:6px 0 0">Per questo periodo sono disponibili solo i caffè.</p>'}</div>
+  ${ch ? `<div class="card"><h3><span>📈 Andamento consumi</span></h3>${ch.cons}</div>` : ''}
+  <div class="card"><h3><span>🧾 Spese anticipate per il fondo</span><b class="mono green">${eur(R.tot.speseTot || 0)}</b></h3>
+    ${spese ? rankList(spese, eur, 'Nessuna spesa convalidata in questo periodo.') : `${nonDisp}`}</div>
+  ${ch ? `<div class="card"><h3><span>📈 Andamento spese</span></h3>${ch.spese}</div>` : ''}`;
+}
+function viewPul(R, ch){
+  if(!R.turni) return `<div class="card"><h3>✨ Turni di pulizia</h3>${nonDisp}</div>`;
+  const righe = st.membri.map(m => ({m, t: nz(R.turni, m.id), p: nz(R.pPul, m.id)})).filter(x => x.t > 0 || x.p > 0).sort((a, b) => b.p - a.p || b.t - a.t || a.m.nome.localeCompare(b.m.nome));
+  const tt = righe.reduce((a, x) => a + x.t, 0);
+  return `<div class="card"><h3><span>✨ Turni e punteggi</span><b class="mono violet">${tt}</b></h3>
+    ${righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">Turni</th><th class="c">Punti</th></tr></thead><tbody>${righe.map((x, i) => `<tr><td class="mut mono">${i+1}</td><td><b>${esc(x.m.nome)}</b>${x.m.id === st.mid ? ' <span class="pill violet">tu</span>' : ''}</td><td class="c mono">${x.t}</td><td class="c mono violet"><b>${x.p}</b></td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nessun turno registrato in questo periodo.</div>'}</div>
+  ${ch ? `<div class="card"><h3><span>📈 Andamento turni</span></h3>${ch.pul}</div>` : ''}`;
+}
+function viewPag(R, ch){
+  const t = R.tot, netto = (t.ric || 0) + (t.quote || 0) + (t.entrate || 0) - (t.speseCassa || 0) - (t.riscatti || 0) - (t.uscite || 0);
+  const reg = R.regDati ? st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.regDati, m.id))})) : [];
+  return `<div class="card"><h3><span>💰 Riepilogo pagamenti</span></h3>
+    ${rigaTot('💶', 'Ricariche confermate', eur(t.ric || 0))}
+    ${R.legacy ? '' : `${rigaTot('🛡️', 'Quote fondo versate', eur(t.quote || 0), 'contanti / Revolut')}
+    ${rigaTot('🎁', 'Regali tra colleghi', eur(t.regali || 0), (t.regaliN || 0) + (t.regaliN === 1 ? ' regalo' : ' regali'))}
+    ${rigaTot('🧾', 'Spese pagate dalla cassa', eur(t.speseCassa || 0))}
+    ${rigaTot('🏦', 'Riscatti pagati', eur(t.riscatti || 0))}
+    ${rigaTot('📥', 'Entrate registrate', eur(t.entrate || 0))}
+    ${rigaTot('💸', 'Uscite registrate', eur(t.uscite || 0))}
+    ${rigaTot('🔁', 'Giroconti', eur(t.giro || 0), 'tra contanti e conto')}
+    <div class="between" style="padding:10px 0 0;font-size:14px"><b>Flusso netto di cassa</b><b class="mono ${netto < 0 ? 'red' : 'green'}">${eurS(netto)}</b></div>
+    ${infoBtn(`Ricariche + quote + entrate − spese dalla cassa − riscatti − uscite. I giroconti non cambiano il totale.`, 'Come funziona')}`}
+    ${R.legacy ? `<div class="hint" style="margin-top:6px">Per questo periodo è disponibile solo il totale delle ricariche.</div>` : ''}</div>
+  ${R.bfRic ? `<div class="card"><h3><span>👏 Ben fatto ricevuti</span><b class="mono violet">${sumo(R.bfRic)}</b></h3>${rankList(st.membri.map(m => ({id: m.id, v: Math.max(0, nz(R.bfRic, m.id))})), v => v, 'Nessun «Ben fatto» in questo periodo.')}</div>` : ''}
+  ${R.legacy ? '' : `<div class="card"><h3><span>🎁 Chi ha regalato di più</span><b class="mono green">${eur(t.regali || 0)}</b></h3>${rankList(reg, eur, 'Nessun regalo in questo periodo.')}</div>`}
+  ${ch ? `<div class="card"><h3><span>📈 Andamento ricariche</span></h3>${ch.pag}</div>` : ''}`;
+}
+function clPeriodo(d){
+  const r = rangeSal(), chiusi = st.salPer === 'chiusi', L = chiusi ? storicoPeriodi() : [];
+  const opt = (v, l) => `<option value="${v}" ${st.salPer === v ? 'selected' : ''}>${l}</option>`;
+  const i = st.clPer != null && L[st.clPer] ? st.clPer : L.length - 1;
+  return `<div class="card"><label class="f" style="margin:0"><span>Periodo</span>
+    <select class="in" data-chg="salper">${opt('oggi','Oggi')}${opt('settimana','Questa settimana')}${opt('mese','Questo mese')}${opt('anno','Quest\'anno')}${opt('custom','Personalizzato…')}${opt('chiusi','Periodi chiusi')}</select></label>
+    ${st.salPer === 'custom' ? `<div class="grid2" style="margin-top:8px"><label class="f" style="margin:0"><span>Dal</span><input class="in" type="date" id="sal-da" data-chg="saldate" value="${esc(st.salDa)}"></label><label class="f" style="margin:0"><span>Al</span><input class="in" type="date" id="sal-a" data-chg="saldate" value="${esc(st.salA)}"></label></div>` : ''}
+    ${chiusi && L.length ? `<label class="f" style="margin:8px 0 0"><span>Periodo chiuso</span><select class="in" data-chg="clper">${L.map((p, k) => `<option value="${k}" ${k === i ? 'selected' : ''}>${riepLabel(p)}</option>`).join('')}</select></label>` : ''}
+    ${st.isAdmin && !chiusi ? (st.arcMov ? '<p class="hint" style="margin:8px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}
+  </div>
+  <p class="sub" style="margin:0 0 10px">${chiusi ? 'Riepilogo dei periodi chiusi' : esc(r.label) + (st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo')}</p>`;
+}
+function clChiusi(tab){
+  const L = storicoPeriodi();
+  if(!L.length) return '<div class="card"><div class="empty">Nessun periodo chiuso finora.</div></div>';
+  const i = st.clPer != null && L[st.clPer] ? st.clPer : L.length - 1, R = L[i];
+  const conf = {acq: {f: p => sumo(p.caffe) + sumo(p.snack), nome: 'Consumazioni', col: 'var(--amber)'},
+    pul: {f: p => sumo(p.turni), nome: 'Turni', col: 'var(--violet)'},
+    pag: {f: p => (p.tot && p.tot.ric) || 0, nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100)}}[tab];
+  const buck = L.map(p => ({lab: new Date(p.fino).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit'}), full: riepLabel(p), n: Math.max(0, conf.f(p))}));
+  const grafico = `<div class="card"><h3><span>📈 ${conf.nome} per periodo chiuso</span></h3>${graficoBarre({g: 'periodo', buck}, {c: 'per' + tab, nome: conf.nome, col: conf.col, fmt: conf.fmt, ax: conf.ax, vuoto: 'Nessun dato nei periodi chiusi.'})}</div>`;
+  return grafico + (tab === 'acq' ? viewAcq(R, null) : tab === 'pul' ? viewPul(R, null) : viewPag(R, null));
+}
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
 const CL_CAT = [['c', '☕', 'Consumi'], ['p', '✨', 'Pulizie'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
 const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
 function clRighe(d){
-  const r = clRange(), M = aggConChiusi(d, r, 'cl'), G = M.G;
-  const righe = membriAttivi().map(m => { const c = nz(G.ptC, m.id), p = nz(G.ptP, m.id), s = nz(G.ptS, m.id), b = nz(G.ptB, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const r = clRange(), M = r ? aggConChiusi(d, r, 'cl') : null, G = M ? M.G : null;
+  const righe = membriAttivi().map(m => { const c = G ? nz(G.ptC, m.id) : nz(d.S.pcaf, m.id), p = G ? nz(G.ptP, m.id) : nz(d.S.punti, m.id), s = G ? nz(G.ptS, m.id) : nz(d.S.pspesa, m.id), b = G ? nz(G.ptB, m.id) : nz(d.S.pbf, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
   const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
   return {r, righe, pos, M};
 }
@@ -1842,8 +1922,8 @@ function clConteggi(d, r){
   return out;
 }
 function clTitoli(d, r){
-  const C = clConteggi(d, r), pc = clPerKey();
-  const bfNome = pc === 'mese' ? 'Collega del Mese' : pc === 'settimana' ? 'Collega della Settimana' : 'Collega del Giorno';
+  const C = clConteggi(d, r), pc = st.clPerC || 'sempre';
+  const bfNome = pc === 'mese' ? 'Collega del Mese' : pc === 'anno' ? 'Collega dell\'Anno' : pc === 'sempre' ? 'Collega di sempre' : 'Collega del periodo';
   const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '✨', 'Mastro Lindo', 'turni'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
   const att = membriAttivi();
   return def.map(([k, e, nome, u]) => {
@@ -1861,64 +1941,58 @@ function clHero(righe, pos, T, r){
   else { const t3 = byTot[2], x = Math.max(1, t3.tot - me.tot + 1); msg = `🎯 Ti ${x === 1 ? 'manca 1 punto' : 'mancano ' + x + ' punti'} per entrare sul podio (superare ${esc(t3.nome)}).`; }
   const miei = T.filter(t => t.mids.includes(me.m.id));
   return `<div class="card hero" id="cl-hero">
-    <div class="between"><span class="herotag">La mia scheda</span><span class="pill mut">${esc(r ? r.label : 'Sempre')}</span></div>
+    <div class="between"><span class="herotag">La tua scheda</span><span class="pill mut">${esc(r ? r.label : 'Sempre')}</span></div>
     <div class="hero-main"><div class="hero-pos">${rk <= 3 ? ['🥇', '🥈', '🥉'][rk - 1] + ' ' : ''}#${rk}<small> su ${n}</small></div><div class="hero-tot"><b>${me.tot}</b><small>punti</small></div></div>
     <div class="hero-grid">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${me[k]}</b><small>${l}</small></div>`).join('')}</div>
     <p class="hero-msg" id="cl-hero-msg">${msg}</p>
     ${miei.length ? `<div class="hero-tit">${miei.map(t => `<span class="pill amber">${t.e} ${esc(t.nome)}</span>`).join(' ')}</div>` : ''}
   </div>`;
 }
-/* ---------- Tasso di Onestà automatico: caffè registrati nel periodo ÷ (kg di caffè in grani acquistati nel periodo × 130) ---------- */
-function kgCaffeSpesa(m){
-  const parti = (m.articoliNomi && m.articoliNomi.length) ? m.articoliNomi : String(m.descr || '').split(/[,;+]/);
-  let kg = 0;
-  parti.forEach(p => {
-    const t = String(p).toLowerCase();
-    if(!/caff[eèé]/.test(t) || /macchina|filtr|ciald|capsul|solubil|decalcif|zuccher|tazz|bicchier|palett|orzo|ginseng/.test(t)) return;
-    let k = 0;
-    const mk = t.match(/(\d+(?:[.,]\d+)?)\s*kg/);
-    if(mk) k = parseFloat(mk[1].replace(',', '.'));
-    else { const mg = t.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grammi)\b/); if(mg) k = parseFloat(mg[1].replace(',', '.')) / 1000; }
-    kg += (k > 0 && k <= 50) ? k : 1;
-  });
-  return kg;
+function clClassifica(d){
+  const {r, righe, pos, M} = clRighe(d), T = clTitoli(d, r);
+  const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
+  const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
+  const pc = st.clPerC || 'sempre', opt = (v, l) => `<option value="${v}" ${pc === v ? 'selected' : ''}>${l}</option>`;
+  const cur = new Date().toISOString().slice(0, 7);
+  const sel = `<label class="f" style="margin:0 0 8px"><span>Periodo</span><select class="in" data-chg="clpc">${opt('sempre', 'Sempre (totale accumulato)')}${opt('mese', 'Questo mese')}${opt('anno', 'Quest\'anno')}${opt('mesi', 'Per mesi…')}</select></label>
+    ${pc === 'mesi' ? `<div class="grid2" style="margin:0 0 8px"><label class="f" style="margin:0"><span>Dal mese</span><input class="in" type="month" id="cl-m-da" data-chg="clmesi" max="${cur}" value="${esc(st.clMDa || cur)}"></label><label class="f" style="margin:0"><span>Al mese</span><input class="in" type="month" id="cl-m-a" data-chg="clmesi" max="${cur}" value="${esc(st.clMA || cur)}"></label></div>` : ''}
+    ${r ? `<p class="sub" style="margin:0 0 8px">${esc(r.label)}</p>` : ''}${M ? noteChiusi(M) + (M.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : '') : ''}`;
+  const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
+  const chips = [['tot', 'Tutti'], ['c', '☕ Consumi'], ['p', '✨ Pulizie'], ['s', '🧾 Spese'], ['b', '👏 Ben fatto']];
+  const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
+  const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
+  const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
+  const podioH = podio.length ? `<div class="pod" id="cl-podio">${col(podio[1], 1)}${col(podio[0], 0)}${col(podio[2], 2)}</div>` : `<div class="empty">Nessun punto in questa categoria${r ? ' nel periodo' : ''}.</div>`;
+  const riga = (x, i) => `<div class="rk ${x.m.id === st.mid ? 'me' : ''} ${x[key] ? '' : 'z'}"><div class="n">${podio.length + i + 1}</div><div class="nm"><div class="nt"><b class="nn">${esc(x.nome)}</b>${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}${bdg(x.m.id)}</div>
+      <div class="mi"><span>☕ ${x.c}</span><span>✨ ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
+      <div class="v">${x[key]}${key !== 'tot' ? `<small>tot ${x.tot}</small>` : ''}</div></div>`;
+  const albo = `<div class="card" id="cl-albo"><h3><span>🏅 Albo d'onore</span></h3>
+    ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
+      <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(m => esc(nomeBreve(m) || nomeM(m)) + (m === st.mid ? ' (tu)' : '')).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
+    ${infoBtn(`Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.${r ? '' : ' Con «Sempre» contano gli ultimi ' + STORICO_MAX + ' periodi chiusi più quello aperto.'}`, 'Come funziona')}</div>`;
+  return `${clHero(righe, pos, T, r)}
+  <div class="card"><h3><span>🏆 La classifica</span></h3>${sel}${chipsH}
+    ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
+    ${infoBtn(`Tocca un filtro per ordinare. Consumi: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. ${r ? 'Punti guadagnati nel periodo scelto (comprese eventuali rettifiche).' : 'Sono punti totali accumulati: riscattarli non ti fa scendere.'}`, 'Come funziona')}
+    ${r ? (st.isAdmin ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : infoBtn(`Per i periodi scelti contano i movimenti dall\'ultima chiusura di periodo; "Sempre" include tutto lo storico.`, 'Come funziona')) : ''}</div>
+  ${albo}`;
 }
-function kgGrani(list){
-  let kg = 0, n = 0;
-  list.forEach(m => {
-    let src = m, sg = 1;
-    if(m.tipo === 'storno'){ if(!m.orig) return; src = m.orig; sg = -1; }
-    if(src.tipo !== 'spesa' || src.stato !== 'confermata') return;
-    const k = kgCaffeSpesa(src); if(k){ kg += sg * k; n += sg; }
-  });
-  return {kg: Math.max(0, Math.round(kg * 1000) / 1000), n: Math.max(0, n)};
+
+/* ---------- Scheda Acquisti: "I miei consumi" / "Consumi saletta" + widget busta ---------- */
+const acqVista = () => st.acqVista || (adminView() ? 'saletta' : 'miei');
+function acqToggle(){
+  const v = acqVista();
+  return `<div class="chips" id="acq-toggle">${[['miei', '👤 I miei consumi'], ['saletta', '👥 Consumi saletta']].map(([k, l]) => `<button id="acq-v-${k}" class="${v === k ? 'on' : ''}" data-act="acq-vista" data-v="${k}">${l}</button>`).join('')}</div>`;
 }
-function tassoOnesta(c){
-  const B = aggrega(c.tutti), caffe = Math.max(0, sumo(B.caffe)), P = kgGrani(c.tutti), attesi = Math.round(P.kg * CAFFE_PER_KG);
-  return {caffe, kg: P.kg, n: P.n, attesi, pct: attesi > 0 ? Math.round(caffe / attesi * 1000) / 10 : null};
-}
-const kgTxt = kg => String(Math.round(kg * 100) / 100).replace('.', ',');
-function cardOnesta(c, r){
-  const t = tassoOnesta(c);
-  const info = infoBtn(`Calcolo automatico, senza aprire o chiudere buste: caffè registrati dai colleghi nel periodo ÷ (kg di caffè in grani acquistati nello stesso periodo × ${CAFFE_PER_KG}). Gli acquisti sono le spese convalidate il cui articolo o descrizione contiene «caffè» (se indichi i kg, es. «Caffè in grani 2 kg», il conto è preciso; altrimenti si assume 1 kg). Verde da 85%, rosso sotto il 70%. Con periodi brevi o senza acquisti il dato non è significativo: il caffè comprato prima del periodo non viene contato.`, 'Come funziona');
-  if(t.pct == null) return `<div class="card" id="cl-onesta"><h3><span>🛡️ Tasso di Onestà</span><b class="mono mut">n/d</b></h3>
-    <p class="hint" style="margin:0">Nessun acquisto di caffè in grani convalidato in questo periodo (${esc(r.label.toLowerCase())}): confronto non disponibile. Caffè registrati: <b>${t.caffe}</b>.</p>${info}</div>`;
-  const cls = t.pct >= 85 ? 'green' : t.pct < 70 ? 'red' : 'amber';
-  return `<div class="card" id="cl-onesta"><h3><span>🛡️ Tasso di Onestà</span><b class="mono ${cls}" id="cl-onesta-pct">${String(t.pct).replace('.', ',')}%</b></h3>
-    <div class="bar"><i style="width:${Math.min(100, t.pct)}%"></i></div>
-    <p class="hint" style="margin:6px 0 0"><b>${t.caffe}</b> caffè registrati su <b>${t.attesi}</b> attesi · ${kgTxt(t.kg)} kg acquistati in ${t.n} ${t.n === 1 ? 'spesa convalidata' : 'spese convalidate'} (${esc(r.label.toLowerCase())}).</p>${info}</div>`;
-}
-/* totali aggregati della sala per il tipo di punti scelto */
-function clSala(righe, key, G){
-  const tot = k => righe.reduce((a, x) => a + x[k], 0), nn = o => Math.max(0, sumo(o));
-  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti pulizie', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
-  const det = {
-    tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
-    c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
-    p: `<p class="hint" style="margin:6px 0 0">✨ ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno' : 'turni'} di pulizia svolti</p>`,
-    s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
-    b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
-  return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
+function bustaWidget(){
+  const b = bustaAperta(), l = ultimaBustaChiusa();
+  if(!b && !l) return '';
+  const aperta = b ? (() => { const n = b.n || 0, pct = Math.min(100, Math.round(n / BUSTA_CAFFE * 100)), mio = st.mid ? (b['c_' + st.mid] || 0) : 0;
+    return `<div class="between" style="font-size:13.5px"><span>☕ Busta aperta</span><b class="mono">${n} / ${BUSTA_CAFFE}</b></div><div class="bar"><i style="width:${pct}%"></i></div>${st.mid ? `<p class="hint" style="margin:6px 0 0">Caffè tuoi da questa busta: <b>${mio}</b></p>` : ''}`; })() : '<p class="hint" style="margin:0">Nessuna busta aperta al momento.</p>';
+  const tasso = l ? (() => { const t = tassoBusta(l), cls = t >= 85 ? 'green' : t < 70 ? 'red' : 'amber', dt = l.chiusaTs ? ' · chiusa il ' + dBreve(tms(l.chiusaTs)) : '';
+    return `<div class="between" style="font-size:13.5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)"><span>Tasso di Onestà <span class="mut" style="font-size:11.5px">ultima busta${dt}</span></span><b class="mono ${cls}" id="busta-tasso">${t}%</b></div>
+      <p class="hint" style="margin:6px 0 10px">${l.n || 0} caffè registrati su ${BUSTA_CAFFE} attesi. Verde da 85%, rosso sotto il 70%.</p>`; })() : '';
+  return `<div class="card" id="busta-widget">${aperta}${tasso}</div>`;
 }
 /* "I miei consumi" nel periodo corrente: solo movimenti già in memoria */
 function viewMiei(c){
@@ -1939,57 +2013,39 @@ function viewMiei(c){
   <div class="card"><h3><span>📈 Quando consumo</span></h3>${graficoBarre(S, {c: 'miei', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo tuo in questo periodo.'})}</div>
   <div class="card"><h3><span>📆 Nei giorni della settimana</span></h3>${graficoBarre({g: 'weekday', buck: wd}, {c: 'miei-wd', nome: 'Consumazioni', col: 'var(--sky)', vuoto: 'Nessun consumo tuo in questo periodo.'})}</div>`;
 }
-function clIo(righe, c){
-  const me = righe.find(x => x.m.id === st.mid);
-  if(!me) return '<div class="card"><div class="empty">Profilo collega non disponibile.</div></div>';
-  const tot = k => righe.reduce((a, x) => a + x[k], 0), quota = (a, b) => b > 0 ? Math.round(a / b * 100) + '%' : '–';
-  return `<div class="card" id="cl-contributo"><h3><span>🤝 Il mio contributo alla saletta</span></h3>
-    <table><thead><tr><th>Punti</th><th class="c">Miei</th><th class="c">Saletta</th><th class="c">Quota</th></tr></thead><tbody>
-    ${CL_CAT.map(([k, e, l]) => `<tr><td>${e} ${l}</td><td class="c mono"><b>${me[k]}</b></td><td class="c mono">${tot(k)}</td><td class="c mono">${quota(me[k], tot(k))}</td></tr>`).join('')}
-    <tr><td><b>Totale</b></td><td class="c mono"><b>${me.tot}</b></td><td class="c mono">${tot('tot')}</td><td class="c mono">${quota(me.tot, tot('tot'))}</td></tr></tbody></table></div>
-  ${viewMiei(c)}`;
-}
-function clClassifica(d, R, T, c){
-  const {r, righe, pos, M} = R;
-  const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
-  const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
-  const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '✨ Punti pulizie'], ['s', '🧾 Punti spesa'], ['b', '👏 Punti «Ben fatto»']];
-  const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
-  const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
-  const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
-  const podioH = podio.length ? `<div class="pod" id="cl-podio">${col(podio[1], 1)}${col(podio[0], 0)}${col(podio[2], 2)}</div>` : `<div class="empty">Nessun punto in questa categoria nel periodo.</div>`;
-  const riga = (x, i) => `<div class="rk ${x.m.id === st.mid ? 'me' : ''} ${x[key] ? '' : 'z'}"><div class="n">${podio.length + i + 1}</div><div class="nm"><div class="nt"><b class="nn">${esc(x.nome)}</b>${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}${bdg(x.m.id)}</div>
-      <div class="mi"><span>☕ ${x.c}</span><span>✨ ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
-      <div class="v">${x[key]}${key !== 'tot' ? `<small>tot ${x.tot}</small>` : ''}</div></div>`;
-  const albo = `<div class="card" id="cl-albo"><h3><span>🏅 Albo d'onore</span></h3>
-    ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
-      <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(m => esc(nomeBreve(m) || nomeM(m)) + (m === st.mid ? ' (tu)' : '')).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
-    ${infoBtn(`Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.`, 'Come funziona')}</div>`;
-  const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
-  return `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
-    ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${ptSnack()} per snack. Pulizie: ${puntiPulizia()} per turno. Spesa: ${ptSpesa()} per ogni richiesta convalidata (nessuna se in attesa o respinta). Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
-    ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
-  ${cardOnesta(c, r)}
-  ${albo}`;
+/* riepilogo personale per un periodo chiuso (R = riepilogo salvato) */
+function viewMieiChiuso(R){
+  const me = st.mid; if(!me) return '<div class="card"><div class="empty">Profilo collega non disponibile.</div></div>';
+  const att = membriAttivi(), caffe = Math.max(0, nz(R.caffe, me)), snack = Math.max(0, nz(R.snack, me));
+  const tutti = att.reduce((a, m) => a + Math.max(0, nz(R.caffe, m.id) + nz(R.snack, m.id)), 0), media = att.length ? Math.round(tutti / att.length * 10) / 10 : 0;
+  return `<div class="card" id="miei-consumi"><h3><span>👤 I miei consumi</span><b class="mono amber">${caffe + snack}</b></h3>
+    <div class="grid3"><div class="stat"><small>☕ Caffè</small><b class="mono">${caffe}</b></div><div class="stat"><small>🍫 Snack</small><b class="mono">${R.snack ? snack : '–'}</b></div><div class="stat"><small>💶 Spesi</small><b class="mono">${eur(nz(R.euro, me))}</b></div></div>
+    <p class="hint" style="margin:8px 0 0">Media del gruppo: <b>${media}</b> consumazioni a testa · tu: <b>${caffe + snack}</b>.${R.snack ? '' : ' Per questo periodo sono disponibili solo i caffè.'}</p></div>`;
 }
 function pClassifiche(d){
-  const amb = st.clAmb === 'io' ? 'io' : 'saletta', per = clPerKey();
-  const R = clRighe(d), r = R.r, c = R.M, T = clTitoli(d, r);
-  const chip = (act, cur, v, l) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
-  const filtri = `<div class="card" id="cl-filtri">
-    <div class="chips" id="cl-amb">${chip('cl-amb', amb, 'saletta', '👥 Saletta')}${chip('cl-amb', amb, 'io', '👤 Io')}</div>
-    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'oggi', 'Oggi')}${chip('cl-per', per, 'settimana', 'Questa settimana')}${chip('cl-per', per, 'mese', 'Mese corrente')}</div>
-    <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
-    ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
-  return `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button><h2>${ic('chart')} Classifiche e statistiche</h2>
-  ${filtri}${clHero(R.righe, R.pos, T, r)}
-  ${amb === 'io' ? clIo(R.righe, c) : clClassifica(d, R, T, c)}`;
+  const tab = st.clTab || 'class';
+  const tabs = [['class', '🏆 LA CLASSIFICA'], ['acq', 'ACQUISTI'], ['pul', 'PULIZIE'], ['pag', 'PAGAMENTI']];
+  const head = `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button><h2>${ic('chart')} Classifiche e statistiche</h2>
+    <div class="chips">${tabs.map(([v, l]) => `<button id="cl-tab-${v}" class="${tab === v ? 'on' : ''}" data-act="cl-tab" data-v="${v}">${l}</button>`).join('')}</div>`;
+  if(tab === 'class') return head + clClassifica(d);
+  if(st.salPer === 'chiusi'){
+    if(tab === 'acq'){
+      const L = storicoPeriodi(), i = st.clPer != null && L[st.clPer] ? st.clPer : L.length - 1;
+      return head + clPeriodo(d) + acqToggle() + bustaWidget() + (acqVista() === 'saletta' ? clChiusi(tab) : L[i] ? viewMieiChiuso(L[i]) : '<div class="card"><div class="empty">Nessun periodo chiuso finora.</div></div>');
+    }
+    return head + clPeriodo(d) + clChiusi(tab);
+  }
+  const c = aggPeriodoC(d), r = c.r, G = c.G;
+  const ch = tab === 'acq' ? {cons: graficoBarre(serieCont(c, fCons, 0, p => sumo(p.caffe) + sumo(p.snack)), {c: 'cons', nome: 'Consumazioni', col: 'var(--amber)', vuoto: 'Nessun consumo in questo periodo.'}),
+      spese: graficoBarre(serieCont(c, fSpese, 2, p => (p.tot && p.tot.speseTot) || 0), {c: 'spese', nome: 'Spese', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna spesa convalidata in questo periodo.'})}
+    : tab === 'pul' ? {pul: graficoBarre(serieCont(c, fTurni, 1, p => sumo(p.turni)), {c: 'pul', nome: 'Turni', col: 'var(--violet)', vuoto: 'Nessun turno in questo periodo.'})}
+    : {pag: graficoBarre(serieCont(c, fRic, 3, p => (p.tot && p.tot.ric) || 0), {c: 'pag', nome: 'Ricariche', col: 'var(--green)', fmt: eur, ax: v => Math.round(v / 100), vuoto: 'Nessuna ricarica in questo periodo.'})};
+  if(tab === 'acq') return head + clPeriodo(d) + noteChiusi(c) + acqToggle() + bustaWidget() + (acqVista() === 'miei' ? viewMiei(c) : viewAcq(G, ch));
+  return head + clPeriodo(d) + noteChiusi(c) + (tab === 'pul' ? viewPul(G, ch) : viewPag(G, ch));
 }
-A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
-A['cl-per'] = ds => { st.clP = ['oggi', 'settimana', 'mese'].includes(ds.v) ? ds.v : 'oggi'; st.scSel = null; render(); };
+A['cl-tab'] = ds => { st.clTab = ds.v; st.scSel = null; render(); };
 A['cl-chip'] = ds => { st.clSort = {k: CL_KEYS.includes(ds.k) ? ds.k : 'tot', dir: -1}; render(); };
+A['acq-vista'] = ds => { st.acqVista = ds.v === 'saletta' ? 'saletta' : 'miei'; st.scSel = null; render(); };
 A['carica-arc-mov'] = () => { if(!st.arcLoading && !st.arcMov) caricaArcMov(); };
 
 /* ---------- Lista della spesa collaborativa ---------- */
@@ -2172,8 +2228,9 @@ function pInventario(d){
         : `<b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b><div class="mut" style="font-size:11px">buste disponibili</div>`}</td></tr>`;
   return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
     ${adminView() ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
+  ${cardBusta()}
   <div class="banner sky">${ic('info')}<div>Materiali di consumo (palette, zucchero, bicchieri, detersivi…) non si contano: sono spese generali, aggiungili alla <b>Lista della spesa</b> e registrale quando li compri.</div></div>
-  ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
+  ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Tutti possono aprire una nuova busta del caffè; prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
   <div class="card" style="padding:6px 8px;overflow-x:auto">
   <table><thead><tr>${th('nome','Articolo')}${th('prezzo','Prezzo','r')}${th('stock','Giacenza','c')}</tr></thead><tbody>
     ${rigaCaffe}
@@ -2396,18 +2453,285 @@ A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render
 A['adm-tab'] = ds => { if(!ADM_TABS.some(x => x[0] === ds.v)) return; st.admTab = ds.v; LS.set('admTab', ds.v); st.page = 'bar'; LS.set('page', 'bar'); render(); };
 A['vista'] = ds => { st.vista = ds.v === 'user' ? 'user' : 'admin'; LS.set('vista', st.vista); st.page = 'bar'; LS.set('page', 'bar'); closeSheet(); window.scrollTo(0,0); render(); };
 
+/* Apri nuova busta: chiude l'eventuale busta in corso (calcola il Tasso di Onestà), ne apre una a contatore zero
+   e, se ci sono buste disponibili in scorta, la scala (campo sc). */
+let bustaTap = 0;
+A['busta-apri'] = () => {
+  if(Date.now() - bustaTap < 1500) return; bustaTap = Date.now();
+  const vecchia = bustaAperta(), d = derived();
+  if(vecchia && !confirm(`Aprire una nuova busta? Quella in corso (${vecchia.n || 0} caffè registrati) verrà chiusa e il contatore ripartirà da zero.`)) return;
+  const sc = busteDisp(d) > 0;
+  const b = db.batch(), nuova = C('buste').doc();
+  if(vecchia) b.update(C('buste').doc(vecchia.id), {stato: 'chiusa', chiusaTs: TS(), chiusaDa: st.mid});
+  b.set(nuova, clean({stato: 'aperta', apertaTs: TS(), apertaDa: st.mid, n: 0, sc: sc ? 1 : undefined}));
+  b.commit().then(() => toast('Nuova busta aperta: contatore a zero')).catch(e => toast('Non riuscito (' + errMsg(e) + ')', 'err'));
+};
+A['busta-visto'] = ds => { LS.set('bustaVista_' + ds.id, 1); render(); };
+
+A['drawer'] = () => { $('drawer').classList.add('on'); $('drawer-ov').classList.add('on'); };
+A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
+  <p class="sub">Armieri 5.0 v${VERSION} · ${esc(st.gruppo.nome || '')}</p>
+  <div class="card" style="margin:0 0 10px"><div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Il tuo ruolo</span><b>${st.isAdmin ? 'Amministratore' : 'Collega'}</b></div>
+    <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Prezzo caffè</span><b class="mono">${eur(st.gruppo.prezzoCaffe || 0)}</b></div>
+    <div class="between" style="font-size:13px"><span class="tx2">Quota fondo annuale</span><b class="mono">${eur(st.gruppo.quotaAnnua || 0)}</b></div></div>
+  ${infoBtn(`Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un amministratore. Ricariche e pagamenti li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.`, 'Come funziona')}
+  <button class="btn block" data-act="sheet-close">Chiudi</button>`); };
+/* forza l'aggiornamento: svuota cache e service worker, rilegge i file dalla rete e ricarica (dati e accesso restano) */
+A['aggiorna'] = async () => {
+  toast('Aggiorno all\'ultima versione…');
+  try{
+    await Promise.all(['index.html', 'config.js', 'sw.js'].map(f => fetch(f, {cache: 'reload'}).catch(() => {})));
+    if('serviceWorker' in navigator){ const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); }
+    if(window.caches){ const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); }
+  }catch(e){}
+  location.reload();
+};
+A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
+A['sheet-close'] = closeSheet;
+A['go'] = ds => { if(ds.p === 'eventi') LS.set('evVisti_' + st.gid, Math.max(Date.now(), ...(st.eventi || []).map(e => tms(e.ts)))); if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['entry'] = ds => { st.entry = ds.v || null; render(); };
+
+/* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
+A['condividi-app'] = async () => {
+  A['drawer-close']();
+  const url = appUrl();
+  if(navigator.share){
+    try { await navigator.share({title: 'Armieri 5.0', url}); return; }
+    catch(e){ if(e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link dell\'app copiato'); }
+  catch(e){ window.open('https://wa.me/?text=' + encodeURIComponent(url), '_blank'); }
+};
+A['install-app'] = async () => {
+  const p = installPrompt; if(!p) return;
+  installPrompt = null;
+  try {
+    p.prompt();
+    const r = await p.userChoice;
+    if(r && r.outcome === 'accepted'){ st.installata = true; toast('Installazione avviata'); }
+  } catch(e){}
+  render();
+};
+A['install-salta'] = () => {
+  if(!confirm('Continuare nel browser? Se installerai l\'app più tardi, l\'app installata non conoscerà la tua registrazione e dovrai registrarti di nuovo.')) return;
+  st.skipInstall = true; render();
+};
+
+A['join'] = async () => {
+  const code = normCode(val('j-code'));
+  if(!code) return toast('Il codice ha 12 caratteri, es. ABCD-EFGH-JKLM', 'err');
+  st.busy = true; render();
+  try {
+    const s = await db.collection('saletta').doc(code).get({source:'server'});
+    if(!s.exists) { toast('Codice non trovato', 'err'); return; }
+    st.joinCode = code; st.joinNome = s.data().nome || ''; st.entry = 'creatore';
+  } catch(e){ toast('Impossibile verificare il codice (' + errMsg(e) + ')', 'err'); }
+  finally { st.busy = false; render(); }
+};
+
+A['join-collega'] = () => { const code = st.joinCode; if(!code) return; st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null; st.joinCode = null; connect(code); render(); };
+A['join-creatore'] = async () => {
+  const code = st.joinCode || st.recCode, pin = val('jc-pin');
+  if(!code) return;
+  if(!pin) return toast('Inserisci il PIN amministratore', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione', 'err');
+  st.busy = true; render();
+  try {
+    const g = db.collection('saletta').doc(code);
+    const gd = await g.get({source:'server'}), cm = gd.exists && gd.data().creatoreMid;
+    if(!cm){ toast('Questo gruppo non ha un creatore registrato: entra come nuovo collega', 'err'); return; }
+    // se questo telefono è già amministratore e già collegato non c'è nulla da scrivere
+    const ad = await g.collection('admin').doc(st.uid).get({source:'server'});
+    if(!ad.exists){
+      try { await g.collection('admin').doc(st.uid).set({pin, nome: gd.data().nome || 'Creatore', ts: TS()}); }   // le regole verificano il PIN
+      catch(e){ throw Object.assign(e, {fase: 'pin'}); }
+    }
+    const ut = await g.collection('utenti').doc(st.uid).get({source:'server'});
+    if(!ut.exists){
+      const md = await g.collection('membri').doc(cm).get({source:'server'});
+      await g.collection('utenti').doc(st.uid).set({mid: cm, nome: md.exists ? md.data().nome : 'Creatore', ts: TS()});
+    }
+    const mid = ut.exists ? ut.data().mid : cm;
+    st.gid = code; LS.set('gid', code); LS.set('mid', mid); LS.del('invito'); st.entry = null; st.joinCode = null;
+    connect(code); toast(ad.exists ? 'Bentornato 🛡️ Questo telefono era già amministratore' : 'Bentornato, creatore del gruppo 🛡️');
+  } catch(e){ toast(e && e.fase === 'pin' ? errIngresso(e, 'PIN amministratore errato') : errIngresso(e), 'err'); }
+  finally { st.busy = false; render(); }
+};
+A['crea'] = async () => {
+  const nome = val('c-nome'), io = val('c-io'), nick = val('c-nick'), pin = val('c-pin');
+  const pc = parseEuro(val('c-caffe')), qa = parseEuro(val('c-quota'));
+  const ct = val('c-contanti') ? parseEuro(val('c-contanti')) : 0, rv = val('c-revolut') ? parseEuro(val('c-revolut')) : 0;
+  if(!nome || !validaNome(io)) return toast('Scrivi il nome del gruppo e il tuo nome', 'err');
+  if(!validaNick(nick)) return toast('Nickname troppo lungo', 'err');
+  if(!(pc >= 0) || !(qa >= 0) || !(ct >= 0) || !(rv >= 0)) return toast('Controlla gli importi', 'err');
+  if(pin.length < 6) return toast('Il PIN deve avere almeno 6 caratteri', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione per creare il gruppo', 'err');
+  st.busy = true; render();
+  try {
+    const gid = newCode(), g = db.collection('saletta').doc(gid);
+    const me = g.collection('membri').doc();
+    await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1});
+    await g.collection('segreti').doc('pin').set({pin});
+    await g.collection('admin').doc(st.uid).set({pin, nome: io, ts: TS()});
+    const b = db.batch();
+    b.set(me, clean({nome: io, nick: nick || undefined, uid: st.uid, attivo: true, creato: TS()}));
+    b.set(g.collection('utenti').doc(st.uid), {mid: me.id, nome: io, ts: TS()});
+    await b.commit();
+    st.gid = gid; st.mid = me.id; LS.set('gid', gid); LS.set('mid', me.id); st.entry = null; st.page = 'impostazioni'; LS.set('page','impostazioni');
+    connect(gid);
+    st.membri = [{id: me.id, nome: io, nick, attivo: true}];
+    if(ct > 0) addMov({tipo:'entrata', fonte:'contanti', importo: ct, causale:'Saldo iniziale cassa'});
+    if(rv > 0) addMov({tipo:'entrata', fonte:'revolut', importo: rv, causale:'Saldo iniziale cassa'});
+    toast('Gruppo creato! Ora invita i colleghi con il codice.');
+  } catch(e){ toast('Creazione non riuscita (' + errMsg(e) + ')', 'err'); }
+  finally { st.busy = false; render(); }
+};
+
+A['invia-richiesta'] = async () => {
+  const nome = val('r-nome').replace(/\s+/g, ' '), nick = val('r-nick');
+  if(!validaNome(nome)) return toast('Scrivi nome e cognome (almeno 2 caratteri)', 'err');
+  if(!validaNick(nick)) return toast('Nickname troppo lungo (max 20)', 'err');
+  st.busy = true; render();
+  try { await C('richieste').doc(st.uid).set(clean({nome, nick: nick || undefined, stato: 'attesa', ts: TS()})); toast('Richiesta inviata'); }
+  catch(e){ toast('Invio non riuscito (' + errMsg(e) + ')', 'err'); }
+  finally { st.busy = false; render(); }
+};
+A['richiesta-modifica'] = () => { st.richiesta = {...st.richiesta, stato: 'modifica'}; render(); };
+A['richiesta-ritira'] = () => { if(!confirm('Ritirare la richiesta di accesso?')) return; C('richieste').doc(st.uid).delete().catch(e => toast(errMsg(e), 'err')); };
+A['nick'] = () => {
+  const m = membro(st.mid);
+  openSheet(`<h3>${ic('user')} Il tuo nickname</h3><p class="sub">Il nome <b>${esc(m.nome)}</b> è stato registrato dall'amministratore e non si può cambiare.</p>
+    <label class="f"><span>Nickname</span><input class="in" id="nk" maxlength="20" value="${esc(m.nick || '')}" placeholder="facoltativo" autofocus></label>
+    <button class="btn amber block big" data-act="salva-nick">Salva</button>`);
+};
+A['salva-nick'] = () => {
+  const nick = val('nk'); if(!validaNick(nick)) return toast('Massimo 20 caratteri', 'err');
+  C('membri').doc(st.mid).update({nick}).then(() => toast('Nickname aggiornato')).catch(e => toast(errMsg(e), 'err'));
+  closeSheet();
+};
+A['approva'] = ds => {
+  const r = st.richieste.find(x => x.id === ds.id); if(!r) return;
+  const liberi = membriAttivi().filter(m => !m.uid || !st.utenti.some(u => u.id === m.uid));
+  const simile = liberi.find(m => m.nome.toLowerCase().trim() === r.nome.toLowerCase().trim());
+  openSheet(`<h3>${ic('user')} Approva ${esc(r.nome)}</h3><p class="sub">${r.nick ? 'Nickname “' + esc(r.nick) + '” · ' : ''}richiesta ${quando(r.ts && r.ts.toMillis ? r.ts.toMillis() : 0)}</p>
+    <label class="f"><span>Registra come</span><select class="in" id="ap-m">
+      <option value="">➕ Nuovo collega: ${esc(r.nome)}</option>
+      ${st.membri.map(m => `<option value="${m.id}" ${simile && simile.id === m.id ? 'selected' : ''}>Collega esistente: ${esc(m.nome)}</option>`).join('')}
+    </select></label>
+    ${infoBtn(`Scegli un collega esistente se ha cambiato telefono o se l'avevi già aggiunto tu: mantiene saldo e storico.`, 'Come funziona')}
+    ${st.gruppo.quotaAnnua > 0 ? `<label class="check"><input type="checkbox" id="ap-quota"><b style="flex:1;font-size:14px">Ha già pagato la quota ${anno()}</b><span class="mut mono" style="font-size:12px">${eur(st.gruppo.quotaAnnua)}</span></label>
+    ${infoBtn(`Se spunti, la quota risulta pagata. Altrimenti il collega vedrà l'avviso «Quota non ancora saldata». Il saldo parte comunque da zero.`, 'Come funziona')}` : ''}
+    <div class="grid2"><button class="btn red" data-act="rifiuta-accesso" data-id="${r.id}">Rifiuta</button><button class="btn green" data-act="conferma-approva" data-id="${r.id}">Approva</button></div>`);
+};
+A['conferma-approva'] = ds => {
+  const r = st.richieste.find(x => x.id === ds.id); if(!r) return closeSheet();
+  const esistente = val('ap-m');
+  const b = db.batch();
+  const mref = esistente ? C('membri').doc(esistente) : C('membri').doc();
+  if(esistente) b.set(mref, clean({uid: r.id, nick: r.nick || undefined, attivo: true}), {merge: true});
+  else b.set(mref, clean({nome: r.nome, nick: r.nick || undefined, uid: r.id, attivo: true, creato: TS()}));
+  b.set(C('utenti').doc(r.id), {mid: mref.id, nome: esistente ? (membro(esistente) || {}).nome || r.nome : r.nome, ts: TS()});
+  b.set(C('richieste').doc(r.id), {stato: 'approvata', mid: mref.id, esitoDa: myName(), esitoTs: TS()}, {merge: true});
+  if($('ap-quota') && $('ap-quota').checked && statoQuota(derived(), mref.id, anno()) !== 'pagata')
+    addMov({tipo:'quota', mid: mref.id, anno: anno(), metodo: 'esterno', importo: st.gruppo.quotaAnnua, cred: false});
+  b.commit().then(() => toast(`${r.nome} è nel gruppo`)).catch(e => toast('Non riuscito (' + errMsg(e) + ')', 'err'));
+  closeSheet();
+};
+A['rifiuta-accesso'] = ds => {
+  C('richieste').doc(ds.id).set({stato: 'rifiutata', esitoDa: myName(), esitoTs: TS()}, {merge: true}).then(() => toast('Richiesta rifiutata')).catch(e => toast(errMsg(e), 'err'));
+  closeSheet();
+};
+A['gioco-tutti'] = ds => { const g = giocoSt(); cercaFiltra('gm-lista', membriAttivi()).forEach(m => { if(ds.v === '1') g.sel[m.id] = true; else delete g.sel[m.id]; }); render(); };
+A['gioco-toggle'] = ds => { const g = giocoSt(); g.sel[ds.id] = !g.sel[ds.id]; render(); };
+A['gioco-reset'] = () => { st.gioco = null; render(); };
+function giocoAvvia(g){
+  g.ord = Object.keys(g.sel).filter(k => g.sel[k] && membro(k)); for(let k = g.ord.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [g.ord[k], g.ord[j]] = [g.ord[j], g.ord[k]]; }
+  g.fase = 'play'; g.i = 0; g.lo = g.min; g.hi = g.max; g.secret = g.min + Math.floor(Math.random() * (g.max - g.min + 1)); g.ultimo = null; g.storia = []; g.perde = null;
+}
+A['gioco-start'] = () => {
+  const g = giocoSt(), mn = 0, mx = parseInt(val('gm-max'), 10);
+  if(![100, 500, 1000].includes(mx)) return toast('Scegli il numero massimo', 'err');
+  if(Object.keys(g.sel).filter(k => g.sel[k]).length < 2) return toast('Servono almeno 2 giocatori', 'err');
+  g.min = mn; g.max = mx; giocoAvvia(g); render();
+};
+A['gioco-ancora'] = () => { const g = giocoSt(); giocoAvvia(g); render(); };
+A['gioco-prova'] = () => {
+  const g = giocoSt(), n = parseInt(val('gm-n'), 10);
+  if(!Number.isInteger(n) || n < g.lo || n > g.hi) return toast(`Scrivi un numero tra ${g.lo} e ${g.hi}`, 'err');
+  const mid = g.ord[g.i];
+  const inp = $('gm-n'); if(inp) inp.value = '';   // pronto per il giocatore dopo: campo vuoto e tastiera ancora su
+  const rifocus = () => requestAnimationFrame(() => requestAnimationFrame(() => { const x = $('gm-n'); if(x) x.focus(); }));
+  if(n === g.secret){ g.storia.push({mid, n, dir: 'ok'}); g.perde = mid; g.fase = 'fine'; try { navigator.vibrate && navigator.vibrate([120, 60, 120, 60, 300]); } catch(e){} render(); return; }
+  const dir = n < g.secret ? 'su' : 'giu';
+  if(dir === 'su') g.lo = n + 1; else g.hi = n - 1;
+  g.ultimo = {mid, n, dir}; g.storia.push({mid, n, dir}); g.i = (g.i + 1) % g.ord.length; render(); rifocus();
+};
+
+A['elimina-gruppo'] = () => {
+  if(!st.gruppo) return;
+  openSheet(`<h3 style="color:var(--red)">${ic('trash')} Elimina il gruppo</h3>
+    <p class="sub">Verranno cancellati <b>definitivamente</b> per tutti i colleghi: movimenti, saldi, cassa, inventario, quote, eventi e anagrafica. Non si può annullare.</p>
+    <label class="f"><span>Per confermare scrivi il nome del gruppo: <b>${esc(st.gruppo.nome)}</b></span><input class="in" id="eg-nome" autocomplete="off"></label>
+    <button class="btn block big" data-act="conferma-elimina-gruppo" style="background:var(--red);border-color:var(--red);color:#fff">Elimina per sempre</button>`);
+};
+A['conferma-elimina-gruppo'] = async () => {
+  const g0 = st.gruppo; if(!g0 || st.busy) return;
+  if(val('eg-nome').trim() !== g0.nome) return toast('Il nome non corrisponde', 'err');
+  if(!navigator.onLine) return toast('Serve la connessione per eliminare il gruppo', 'err');
+  const gid = st.gid, g = db.collection('saletta').doc(gid), me = st.uid;
+  st.busy = true; closeSheet(); toast('Eliminazione in corso…');
+  try {
+    // 1) leggo tutto finché le regole mi riconoscono; l'ordine di cancellazione tiene per ultimi amministratori e collegamenti telefono
+    const cols = ['movimenti','buste','riscatti','acquisti','eventi','chiusure','archivio','estratti','prodotti','listaSpesa','membri','richieste','richiesteAdmin','bloccati','admin','utenti'];
+    const snaps = await Promise.all(cols.map(n => g.collection(n).get()));
+    const ownUtente = g.collection('utenti').doc(me);
+    const refs = [g.collection('segreti').doc('pin')];
+    snaps[cols.indexOf('membri')].docs.forEach(d => refs.push(g.collection('segretiMembri').doc(d.id)));
+    cols.forEach((n, i) => snaps[i].docs.forEach(d => { if(!(n === 'utenti' && d.id === me)) refs.push(d.ref); }));
+    disconnect();
+    for(let i = 0; i < refs.length; i += 400){
+      const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit();
+    }
+    await g.delete();
+    await ownUtente.delete().catch(() => {});
+    st.gid = null; st.mid = null; st.entry = null; LS.del('gid'); LS.del('mid'); LS.del('page');
+    toast('Gruppo eliminato');
+  } catch(e){ toast('Eliminazione non riuscita (' + errMsg(e) + '). Riprova: i dati già cancellati non tornano.', 'err'); }
+  finally { st.busy = false; render(); }
+};
+A['esci-gruppo'] = force => {
+  if(force !== true && st.isAdmin && st.gid){
+    const unico = st.admins.length <= 1;
+    const msg = (unico ? 'ATTENZIONE: sei l\'unico amministratore. ' : '') + 'Per rientrare servono il codice del gruppo (e il PIN per tornare amministratore).\n\nCodice: ' + st.gid + '\n\nPremi OK per copiare il codice e uscire, Annulla per restare.';
+    if(!confirm(msg)) return;
+    try { navigator.clipboard && navigator.clipboard.writeText(st.gid); } catch(e){}
+  } else if(force !== true && !confirm('Uscire dal gruppo su questo telefono? Potrai rientrare con il codice.')) return;
+  disconnect(); st.gid = null; st.mid = null; st.entry = null; LS.del('gid'); LS.del('mid'); render();
+};
+
+/* --- bar --- */
+const caffeBtn = () => { const q = st.caffeQta, pc = st.gruppo.prezzoCaffe || 0; return `${ic('check')} ${q > 1 ? `Offri un giro di ${q} caffè (${eur(pc*q)})` : `Registra 1 caffè (${eur(pc)})`}`; };
+A['caffe-menu'] = () => {
+  if(maxCaffe() < 1) return toast(MSG_CREDITO, 'err');
+  st.caffeQta = 1;
+  openSheet(`<h3>${ic('coffee')} Acquista caffè</h3><p class="sub">Prezzo unitario <b class="amber">${eur(st.gruppo.prezzoCaffe || 0)}</b>. Quanti ne prendi? <span class="mut">(max ${maxCaffe()} col tuo credito)</span></p>
+    <div class="qty"><button data-act="cq" data-v="-1">−</button><span class="mono" id="cq-n">1</span><button data-act="cq" data-v="1">+</button></div>
+    <button class="btn block big amber" id="cq-btn" data-act="caffe">${caffeBtn()}</button>`);
+};
+A['cq'] = ds => { st.caffeQta = Math.min(Math.max(1, maxCaffe()), Math.max(1, st.caffeQta + Number(ds.v))); $('cq-n').textContent = st.caffeQta; const b = $('cq-btn'); b.innerHTML = caffeBtn(); b.className = 'btn block big ' + (st.caffeQta > 1 ? 'giro' : 'amber'); };
 let lastTap = 0;
 A['caffe'] = () => {
   if(Date.now() - lastTap < 900) return; lastTap = Date.now();
   const q = st.caffeQta, pc = st.gruppo.prezzoCaffe;
   if(!puoPagare(pc * q)){ closeSheet(); return toast(MSG_CREDITO, 'err'); }
   const id = addMov({tipo:'caffe', mid: st.mid, qta: q, importo: pc * q, pt: ptCaffe() * q});
+  bustaInc(q);
   st.caffeQta = 1; closeSheet(); render();
   toast(q > 1 ? `Giro di ${q} caffè registrato (−${eur(pc*q)})` : `Caffè registrato (−${eur(pc)})`, '', {label:'Annulla', fn: () => annullaConsumo(id)});
 };
 function annullaConsumo(id){
   const mv = derived().movs.find(x => x.id === id);
-  C('movimenti').doc(id).update({stato:'annullata'}).then(() => { toast('Annullato'); }).catch(e => toast('Non annullabile (' + errMsg(e) + ')', 'err'));
+  C('movimenti').doc(id).update({stato:'annullata'}).then(() => { if(mv && mv.tipo === 'caffe') bustaInc(-mv.qta); toast('Annullato'); }).catch(e => toast('Non annullabile (' + errMsg(e) + ')', 'err'));
 }
 A['annulla-consumo'] = ds => annullaConsumo(ds.id);
 A['annulla-richiesta'] = ds => {
@@ -3442,6 +3766,9 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'rp-data'){ st.rpDa = ($('rp-da') || {}).value || ''; st.rpA = ($('rp-a') || {}).value || ''; render(); }
   if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
+  if(el && el.dataset.chg === 'clper'){ st.clPer = Number(el.value); st.scSel = null; render(); }
+  if(el && el.dataset.chg === 'clpc'){ st.clPerC = el.value; render(); }
+  if(el && el.dataset.chg === 'clmesi'){ st.clMDa = $('cl-m-da').value || st.clMDa; st.clMA = $('cl-m-a').value || st.clMA; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
