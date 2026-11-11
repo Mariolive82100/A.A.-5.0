@@ -192,6 +192,7 @@ main.wide{max-width:980px}
 .rk .mi{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:var(--mut);margin-top:3px}
 .rk .v{flex:none;text-align:right;font-size:20px;font-weight:800;color:var(--amber)}.rk .v small{display:block;font-size:10.5px;font-weight:600;color:var(--mut)}
 
+.pbar.off{opacity:.75}.pbar.off .pbs{color:var(--amber,#f5a524)}
 .tessera{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left;background:transparent;color:inherit;cursor:pointer}
 .tessera.ok{border-color:var(--green);background:rgba(52,211,153,.10)}
 .tessera.ok .bar i{background:var(--green)}
@@ -395,7 +396,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.30.0';
+const VERSION = '1.31.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -772,6 +773,15 @@ const ptCaffe = () => cfgN('ptCaffe', 1);
 const ptSnack = () => cfgN('ptSnack', 1);
 const ptSpesa = () => cfgN('ptSpesa', PUNTI_SPESA);
 const ptBenFatto = () => cfgN('ptBenFatto', 2);
+/* interruttori dei punti (admin, nel documento del gruppo): assente = attivo, cosi' i gruppi esistenti non cambiano */
+const flagOn = k => !(st.gruppo && st.gruppo[k] === false);
+const ptMaster = () => flagOn('ptOn');
+const onP = k => ptMaster() && flagOn(k);
+const PUL_FLAG = {macc: 'pulMaccOn', secchio: 'pulSecchioOn', sala: 'pulSalaOn'};
+const pulOn = k => onP(PUL_FLAG[k]);
+const ptCaffeE = () => onP('ptCaffeOn') ? ptCaffe() : 0, ptSnackE = () => onP('ptCaffeOn') ? ptSnack() : 0;
+const ptSpesaE = () => onP('ptSpesaOn') ? ptSpesa() : 0, ptBfE = () => onP('ptBfOn') ? ptBenFatto() : 0;
+const MSG_PUL_OFF = '🚫 Riscatto punti disabilitato dall\'amministratore';
 const sogliaPunti = () => Math.max(1, cfgN('sogliaPunti', 30));
 const creditiSoglia = () => Math.max(1, cfgN('creditiSoglia', 1));
 const bfN = () => Math.max(1, cfgN('bfN', 1));
@@ -1201,7 +1211,7 @@ function pBar(d){
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
     </div>
     <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn regalo block" id="btn-regala-home" data-act="regala">🎁 Regala crediti</button><button class="btn acquisto block" id="btn-acquista-home" data-act="acquista">🤝 Acquista crediti da un collega</button></div>
-    ${(() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
+    ${!ptMaster() ? '' : (() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
     ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
@@ -1215,7 +1225,7 @@ function pBar(d){
     <div class="grid">
       <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
       <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
-      <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
+      <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
       <button class="gbtn" id="btn-lista-spesa" data-act="go" data-p="spesa"><span class="em">🛒</span>Lista della spesa<small>${nSpesa() ? nSpesa() + (nSpesa() === 1 ? ' cosa da comprare' : ' cose da comprare') : 'tutto a posto'}</small>${badgeSpesaAbs()}</button>
     </div>
   </div>
@@ -1406,7 +1416,7 @@ function notifiche(d){
     else if(m.tipo === 'conversione' && m.mid === me) out.push({t, e: '🔄', x: `Hai convertito ${m.punti} Punti Pulizia in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'riscatto' && m.mid === me && (ok || m.stato === 'rifiutata' || !m.stato)) out.push({t, e: m.stato === 'rifiutata' ? '❌' : '🏦', x: m.stato === 'rifiutata' ? `La tua richiesta di riscatto di ${eur(m.importo)} è stata rifiutata` : `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
-    else if(m.tipo === 'ben_fatto' && m.aMid === me) out.push({t, e: '👏', x: `${esc(nomeM(m.daMid))} ti dice «Ben fatto!»: «${esc(m.msg || '')}» (+${(m.pt ?? 2) * fx(m)} punti)`});
+    else if(m.tipo === 'ben_fatto' && m.aMid === me) out.push({t, e: '👏', x: `${esc(nomeM(m.daMid))} ti dice «Ben fatto!»: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`});
     else if(m.tipo === 'riscatto_punti' && m.mid === me) out.push({t, e: '⭐', x: `Hai riscattato ${m.punti * fx(m)} punti: +${eur(m.importo)} di crediti`});
     else if(m.tipo === 'regalo' && m.aMid === me) out.push({t, e: m.trasf ? '🤝' : '🎁', x: `${esc(nomeM(m.daMid))} ti ha ${m.trasf ? 'ceduto' : 'regalato'} ${eur(m.importo)} di crediti${m.msg ? ' · «' + esc(m.msg) + '»' : ''}`});
     else if(m.tipo === 'scambio'){
@@ -1460,7 +1470,7 @@ function descMov(m){
       : {ic:'🔄', t: `${esc(nomeM(m.daMid))} vende ${eur(m.importo)} di crediti a ${esc(nomeM(m.aMid))}${m.causale ? ': ' + esc(m.causale) : ''}`, a: 0, neutro: m.importo};
     case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = !adminView();
       return {ic: m.trasf ? '🤝' : '🎁', t: `${esc(nomeM(m.daMid))} ${m.trasf ? 'ha ceduto (scambio)' : 'ha regalato'} ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
-    case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» (+${(m.pt ?? 2) * fx(m)} punti)`, a: 0};
+    case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`, a: 0};
     case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti * fx(m)} Punti Collega Modello`, a: m.importo};
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · ${m.stato === 'attesa' ? 'richiesto al Fondo' : 'pagato dalla cassa'} (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
     case 'spesa': return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: m.fonte !== 'tasca'};
@@ -1686,19 +1696,23 @@ function pulBarra(k, ps, me){
     pct = Math.min(100, Math.round(t.w.length / N * 100));
     stato = t.bloccato ? `✅ Eseguita questa settimana${u ? ` da <b>${chi(u)}</b>` : ''} · riapre tra ${pulCount(t.rinnovo - now)}` : `Disponibile (${t.w.length}/${N})`;
   }
+  const off = !pulOn(k);
+  if(off){ stato = MSG_PUL_OFF; pct = 0; fatto = false; }
   const adm = st.isAdmin && t.ult && t.ult.id ? `<p class="hint" style="margin:6px 0 0;font-size:11px" id="pul-ult-${k}">Ultima: <b>${chi(t.ult)}</b> · ${quando(t.ult.t)} · <button class="btn link" style="padding:0;font-size:11px" id="btn-storna-${k}" data-act="storno" data-id="${t.ult.id}">Storna</button></p>` : '';
-  return `<div class="pbar ${disp ? 'on' : fatto ? 'done' : ''}" id="pul-card-${k}">
+  return `<div class="pbar ${disp ? 'on' : fatto ? 'done' : ''}${off ? ' off' : ''}" id="pul-card-${k}">
     <div class="pbr1"><b>${em} ${nome}</b><span class="pill violet">+${t.pt} pt</span></div>
     <div class="pbg"><i style="width:${pct}%"></i></div>
     <div class="pbr3"><span class="pbs" id="pul-stato-${k}">${stato}</span>
-      <button class="btn sm pulbtn" id="btn-pul-${k}" data-act="pul" data-k="${k}" ${disp && me ? '' : 'disabled'}>${disp ? 'Riscatta punti' : '⏳ Non attivo'}</button></div>${adm}</div>`;
+      <button class="btn sm pulbtn" id="btn-pul-${k}" data-act="pul" data-k="${k}" ${disp && me ? '' : 'disabled'}>${disp ? 'Riscatta punti' : off ? '🚫 Disabilitato' : '⏳ Non attivo'}</button></div>${adm}</div>`;
 }
+const avvisoPuntiOff = () => ptMaster() ? '' : `<div class="banner amber" id="punti-off">${ic('alert')}<div class="grow"><b>Sistema punti disattivato</b><br><span style="font-size:12.5px">Nessun punto viene accreditato: le classifiche mostrano lo storico.</span></div></div>`;
 function pPulizie(d){
   const me = st.mid, ps = pulStato();
   const scala = st.isAdmin && !scalaDa() ? `<div class="banner amber" id="pul-scala">${ic('alert')}<div class="grow">La scala punti ×10 non è ancora attiva: i punti dei compiti sono già nel nuovo formato.</div><button class="btn sm amber" data-act="go" data-p="regole">Regole</button></div>` : '';
   const classifica = membriAttivi().slice().sort((a,b) => (d.S.punti[b.id]||0) - (d.S.punti[a.id]||0) || (d.S.turni[b.id]||0) - (d.S.turni[a.id]||0) || a.nome.localeCompare(b.nome));
   return `<h2>${ic('brush')} Pulizie</h2><p class="sub" style="margin-bottom:12px">Fai il tuo compito e riscatta i punti.</p>
   ${scala}
+  ${avvisoPuntiOff()}
   ${['macc', 'secchio', 'sala'].map(k => pulBarra(k, ps, me)).join('')}
   <div class="card" id="classifica-pulizie"><h3>🏆 Mastro Lindo · Classifica Punti Pulizia</h3>
     <table><thead><tr><th>#</th><th>Collega</th><th class="c">Punti</th><th class="c">Compiti</th></tr></thead><tbody>
@@ -2155,6 +2169,7 @@ function pStatConsumi(d){
 A['sc-amb'] = ds => { st.scA = ds.v === 'io' ? 'io' : 'saletta'; render(); };
 A['sc-per'] = ds => { if(!SC_PER.some(x => x[0] === ds.v)) return; st.scP = ds.v; render(); };
 function pClassificaPunti(d){
+  const avvPunti = avvisoPuntiOff();
   const amb = st.clAmb === 'io' ? 'io' : 'saletta', per = clPerKey();
   const R = clRighe(d), r = R.r, c = R.M, T = clTitoli(d, r);
   const chip = (act, cur, v, l) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
@@ -2163,7 +2178,7 @@ function pClassificaPunti(d){
     <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'oggi', 'Oggi')}${chip('cl-per', per, 'settimana', 'Questa settimana')}${chip('cl-per', per, 'mese', 'Mese corrente')}</div>
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
-  return `${filtri}${clHero(R.righe, R.pos, T, r)}
+  return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
   ${amb === 'io' ? clIo(R.righe, c) : clClassifica(d, R, T, c)}`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
@@ -2498,10 +2513,16 @@ const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
     ${infoBtn(`Il prezzo del caffè e il listino si gestiscono dalla scheda Magazzino dell'Amministrazione. Le regole dei punti sono nel menu, alla voce Regole Punti e Saletta.`, 'Come funziona')}
   </div>
 `;
+const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['rp-on-spesa', 'ptSpesaOn', '🧾 Punti spesa fondo'], ['rp-on-bf', 'ptBfOn', '👏 Punti «Ben fatto»'],
+  ['rp-on-macc', 'pulMaccOn', '☕ Pulizia macchinetta (riscatto)'], ['rp-on-secchio', 'pulSecchioOn', '🪣 Svuotamento secchio (riscatto)'], ['rp-on-sala', 'pulSalaOn', '🧹 Pulizia generale sala (riscatto)']];
 const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Modello</h3>
     ${infoBtn(`Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.`, 'Come funziona')}
     ${scalaDa() ? `<p class="hint" id="scala-attiva" style="margin:0 0 10px">✅ Scala punti ×10 attiva dal ${dataOra(scalaDa()).slice(0, 10)}.</p>`
       : `<div class="banner amber" id="banner-scala">${ic('alert')}<div class="grow"><b>Scala punti ×10 non ancora attiva</b><br><span style="font-size:12.5px">Porta soglia e punti ai nuovi valori (300 · caffè 10 · spesa 20 · «Ben fatto» 20 · snack 10) e rivaluta in memoria i punti già maturati.</span></div><button class="btn sm amber" id="btn-scala10" data-act="scala10">Passa alla scala ×10</button></div>`}
+    <h3 style="margin-top:4px">Interruttori punti</h3>
+    <label class="check"><input type="checkbox" id="rp-on" data-chg="rp-sw" ${ptMaster() ? 'checked' : ''}><b style="flex:1;font-size:14px">⭐ Sistema Punti e Gamification attivo</b></label>
+    <p class="hint" style="margin:4px 0 8px">Se spento, nessun accredito di punti e Tessera Fedeltà nascosta. I punti già maturati restano.</p>
+    <div id="rp-sw-lista">${RP_SW.map(([id, k, l]) => `<label class="check"><input type="checkbox" id="${id}" ${flagOn(k) ? 'checked' : ''} ${ptMaster() ? '' : 'disabled'}><b style="flex:1;font-size:14px">${l}</b></label>`).join('')}</div>
     <div class="grid2">
       <label class="f"><span>Soglia riscatto (punti)</span><input class="in mono" id="rp-soglia" inputmode="numeric" value="${sogliaPunti()}"></label>
       <label class="f"><span>Crediti erogati</span><input class="in mono" id="rp-crediti" inputmode="numeric" value="${creditiSoglia()}"></label>
@@ -2888,7 +2909,7 @@ A['caffe'] = () => {
   if(Date.now() - lastTap < 900) return; lastTap = Date.now();
   const q = st.caffeQta, pc = st.gruppo.prezzoCaffe;
   if(!puoPagare(pc * q)){ closeSheet(); return toast(MSG_CREDITO, 'err'); }
-  const id = addMov({tipo:'caffe', mid: st.mid, qta: q, importo: pc * q, pt: ptCaffe() * q});
+  const id = addMov({tipo:'caffe', mid: st.mid, qta: q, importo: pc * q, pt: ptCaffeE() * q});
   st.caffeQta = 1; closeSheet(); render();
   toast(q > 1 ? `Giro di ${q} caffè registrato (−${eur(pc*q)})` : `Caffè registrato (−${eur(pc)})`, '', {label:'Annulla', fn: () => annullaConsumo(id)});
 };
@@ -2913,7 +2934,7 @@ A['snack'] = () => {
 A['prendi-snack'] = ds => {
   const p = prodotto(ds.id); if(!p) return;
   if(!puoPagare(p.prezzo)){ closeSheet(); return toast(MSG_CREDITO, 'err'); }
-  const id = addMov({tipo:'snack', mid: st.mid, pid: p.id, qta: 1, importo: p.prezzo, nome: p.nome, emoji: p.emoji || '', pt: ptSnack()});
+  const id = addMov({tipo:'snack', mid: st.mid, pid: p.id, qta: 1, importo: p.prezzo, nome: p.nome, emoji: p.emoji || '', pt: ptSnackE()});
   closeSheet();
   const rest = (derived().S.stock[p.id] || 0);
   toast(`${p.nome} (−${eur(p.prezzo)})${st.isAdmin && rest <= SOGLIA_SCORTA ? ' · scorte basse!' : ''}`, '', {label:'Annulla', fn: () => annullaConsumo(id)});
@@ -3000,7 +3021,7 @@ A['paga-spesa'] = ds => {
 };
 A['conferma-paga-spesa'] = ds => {
   const met = radio('ps-met') || 'contanti', mv = derived().movs.find(x => x.id === ds.id);
-  C('movimenti').doc(ds.id).update({stato: 'confermata', fonte: met, esitoDa: myName(), esitoTs: TS(), pt: ptSpesa()})
+  C('movimenti').doc(ds.id).update({stato: 'confermata', fonte: met, esitoDa: myName(), esitoTs: TS(), pt: ptSpesaE()})
     .then(() => { aggiornaArticoli(mv, true); closeSheet(); toast('Spesa pagata dalla cassa ✓'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
@@ -3042,8 +3063,9 @@ function pulStato(){
     sala: {w: sala, bloccato: sala.length >= pulGruppoN(), rinnovo, ult: ult('sala'), pt: ptPulSala()}
   };
 }
-const pulDisp = ps => ({macc: ps.macc.pronto, secchio: !ps.secchio.fatto && ps.secchio.aperto, sala: !ps.sala.bloccato});
+const pulDisp = ps => ({macc: ps.macc.pronto && pulOn('macc'), secchio: !ps.secchio.fatto && ps.secchio.aperto && pulOn('secchio'), sala: !ps.sala.bloccato && pulOn('sala')});
 function pulMsg(ps, k){
+  if(!pulOn(k)) return MSG_PUL_OFF;
   if(k === 'macc') return `Mancano ${ps.macc.soglia - ps.macc.n} caffè alla prossima pulizia`;
   if(k === 'secchio') return ps.secchio.fatto ? `Svuotato oggi da ${nomeBreve(ps.secchio.fatto.mid) || nomeM(ps.secchio.fatto.mid)}` : `Disponibile tra ${pulCount(ps.secchio.prossima - Date.now())}`;
   const u = ps.sala.w[ps.sala.w.length - 1];
@@ -3054,6 +3076,7 @@ const ptPulK = k => ({macc: ptPulMacc, secchio: ptPulSecchio, sala: ptPulSala}[k
 /* «Riscatta punti»: registrazione immediata del compito, alla data/ora corrente */
 A['pul'] = ds => {
   const k = ds.k; if(!PUL_DEF[k] || !st.mid) return;
+  if(!pulOn(k)) return toast(MSG_PUL_OFF, 'err');
   const ps = pulStato(); if(!pulDisp(ps)[k]) return toast(pulMsg(ps, k), 'err');
   addMov({tipo: 'pulizia', task: k, mid: st.mid, mids: [st.mid], punti: ptPulK(k), giorno: oggiISO()});
   toast(`${PUL_DEF[k][1]}: +${ptPulK(k)} punti ✨`);
@@ -3184,7 +3207,7 @@ A['conferma-storno'] = ds => {
 };
 A['esito'] = ds => {
   const mv = derived().movs.find(x => x.id === ds.id);
-  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesa()} : {})})
+  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesaE()} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
@@ -3507,6 +3530,7 @@ A['conferma-caffe-fuori'] = () => {
 /* --- punti caffè, punti (admin), spesa admin, prezzo caffè --- */
 /* --- Punti Collega Modello: punti di tutte le categorie, riscatto a soglia --- */
 A['tessera'] = () => {
+  if(!ptMaster()) return toast('Sistema punti disattivato dall\'amministratore', 'err');
   const d = derived(), r = sogliaPunti(), cr = creditiSoglia(), pt = ptDisp(d, st.mid), ok = pt >= r, me = st.mid;
   const usati = ptUsati(d, me);
   openSheet(`<h3>⭐ Punti Collega Modello</h3>
@@ -3520,6 +3544,7 @@ A['tessera'] = () => {
       <p class="tx2" style="font-size:14px;line-height:1.5;margin:10px 0 0">Riscattare i punti non cambia la tua posizione in classifica.</p></div>`);
 };
 A['riscatta-punti'] = () => {
+  if(!ptMaster()) return toast('Sistema punti disattivato dall\'amministratore', 'err');
   const d = derived(), r = sogliaPunti(), cr = creditiSoglia();
   if(ptDisp(d, st.mid) < r) return toast(`Servono ${r} punti`, 'err');
   addMov({tipo:'riscatto_punti', mid: st.mid, importo: cr * 100, punti: r});
@@ -3552,7 +3577,7 @@ A['benfatto'] = () => {
   const col = membriAttivi().filter(m => m.id !== st.mid).slice().sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
   const left = bfRestanti(), n = bfN();
   openSheet(`<h3>👏 Ben fatto!</h3>
-    <p class="sub">Riconosci un collega meritevole: lui riceve <b>+${ptBenFatto()} punti</b>, tu non perdi nulla.</p>
+    <p class="sub">Riconosci un collega meritevole: ${ptBfE() ? `lui riceve <b>+${ptBenFatto()} punti</b>, tu non perdi nulla.` : 'i punti «Ben fatto» sono disattivati: il riconoscimento resta, senza punti.'}</p>
     <div class="banner ${left > 0 ? 'sky' : 'amber'}">${ic(left > 0 ? 'info' : 'alert')}<div>${left > 0 ? `Gettoni disponibili: <b>${left}</b> su ${n} (${bfPeriodo() === 'mese' ? 'questo mese' : 'questa settimana'}).` : `Gettone già usato: si rinnova ${bfRinnovo()}.`}</div></div>
     ${col.length ? `<label class="f" style="margin-bottom:6px"><span>A chi?</span></label>${cercaBox('bf-lista')}<div id="bf-lista" style="max-height:30vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="radio" name="bf-dest" value="${m.id}" data-chg="bf-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('bf-lista')}</div>` : '<div class="empty">Non ci sono altri colleghi.</div>'}
     <label class="f"><span>Perché? (obbligatorio) <small id="bf-cnt" class="mut">0/80</small></span><input class="in" id="bf-msg" maxlength="80" data-chg="bf-upd" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
@@ -3563,8 +3588,8 @@ A['bf-invia'] = () => {
   if(!dest || dest === st.mid || !membro(dest)) return toast('Scegli un collega', 'err');
   if(msg.length < 2) return toast('Scrivi la motivazione', 'err');
   if(bfRestanti() <= 0) return toast('Gettone già usato in questo periodo', 'err');
-  addMov({tipo:'ben_fatto', mid: st.mid, dest, daMid: st.mid, aMid: dest, msg, pt: ptBenFatto()});
-  closeSheet(); toast(`👏 Ben fatto a ${nomeBreve(dest)}! +${ptBenFatto()} punti`);
+  addMov({tipo:'ben_fatto', mid: st.mid, dest, daMid: st.mid, aMid: dest, msg, pt: ptBfE()});
+  closeSheet(); toast(`👏 Ben fatto a ${nomeBreve(dest)}!${ptBfE() ? ` +${ptBfE()} punti` : ''}`);
 };
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSnack: n('rp-snack'), ptSpesa: n('rp-spesa'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn'),
@@ -3573,7 +3598,9 @@ A['salva-punti'] = () => {
   const ok = inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptSnack, 0, 100) && inR(v.ptSpesa, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.bfN, 1, 20)
     && inR(v.ptPulMacc, 0, 500) && inR(v.ptPulSecchio, 0, 500) && inR(v.ptPulSala, 0, 500) && inR(v.pulMaccCaffe, 1, 200) && inR(v.pulSecchioFine, 1, 24) && inR(v.pulSecchioInizio, 0, 23) && v.pulSecchioInizio < v.pulSecchioFine && inR(v.pulGruppoN, 1, 20);
   if(!ok) return toast('Valori non validi', 'err');
-  G().set({...v, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
+  const sw = {ptOn: !!($('rp-on') && $('rp-on').checked)};
+  RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
+  G().set({...v, ...sw, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
 /* passaggio alla scala punti ×10: una sola scrittura sul documento del gruppo (scalaDa + valori espliciti); i movimenti vecchi si rivalutano in memoria */
 A['scala10'] = () => {
@@ -3714,7 +3741,7 @@ A['spesa-admin'] = () => {
 A['conferma-spesa-admin'] = () => {
   const descr = val('sa-desc'), imp = parseEuro(val('sa-imp')), fonte = radio('sa-met') || 'contanti';
   if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi cosa è stato comprato e un importo valido', 'err');
-  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'confermata', esitoDa: myName(), pt: ptSpesa()});
+  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'confermata', esitoDa: myName(), pt: ptSpesaE()});
   closeSheet(); toast('Spesa registrata');
 };
 A['salva-prezzo-caffe'] = () => {
@@ -4008,6 +4035,7 @@ document.addEventListener('change', e => {
   if(e.target && (e.target.name === 'q-met' || e.target.name === 'q-cred')) quotaAggiorna();
   const el = e.target.closest('[data-chg]');
   if(el && el.dataset.chg === 'rp-data'){ st.rpDa = ($('rp-da') || {}).value || ''; st.rpA = ($('rp-a') || {}).value || ''; render(); }
+  if(el && el.dataset.chg === 'rp-sw') document.querySelectorAll('#rp-sw-lista input').forEach(i => { i.disabled = !el.checked; });
   if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
