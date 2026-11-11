@@ -377,7 +377,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.20.0';
+const VERSION = '1.21.0';
 const MAXOP = 50000, BUSTA_CAFFE = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -463,7 +463,7 @@ const st = {
   gruppo: null, membri: [], prodotti: [], eventi: [], chiusure: [], movimenti: [], pending: {},
   admins: [], utenti: [], isAdmin: false,
   ready: {}, sync: 'conn', syncErr: '', entry: null, busy: false,
-  caffeQta: 1, riscSel: {}, riscMet: 'contanti', invSort: {k:'nome', asc:true}, feedFiltro: 'tutti', statPeriodo: 'corrente', salPer: 'mese', salDa: '', salA: '', scSel: null, listaSpesa: [], spesaSel: {}, arcMov: null, arcLoading: false,
+  caffeQta: 1, riscSel: {}, riscMet: 'contanti', invSort: {k:'nome', asc:true}, feedFiltro: 'tutti', statPeriodo: 'corrente', salPer: 'mese', rpPer: 'oggi', rpDa: '', rpA: '', salDa: '', salA: '', scSel: null, listaSpesa: [], spesaSel: {}, arcMov: null, arcLoading: false,
   archivio: null, skipInstall: false, installata: false
 };
 
@@ -1492,6 +1492,7 @@ function pFeed(d){
   const last = ultimaChiusura(), av = adminView();
   return `<h2>${ic('receipt')} Cassa e registro ${infoBtn(`Il saldo è la cassa comune (contanti + conto). Qui sotto tutta la storia del fondo, visibile a tutti${last ? ' · dal ' + dataOra(last.fino.toMillis()) : ''}.`)}</h2>
   <div class="stat" style="margin:0 0 12px"><small>Saldo disponibile del fondo</small><b class="mono amber" id="r-fondo-tot" style="font-size:28px;line-height:1.2">${fondoNoto() ? eur(tesoro(d).cassa) : '—'}</b></div>
+  ${st.isAdmin ? riepilogoCard(d) : ''}
   <div class="chips">${[['tutti','Tutti'],['miei','Miei'],['bar','Caffè & Snack'],['cassa','Cassa & Spese'],['attesa','In attesa']].map(([v,l]) => `<button class="${f===v?'on':''}" data-act="feed-filtro" data-v="${v}">${l}</button>`).join('')}</div>
   <label class="f" style="margin:0 0 10px"><span>Cerca per collega</span><div class="row" style="gap:6px"><input class="in" id="feed-q" type="search" inputmode="search" autocomplete="off" placeholder="Nome o nickname…" data-chg="feed-q" value="${esc(st.feedQ || '')}" style="flex:1"><button class="btn sm ghost" id="feed-q-x" data-act="feed-q-x" ${st.feedQ ? '' : 'hidden'}>✕</button></div></label>
   <div class="card" id="feed-list">${feedLista(d)}</div>
@@ -2292,7 +2293,8 @@ function pStatistiche(d){
       <option value="corrente">Periodo aperto</option>
       ${ch.slice().reverse().map(c => `<option value="${c.id}" ${per===c.id?'selected':''}>${esc(labelChiusura(c))}</option>`).join('')}
     </select></div>
-  <button class="btn block" style="margin-bottom:12px" data-act="rendiconto">${ic('share','s')} Condividi rendiconto</button>
+  ${riepilogoCard(d)}
+  <button class="btn block" style="margin-bottom:12px" data-act="rendiconto">${ic('share','s')} Condividi rendiconto (immagine)</button>
   <div class="grid3" style="margin-bottom:12px">
     <div class="stat"><small>Caffè</small><b class="mono amber">${caffeTot}</b></div>
     <div class="stat"><small>Snack</small><b class="mono">${snackTot}</b></div>
@@ -3761,6 +3763,7 @@ document.addEventListener('change', e => {
   if(e.target && (e.target.name === 'q-met' || e.target.name === 'q-cred')) quotaAggiorna();
   const el = e.target.closest('[data-chg]');
   if(el && el.dataset.chg === 'stat-periodo'){ st.statPeriodo = el.value; render(); }
+  if(el && el.dataset.chg === 'rp-data'){ st.rpDa = ($('rp-da') || {}).value || ''; st.rpA = ($('rp-a') || {}).value || ''; render(); }
   if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'clper'){ st.clPer = Number(el.value); st.scSel = null; render(); }
@@ -3789,6 +3792,73 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Enter' && e.target.id === 'sp-nome') A['spesa-aggiungi']();
 });
 setInterval(() => { if(st.page === 'feed' || st.page === 'bar') render(); }, 60000);
+
+/* ---------- Riepilogo per periodo (admin): filtri rapidi, tutto calcolato in memoria; condivisione testuale ---------- */
+const RP_PER = [['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['mese', 'Questo mese'], ['corrente', 'Periodo corrente'], ['custom', 'Personalizzato']];
+const dBr = ms => new Date(ms).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'}).replace(/\.$/, '');
+function rpRange(){
+  const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = st.rpPer || 'oggi';
+  const ini = dt => { dt.setHours(0, 0, 0, 0); return dt.getTime(); }, fine = dt => { dt.setHours(23, 59, 59, 999); return dt.getTime(); };
+  if(p === 'settimana'){ const dow = (o.getDay() + 6) % 7, da = ini(new Date(y, m, o.getDate() - dow)); return {p, da, a: Infinity, label: `Questa settimana (da ${dBr(da)})`}; }
+  if(p === 'mese') return {p, da: ini(new Date(y, m, 1)), a: Infinity, label: `Questo mese (${o.toLocaleDateString('it-IT', {month: 'long', year: 'numeric'})})`};
+  if(p === 'corrente'){ const l = ultimaChiusura(), da = l ? l.fino.toMillis() : 0; return {p, da, a: Infinity, label: da ? `Periodo corrente (dal ${dBr(da)})` : 'Periodo corrente (dall\'inizio)'}; }
+  if(p === 'custom'){
+    const da = st.rpDa ? ini(new Date(st.rpDa + 'T00:00:00')) : 0, a = st.rpA ? fine(new Date(st.rpA + 'T00:00:00')) : Infinity;
+    return {p, da, a, label: (st.rpDa ? dBr(da) : 'inizio') + ' → ' + (st.rpA ? dBr(a) : 'oggi')};
+  }
+  return {p: 'oggi', da: ini(new Date(y, m, o.getDate())), a: Infinity, label: `Oggi (${dBr(Date.now())})`};
+}
+/* totali del periodo dai movimenti gia' in memoria (stessa regola degli storni delle altre statistiche) */
+function riepRange(r){
+  const R = {caffe: 0, caffeE: 0, snack: 0, snackE: 0, inC: 0, inR: 0, spese: 0, per: {}};
+  const per = mid => R.per[mid] || (R.per[mid] = {n: 0, e: 0});
+  const pass = (m, sg) => {
+    switch(m.tipo){
+      case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ R.caffe += sg * (m.qta || 0); R.caffeE += sg * (m.importo || 0); const p = per(m.mid); p.n += sg * (m.qta || 0); p.e += sg * (m.importo || 0); } break;
+      case 'snack': if(m.stato !== 'annullata'){ R.snack += sg * (m.qta || 0); R.snackE += sg * (m.importo || 0); const p = per(m.mid); p.n += sg * (m.qta || 0); p.e += sg * (m.importo || 0); } break;
+      case 'ricarica': if(m.stato === 'confermata'){ if(m.metodo === 'revolut') R.inR += sg * m.importo; else R.inC += sg * m.importo; } break;
+      case 'quota': if(m.metodo === 'revolut') R.inR += sg * m.importo; else if(m.metodo === 'contanti') R.inC += sg * m.importo; break;
+      case 'spesa': if(m.stato === 'confermata') R.spese += sg * m.importo; break;
+      case 'storno': if(m.orig) pass(m.orig, -sg); break;
+    }
+  };
+  (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a).forEach(m => pass(m, 1));
+  R.top = Object.entries(R.per).filter(([, v]) => v.n > 0).sort((a, b) => b[1].e - a[1].e || b[1].n - a[1].n).slice(0, 5).map(([mid, v]) => ({mid, n: v.n, e: v.e}));
+  return R;
+}
+function riepilogoCard(d){
+  const r = rpRange(), R = riepRange(r), last = ultimaChiusura(), parziale = !st.arcMov && last && r.da < last.fino.toMillis();
+  const c = d.S.cassa, tot = (c.contanti || 0) + (c.revolut || 0), maxE = Math.max(1, ...R.top.map(x => x.e));
+  return `<div class="card" id="riepilogo"><h3><span>📊 Riepilogo per periodo</span><span class="mut" style="font-weight:500;text-transform:none;letter-spacing:0">${esc(r.label)}</span></h3>
+    <div class="chips" id="rp-chips">${RP_PER.map(([v, l]) => `<button id="rp-${v}" class="${r.p === v ? 'on' : ''}" data-act="rp-per" data-v="${v}">${l}</button>`).join('')}</div>
+    ${r.p === 'custom' ? `<div class="grid2" style="margin:0 0 10px"><label class="f" style="margin:0"><span>Dal</span><input class="in" type="date" id="rp-da" value="${esc(st.rpDa || '')}" data-chg="rp-data"></label><label class="f" style="margin:0"><span>Al</span><input class="in" type="date" id="rp-a" value="${esc(st.rpA || '')}" data-chg="rp-data"></label></div>` : ''}
+    <div class="grid2" style="margin-bottom:8px">
+      <div class="stat"><small>☕ Caffè</small><b class="mono amber" id="rp-caffe">${R.caffe}</b><small>${eur(R.caffeE)}</small></div>
+      <div class="stat"><small>🍫 Snack</small><b class="mono" id="rp-snack">${R.snack}</b><small>${eur(R.snackE)}</small></div>
+      <div class="stat"><small>📥 Incassi</small><b class="mono green" id="rp-inc">${eur(R.inC + R.inR)}</b><small>Contanti ${eur(R.inC)} · Revolut ${eur(R.inR)}</small></div>
+      <div class="stat"><small>💸 Spese anticipate</small><b class="mono red" id="rp-spese">${eur(R.spese)}</b></div></div>
+    <div class="stat" style="margin-bottom:8px"><small>💰 Giacenza cassa (adesso)</small><b class="mono">${eur(tot)}</b><small>Contanti ${eur(c.contanti || 0)} · Revolut ${eur(c.revolut || 0)}</small></div>
+    ${R.top.length ? `<div style="margin:6px 0 8px"><div class="mut" style="font-size:12px;margin-bottom:6px">Top consumatori</div>${R.top.map(x => `<div style="margin-bottom:7px"><div class="between" style="font-size:13px"><span>${esc(nomeM(x.mid))} <span class="mut">· ${x.n}</span></span><b class="mono">${eur(x.e)}</b></div><div class="bar"><i style="width:${Math.round(x.e / maxE * 100)}%"></i></div></div>`).join('')}</div>` : ''}
+    ${parziale ? `<p class="hint" style="margin:0 0 8px">Il periodo scelto parte prima dell'ultima chiusura: i movimenti archiviati non sono caricati. <button class="btn sm ghost" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi l\'archivio'}</button></p>` : ''}
+    <button class="btn amber block big" id="btn-rp-condividi" data-act="rp-condividi">📲 Condividi riepilogo</button></div>`;
+}
+function riepTesto(){
+  const d = derived(), r = rpRange(), R = riepRange(r), c = d.S.cassa, sep = '────────────────────────';
+  const L = ['☕ *RESOCONTO SALETTA ARMIERI*', `📅 Periodo: ${r.label}`, sep,
+    `☕ Caffè totali: ${R.caffe} (${eur(R.caffeE)})`, `🍫 Snack totali: ${R.snack} (${eur(R.snackE)})`,
+    `📥 Incassi registrati: ${eur(R.inC + R.inR)}`, `💸 Spese sostenute: ${eur(R.spese)}`,
+    `💰 Giacenza Cassa: ${eur((c.contanti || 0) + (c.revolut || 0))} (Contanti: ${eur(c.contanti || 0)} | Revolut: ${eur(c.revolut || 0)})`];
+  if(R.top.length){ L.push(sep, '🏆 *Top consumatori*'); R.top.forEach(x => L.push(`• ${nomeM(x.mid)}: ${x.n} ${x.n === 1 ? 'consumo' : 'consumi'} (${eur(x.e)})`)); }
+  L.push(sep, 'Generato da Armieri 5.0');
+  return L.join('\n');
+}
+A['rp-per'] = ds => { if(!RP_PER.some(x => x[0] === ds.v)) return; st.rpPer = ds.v; render(); };
+A['rp-condividi'] = async () => {
+  const testo = riepTesto();
+  if(navigator.share){ try { await navigator.share({text: testo}); return; } catch(e){ if(e && e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(testo); toast('Riepilogo copiato negli appunti'); }
+  catch(e){ const t = document.createElement('textarea'); t.value = testo; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch(x){} t.remove(); toast(ok ? 'Riepilogo copiato negli appunti' : 'Copia non riuscita', ok ? undefined : 'err'); }
+};
 
 /* ---------- Icone (i): spiegazioni a comparsa, si chiudono con un tocco sullo sfondo ---------- */
 const INFOS = {};
