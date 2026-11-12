@@ -349,22 +349,28 @@ header.hasprize{padding-bottom:38px}
   header.hasprize{padding-bottom:10px}
   .prizepill{position:static;flex:none;padding:5px 12px;border:1px solid rgba(251,191,36,.4);border-radius:99px;background:rgba(251,191,36,.10)}
   main,main.wide{max-width:1260px;padding:22px 30px 48px}
-  main:not([data-p="bar"]),#atab-pannello{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start;grid-auto-flow:row dense}
-  main:not([data-p="bar"])>*,#atab-pannello>*{grid-column:1/-1}
-  main:not([data-p="bar"])>.card:not(:has(table)):not(:has(.list)),#atab-pannello>.card:not(:has(table)):not(:has(.list)){grid-column:auto}
   .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start}
   .rp-grid>#card-compiti{grid-column:1/-1}
   main[data-p="bar"] .home .grid{grid-template-columns:repeat(4,1fr)}
   main[data-p="bar"] .gbtn{min-height:190px}
   main[data-p="bar"]>*{max-width:1100px;margin-left:auto;margin-right:auto}
   table{width:100%}
-  .card{overflow-x:visible}
+  /* pagine "da lista o modulo": colonna centrale piu' stretta (niente card sproporzionate); le pagine ricche restano larghe */
+  main[data-p="spesa"],main[data-p="eventi"],main[data-p="compiti"],main[data-p="gioco"],main[data-p="ruota"],main[data-p="perle"],main[data-p="impostazioni"],main[data-p="regolamento"],main[data-p="notifiche"],main[data-p="crediti"]{max-width:860px}
+  main[data-p="saletta"]{max-width:980px}
+  main[data-p="saletta"] .grid2{grid-template-columns:repeat(3,1fr)}
+  /* Classifica: filtri a tutta larghezza, sotto due colonne bilanciate (sinistra: scheda, albo, onesta; destra: podio completo) */
+  .cl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto 1fr;gap:0 18px;align-items:start}
+  .cl-grid>.clg-h{grid-column:1;grid-row:1}.cl-grid>.clg-a{grid-column:1;grid-row:2}.cl-grid>.clg-o{grid-column:1;grid-row:3}
+  .cl-grid>.clg-p{grid-column:2;grid-row:1/5}
+  /* Cassa e registro: cruscotto a tutta larghezza con i 4 indicatori su una riga */
+  #cassa-dash .grid2{grid-template-columns:repeat(4,minmax(0,1fr))}
+  /* premio podio accanto alla posizione, al centro dell'header */
+  #hdr-rank{margin:0 0 0 auto}
+  .prizepill{margin:0 auto 0 0}
+  #hdr-update{margin-left:0!important}
 }
-@media (min-width:1500px){
-  main:not([data-p="bar"]),#atab-pannello{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .rp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  main,main.wide{max-width:1480px}
-}
+@media (min-width:1500px){ main,main.wide{max-width:1360px} }
 </style>
 </head>
 <body>
@@ -447,7 +453,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.37.1';
+const VERSION = '1.37.2';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2242,12 +2248,12 @@ function clClassifica(d, R, T, c){
       <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(m => esc(nomeBreve(m) || nomeM(m)) + (m === st.mid ? ' (tu)' : '')).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
     ${infoBtn(`Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.`, 'Come funziona')}</div>`;
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
-  return `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
+  const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
     ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
-  ${cardOnesta(c, r)}
-  ${albo}`;
+  `;
+  return {podio: podioCard, onesta: cardOnesta(c, r), albo};
 }
 function pClassifiche(d){
   const mod = st.clMod === 'stat' ? 'stat' : (st.clMod === 'arc' && st.isAdmin) ? 'arc' : 'classifica';
@@ -2308,8 +2314,10 @@ function pClassificaPunti(d){
     <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'oggi', 'Oggi')}${chip('cl-per', per, 'settimana', 'Questa settimana')}${chip('cl-per', per, 'mese', '📅 Podio del mese')}${chip('cl-per', per, 'sempre', '🏆 Di sempre')}</div>
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
-  return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
-  ${amb === 'io' ? clIo(R.righe, c) : clClassifica(d, R, T, c)}`;
+  if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
+  ${clIo(R.righe, c)}`;
+  const Z = clClassifica(d, R, T, c);
+  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div><div class="clg-o">${Z.onesta}</div><div class="clg-a">${Z.albo}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
 A['cl-per'] = ds => { st.clP = ['oggi', 'settimana', 'mese', 'sempre'].includes(ds.v) ? ds.v : 'oggi'; st.scSel = null; render(); };
