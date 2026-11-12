@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.36.1';
+const VERSION = '1.36.3';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1670,9 +1670,10 @@ function pRegolamento(){
     `Ti sei sbagliato? <b>Annulla entro ${ANNULLA_MIN} minuti.</b>`,
     'Ogni prelievo riduce la scorta in inventario.'])}
   ${sez('🛒 Spesa e rimborsi', [
-    'Chiunque aggiunge alla <b>Lista della spesa</b>; chi compra spunta gli articoli e registra l\'importo.',
-    'Rimborso <b>in crediti</b> o <b>in denaro</b>: vale solo dopo la <b>convalida</b> di un admin.',
-    'Se rifiutata o annullata, gli articoli tornano in lista.'])}
+    'La <b>Lista della spesa</b> è solo un <b>promemoria</b>: chiunque aggiunge ciò che manca e chi lo compra lo spunta per toglierlo dall\'elenco. Non genera rimborsi.',
+    'Hai anticipato dei soldi per il gruppo (acquisti per la saletta o spese straordinarie come un telegramma o un omaggio autorizzato)? Da Home tocca <b>➕ Ricarica → 🧾 Rimborso spesa</b>: indica motivo, importo e se vuoi il rimborso <b>in crediti</b> o in <b>denaro reale</b>.',
+    'Il rimborso vale solo dopo la <b>convalida</b> di un admin ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
+    'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🎯 Compiti di oggi', [
     'Dal pulsante «Compiti di oggi» in Home: gli admin decidono i compiti (pulizie, macchinetta, secchio, spesa…), ciascuno con il suo punteggio.',
     'Tocchi un compito e parte il <b>sorteggio</b>: chi ha svolto meno incarichi di quel tipo nel periodo ha più probabilità di uscire. Chi è escluso dagli admin non partecipa.',
@@ -1681,7 +1682,7 @@ function pRegolamento(){
     'Non ci sono scadenze né orari: l\'incarico resta aperto finché non viene concluso o annullato da un admin. Un solo incarico alla volta per compito.',
     '🛡️ <b>Supervisor:</b> colleghi delegati dagli admin, senza scadenza finché non revocati: possono convalidare o rifiutare i compiti e creare nuovi compiti dalla pagina. Nessun accesso a cassa o impostazioni.',
     'Nessuno convalida un <b>proprio</b> compito: serve un altro admin o un Supervisor (unica eccezione: un solo admin e nessun Supervisor).',
-    '🛒 Anche <b>chi va a fare la spesa</b> si decide da qui; la Lista della spesa serve per articoli, spunte e rimborsi.',
+    '🛒 Anche <b>chi va a fare la spesa</b> si decide da qui; la Lista della spesa è solo un promemoria degli articoli da comprare.',
     !ptMaster() ? '⚠️ Sistema punti disattivato: i compiti sono bloccati.' : ''])}
     ${sez('⭐ Punti Collega Modello', [
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dall\'admin:</b> nessun accredito; i punti già maturati restano.' : '',
@@ -1776,6 +1777,15 @@ function prossimaData(ev){
   if(s < oggi) s = `${a+1}-${pad(m)}-${pad(dd)}`;
   return s;
 }
+/* tipi di evento: [emoji, etichetta, icona, rgb, colore testo]. Usati sia nei banner della Home sia nella pagina Eventi */
+const EV_TIPI = {
+  compleanno: ['🎂', 'Compleanno', 'cake', '244,114,182', '#fbcfe8'],
+  nascita:    ['👶', 'Nascita', 'sparkles', '56,189,248', '#bae6fd'],
+  cerimonia:  ['🎓', 'Matrimonio / Laurea', 'sparkles', '167,139,250', '#ddd6fe'],
+  festa:      ['🎉', 'Festa', 'sparkles', '52,211,153', '#a7f3d0'],
+  altro:      ['🗓️', 'Ricorrenza', 'calendar', '245,165,36', '#fde68a']
+};
+const evTipo = t => EV_TIPI[t] || EV_TIPI.altro;
 function giorniA(iso){ const [y,m,d] = iso.split('-').map(Number); const t = new Date(y, m-1, d), o = new Date(); o.setHours(0,0,0,0); return Math.round((t - o) / 86400000); }
 const backHome = () => `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button>`;
 const backSaletta = () => adminView() ? '' : `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="saletta">← Saletta</button>`;
@@ -2264,26 +2274,32 @@ function pSpesa(d){
   const sel = attivi.filter(x => st.spesaSel[x.id]);
   const riga = x => {
     const on = !!st.spesaSel[x.id], puoDel = x.richiestoDa === st.mid || st.isAdmin;
-    return `<div class="li" style="${on ? 'border-color:var(--green)' : ''}"><button class="li grow" style="flex:1;padding:0;text-align:left;border:0" data-act="spesa-toggle" data-id="${x.id}" aria-pressed="${on}">
-      <div class="av">${on ? '☑' : '☐'}</div><div class="grow"><div class="t" style="white-space:normal;font-size:14px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.richiestoDa) || '(sconosciuto)')} · ${x.ts ? quando(tms(x.ts)) : 'ora'}</div></div></button>
+    return `<div class="li" style="${on ? 'border-color:var(--green)' : ''}"><button class="li grow" style="flex:1;padding:0;text-align:left;border:0" data-act="spesa-compra" data-id="${x.id}" aria-label="Segna come comprato">
+      <div class="av">☐</div><div class="grow"><div class="t" style="white-space:normal;font-size:14px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.richiestoDa) || '(sconosciuto)')} · ${x.ts ? quando(tms(x.ts)) : 'ora'}</div></div></button>
       ${puoDel ? `<button class="iconbtn" style="width:32px;height:32px" data-act="spesa-del" data-id="${x.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div>`;
   };
-  return `${backHome()}<h2>🛒 Lista della spesa ${infoBtn(`Cosa serve alla saletta. Chi fa la spesa spunta gli articoli e registra l'acquisto: l'amministratore lo rimborsa.`)}</h2>
+  return `${backHome()}<h2>🛒 Lista della spesa ${infoBtn(`Promemoria condiviso di ciò che manca in saletta. Tocca un articolo quando l'hai comprato per toglierlo dall'elenco. Se hai anticipato dei soldi, chiedi il rimborso da ➕ Ricarica in Home.`)}</h2>
   <div class="card"><div class="row" style="gap:8px;align-items:flex-end"><label class="f" style="flex:1;margin:0"><span>Cosa serve?</span><input class="in" id="sp-nome" maxlength="60" placeholder="es. Caffè in grani" autocomplete="off"></label>
     <button class="btn amber" id="btn-spesa-add" data-act="spesa-aggiungi">${ic('plus','s')} Aggiungi</button></div></div>
   <div class="card"><h3><span>Da comprare</span><b class="mono amber">${attivi.length}</b></h3>
     ${attivi.length ? `<div class="list">${attivi.map(riga).join('')}</div>` : '<div class="empty">Niente da comprare. 🎉</div>'}
-    <button class="btn green block big" id="btn-spesa-registra" data-act="spesa-registra" style="margin-top:12px" ${sel.length ? '' : 'disabled'}>${ic('receipt','s')} Registra acquisto per il fondo${sel.length ? ' (' + sel.length + ')' : ''}</button>
-    <button class="btn block ghost" id="btn-fuori-lista" data-act="spesa" style="margin-top:8px">Acquisto fuori lista</button>
-    ${infoBtn(`Spunta ciò che hai comprato; per un acquisto urgente non in lista usa «Acquisto fuori lista».`, 'Come funziona')}
+    ${infoBtn(`Tocca un articolo per segnarlo come comprato. Se accanto a «Acquistati di recente» ti sei sbagliato, puoi rimetterlo in lista. Per farti rimborsare una spesa usa ➕ Ricarica → Rimborso spesa.`, 'Come funziona')}
   </div>
   ${miei.length ? `<div class="card"><h3><span>${ic('clock','s')} I tuoi in rimborso</span><b class="mono">${miei.length}</b></h3><div class="list">${miei.map(x => { const orfano = st.ready.mv && !d.movs.some(m => m.id === x.richiestaId && m.stato !== 'annullata' && m.stato !== 'rifiutata'); return `<div class="li"><div class="av">⏳</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${esc(x.nome)}</div><div class="d">${orfano ? 'richiesta non inviata' : 'in attesa di convalida'}</div></div>${orfano ? `<button class="btn sm ghost" data-act="spesa-rilascia" data-id="${x.id}">Rimetti in lista</button>` : ''}</div>`; }).join('')}</div>
     <p class="hint" style="margin:8px 0 0">Per annullare la richiesta vai in Notifiche → In attesa.</p></div>` : ''}
   ${altri.length ? `<div class="card"><h3><span>In rimborso (altri colleghi)</span><b class="mono">${altri.length}</b></h3><div class="list">${altri.map(x => `<div class="li"><div class="av">⏳</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${esc(x.nome)}</div><div class="d">preso da ${esc(nomeBreve(x.acquirenteMid) || '—')}</div></div></div>`).join('')}</div></div>` : ''}
-  ${storico.length ? `<details class="card"><summary class="mut" style="cursor:pointer;font-size:13px">Acquistati di recente (${storico.length})</summary><div class="list" style="margin-top:8px">${storico.map(x => `<div class="li"><div class="av">✅</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.acquirenteMid) || '—')} · ${x.acquistoTs ? quando(tms(x.acquistoTs)) : ''}</div></div></div>`).join('')}</div></details>` : ''}`;
+  ${storico.length ? `<details class="card"><summary class="mut" style="cursor:pointer;font-size:13px">Acquistati di recente (${storico.length})</summary><div class="list" style="margin-top:8px">${storico.map(x => `<div class="li"><div class="av">✅</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.acquirenteMid) || '—')} · ${x.acquistoTs ? quando(tms(x.acquistoTs)) : ''}</div></div>${(st.isAdmin || x.acquirenteMid === st.mid) ? `<button class="btn sm ghost" data-act="spesa-annulla-acq" data-id="${x.id}">Rimetti in lista</button>` : ''}</div>`).join('')}</div></details>` : ''}`;
 }
 A['spesa-rilascia'] = ds => aggiornaArticoli({articoli: [ds.id]}, false);
-A['spesa-toggle'] = ds => { st.spesaSel[ds.id] = !st.spesaSel[ds.id]; render(); };
+A['spesa-compra'] = ds => {
+  C('listaSpesa').doc(ds.id).update({stato: 'acquistato', acquirenteMid: st.mid, acquistoTs: TS()})
+    .then(() => toast('Segnato come comprato ✓')).catch(e => toast('Non aggiornato (' + errMsg(e) + ')', 'err'));
+};
+A['spesa-annulla-acq'] = ds => {
+  const del = firebase.firestore.FieldValue.delete();
+  C('listaSpesa').doc(ds.id).update({stato: 'da_comprare', acquirenteMid: del, acquistoTs: del})
+    .then(() => toast('Rimesso in lista')).catch(e => toast('Non aggiornato (' + errMsg(e) + ')', 'err'));
+};
 A['spesa-aggiungi'] = () => {
   const nome = val('sp-nome').replace(/\s+/g, ' ');
   if(nome.length < 2 || nome.length > 60) return toast('Scrivi cosa serve (2-60 caratteri)', 'err');
@@ -2297,37 +2313,6 @@ A['spesa-del'] = ds => {
   if(!confirm(`Eliminare «${x.nome}» dalla lista?`)) return;
   delete st.spesaSel[ds.id];
   C('listaSpesa').doc(ds.id).delete().catch(e => toast('Non eliminato (' + errMsg(e) + ')', 'err'));
-};
-A['spesa-registra'] = () => {
-  const sel = (st.listaSpesa || []).filter(x => x.stato === 'da_comprare' && st.spesaSel[x.id]);
-  if(!sel.length) return toast('Spunta almeno un articolo', 'err');
-  openSheet(`<h3>${ic('receipt')} Registra acquisto per il fondo</h3>
-    <p class="sub">Un amministratore lo convalida guardando lo scontrino.</p>
-    <div class="banner sky">${ic('cookie')}<div><b>Articoli:</b> ${sel.map(x => esc(x.nome)).join(', ')}</div></div>
-    <label class="f"><span>Importo totale speso €</span><input class="in mono" id="sl-imp" inputmode="decimal" placeholder="12,50" autofocus></label>
-    <label class="f"><span>Note (facoltative)</span><input class="in" id="sl-note" maxlength="200" placeholder="es. scontrino nel cassetto"></label>
-    <label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('sl-rimb', [['crediti','🪙 In crediti'],['denaro','💶 Denaro reale']], 'crediti')}</label>
-    ${infoBtn(`In crediti: l'importo diventa un credito per te. In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia.`, 'Come funziona')}
-    <button class="btn green block big" data-act="conferma-spesa-lista">Invia richiesta di rimborso</button>`);
-};
-A['conferma-spesa-lista'] = async () => {
-  if(st.busy) return;
-  const sel = (st.listaSpesa || []).filter(x => x.stato === 'da_comprare' && st.spesaSel[x.id]);
-  const imp = parseEuro(val('sl-imp')), note = val('sl-note').slice(0, 200), fonte = (radio('sl-rimb') || 'crediti') === 'denaro' ? 'denaro' : 'tasca';
-  if(!sel.length) return toast('Gli articoli non sono più disponibili', 'err');
-  if(!(imp > 0) || imp > MAXOP) return toast('Inserisci un importo valido', 'err');
-  if(!navigator.onLine) return toast('Serve la connessione per prenotare gli articoli', 'err');
-  st.busy = true;
-  const ref = C('movimenti').doc();
-  try {
-    const b = db.batch();
-    sel.forEach(x => b.update(C('listaSpesa').doc(x.id), {stato: 'in_rimborso', acquirenteMid: st.mid, richiestaId: ref.id}));
-    await b.commit();   // se un collega ha già preso un articolo, le regole rifiutano tutto
-  } catch(e){ st.busy = false; return toast('Qualcuno ha già preso alcuni articoli: ricontrolla la lista (' + errMsg(e) + ')', 'err'); }
-  addMov(clean({tipo: 'spesa', mid: st.mid, importo: imp, fonte, descr: sel.map(x => x.nome).join(', ').slice(0, 80), articoli: sel.map(x => x.id), articoliNomi: sel.map(x => x.nome), note: note || undefined, stato: 'attesa'}), ref.id);
-  sel.forEach(x => delete st.spesaSel[x.id]);
-  st.busy = false; closeSheet(); render();
-  toast('Richiesta di rimborso inviata');
 };
 /* esito della spesa: gli articoli diventano acquistati (convalida) o tornano in lista (rifiuto / annullo) */
 function aggiornaArticoli(m, ok){
@@ -2383,8 +2368,10 @@ function pEventi(){
   const fut = evs.filter(e => e.prossima >= oggiISO()), pas = evs.filter(e => e.prossima < oggiISO()).reverse();
   const row = e => { const g = giorniA(e.prossima); const [y,m,dd] = e.prossima.split('-');
     const puo = st.isAdmin || e.uid === st.uid;
-    return `<div class="li"><div class="av" style="background:rgba(244,114,182,.12);color:var(--pink)">${ic(e.tipo === 'compleanno' ? 'cake' : e.tipo === 'festa' ? 'sparkles' : 'calendar')}</div>
-      <div class="grow"><div class="t">${esc(e.titolo)}</div><div class="d mono">${dd}/${m}/${y}${e.tipo === 'compleanno' ? ' · ogni anno' : ''}</div></div>
+    const [em, lab, icn, rgb, tc] = evTipo(e.tipo);
+    return `<div class="li ev-row" data-tipo="${esc(e.tipo || 'altro')}" style="background:rgba(${rgb},.09);border-left:3px solid rgba(${rgb},.85);border-radius:12px;padding-left:10px;margin-bottom:6px"><div class="av" style="background:rgba(${rgb},.2);color:${tc}">${ic(icn)}</div>
+      <div class="grow"><div class="t">${esc(e.titolo)}</div><div class="d mono">${dd}/${m}/${y}${e.tipo === 'compleanno' ? ' · ogni anno' : ''}</div>
+        <div class="d"><span class="ev-badge" style="display:inline-block;margin-top:3px;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;background:rgba(${rgb},.2);color:${tc}">${em} ${lab}</span></div></div>
       <span class="pill ${g === 0 ? 'amber' : g > 0 && g <= 7 ? 'violet' : 'mut'}">${g === 0 ? 'oggi!' : g === 1 ? 'domani' : g > 0 ? 'tra ' + g + ' gg' : 'passato'}</span>
       ${puo ? `<button class="iconbtn" style="width:32px;height:32px" data-act="del-evento" data-id="${e.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div>`; };
   return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('cake')} Eventi & compleanni</h2><p class="sub" style="margin:0">Scadenzario della saletta</p></div>
@@ -2416,7 +2403,7 @@ function pCassa(d){
     <button class="btn sm green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Entrata</button>
     <button class="btn sm" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>
     <button class="btn sm block" style="margin:-4px 0 12px" data-act="cassa-corr">${ic('edit','s')} Correggi saldo (contanti / Revolut)</button>`
-    : `<div class="banner sky">${ic('lock')}<div>Uscite, entrate e storni li registrano gli amministratori. Se hai preso soldi dalla cassa per fare la spesa usa <b>Lista della spesa</b> dal Bar.</div></div>`}
+    : `<div class="banner sky">${ic('lock')}<div>Uscite, entrate e storni li registrano gli amministratori. Se hai preso soldi dalla cassa per fare la spesa chiedi il rimborso da <b>➕ Ricarica → Rimborso spesa</b> in Home.</div></div>`}
   <div class="card"><h3>Movimenti di cassa</h3>${righeMov(movC.slice(0, 200), d)}</div>`;
 }
 
@@ -2436,7 +2423,7 @@ function pInventario(d){
         : `<b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b><div class="mut" style="font-size:11px">buste disponibili</div>`}</td></tr>`;
   return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
     ${adminView() ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
-  <div class="banner sky">${ic('info')}<div>Materiali di consumo (palette, zucchero, bicchieri, detersivi…) non si contano: sono spese generali, aggiungili alla <b>Lista della spesa</b> e registrale quando li compri.</div></div>
+  <div class="banner sky">${ic('info')}<div>Materiali di consumo (palette, zucchero, bicchieri, detersivi…) non si contano: sono spese generali, aggiungili alla <b>Lista della spesa</b> come promemoria e, se li anticipi, chiedi il <b>Rimborso spesa</b> dalla Home.</div></div>
   ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
   <div class="card" style="padding:6px 8px;overflow-x:auto">
   <table><thead><tr>${th('nome','Articolo')}${th('prezzo','Prezzo','r')}${th('stock','Giacenza','c')}</tr></thead><tbody>
@@ -2998,7 +2985,12 @@ A['prendi-snack'] = ds => {
 };
 
 /* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un amministratore --- */
-A['ricarica-nuova'] = () => {
+A['ricarica-nuova'] = () => openSheet(`<h3>${ic('wallet')} Cosa vuoi fare?</h3>
+  <p class="sub">Scegli se caricare il tuo saldo o farti rimborsare una spesa anticipata per il gruppo.</p>
+  <button class="btn amber block big" id="scelta-ricarica" data-act="ricarica-saldo">💶 Ricarica saldo</button>
+  <button class="btn green block big" id="scelta-rimborso" data-act="rimborso-nuovo" style="margin-top:8px">🧾 Rimborso spesa</button>
+  ${infoBtn(`Ricarica saldo: versi contanti o Revolut e ricevi crediti. Rimborso spesa: hai anticipato dei soldi per la saletta o per il gruppo (acquisti, un telegramma, un omaggio…) e chiedi di essere rimborsato.`, 'Differenza')}`);
+A['ricarica-saldo'] = () => {
   const deb = debitoLibero(), base = deb > 0 ? deb : 1000;
   openSheet(`<h3>${ic('wallet')} Ricarica crediti</h3>
     <p class="sub">${deb > 0 ? `Hai un debito di <b class="mono red">${eur(deb)}</b>. ` : ''}Versi i soldi al Fondo Gruppo; quando un amministratore conferma l'incasso ricevi i crediti (1 credito = 1 €).</p>
@@ -3051,22 +3043,22 @@ A['conferma-riscatto-paga'] = ds => {
   closeSheet();
 };
 
-/* acquisto libero (fuori lista): resta disponibile dalla pagina Lista della spesa */
-A['spesa'] = () => {
-  openSheet(`<h3>${ic('receipt')} Acquisto fuori lista</h3>
-    <p class="sub">Hai comprato qualcosa per la saletta che non era in lista? Un amministratore lo convalida guardando lo scontrino.</p>
-    <label class="f"><span>Descrizione</span><input class="in" id="s-desc" maxlength="80" placeholder="es. Caffè in grani + bicchierini" autofocus></label>
-    <label class="f"><span>Importo totale €</span><input class="in mono" id="s-imp" inputmode="decimal" placeholder="12,50"></label>
+/* rimborso spesa: qualsiasi spesa anticipata per il gruppo (saletta o spese straordinarie). Punti proporzionali all'importo alla convalida */
+A['rimborso-nuovo'] = () => {
+  openSheet(`<h3>${ic('receipt')} Rimborso spesa</h3>
+    <p class="sub">Hai anticipato una spesa per il gruppo? Un amministratore la convalida guardando lo scontrino o la ricevuta.</p>
+    <label class="f"><span>Motivo del rimborso</span><input class="in" id="s-desc" maxlength="80" placeholder="es. Caffè in grani e bicchieri · Telegramma condoglianze" autofocus></label>
+    <label class="f"><span>Importo speso €</span><input class="in mono" id="s-imp" inputmode="decimal" placeholder="12,50"></label>
     <label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('s-rimb', [['crediti','🪙 In crediti'],['denaro','💶 Denaro reale']], 'crediti')}</label>
-    ${infoBtn(`In crediti: l'importo diventa un credito per te (lo riscatti dal Fondo Gruppo). In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia.`, 'Come funziona')}
-    <button class="btn green block big" data-act="conferma-spesa">Invia</button>`);
+    ${infoBtn(`In crediti: l'importo diventa un credito per te (lo riscatti dal Fondo Gruppo). In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia. Alla convalida ricevi anche i punti spesa, qualunque sia il motivo.`, 'Come funziona')}
+    <button class="btn green block big" data-act="conferma-spesa">Invia la richiesta</button>`);
 };
 A['conferma-spesa'] = () => {
   const descr = val('s-desc'), imp = parseEuro(val('s-imp')), fonte = (radio('s-rimb') || 'crediti') === 'denaro' ? 'denaro' : 'tasca';
-  if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi cosa hai comprato e un importo valido', 'err');
+  if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi il motivo e un importo valido', 'err');
   addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'attesa'});
   closeSheet();
-  toast('Spesa inviata, in attesa di convalida');
+  toast('Richiesta di rimborso inviata, in attesa di convalida');
 };
 A['paga-spesa'] = ds => {
   const m = derived().movs.find(x => x.id === ds.id); if(!m || m.stato !== 'attesa') return;
@@ -3395,10 +3387,10 @@ A['rg-invia'] = () => {
 };
 
 /* --- eventi --- */
-A['evento'] = () => openSheet(`<h3>${ic('cake')} Nuovo evento</h3><p class="sub">Compleanni e feste della saletta.</p>
+A['evento'] = () => openSheet(`<h3>${ic('cake')} Nuovo evento</h3><p class="sub">Compleanni, nascite, lauree e feste della saletta. Il banner compare in Home da 3 giorni prima.</p>
   <label class="f"><span>Titolo</span><input class="in" id="e-tit" maxlength="80" placeholder="es. Compleanno Marco" autofocus></label>
   <label class="f"><span>Data</span><input class="in" type="date" id="e-data" value="${oggiISO()}"></label>
-  <label class="f"><span>Tipo</span>${segOpts('e-tipo', [['compleanno','🎂 Compleanno'],['festa','🎉 Festa'],['altro','🗓️ Altro']], 'compleanno')}</label>
+  <label class="f"><span>Tipo</span>${segOpts('e-tipo', [['compleanno','🎂 Compleanno'],['nascita','👶 Nascita'],['cerimonia','🎓 Matrimonio / Laurea'],['festa','🎉 Festa'],['altro','🗓️ Ricorrenza']], 'compleanno')}</label>
   <button class="btn block big" style="background:#db2777;border:0;color:#fff" data-act="salva-evento">Aggiungi</button>`);
 A['salva-evento'] = () => {
   const titolo = val('e-tit'), data = val('e-data'), tipo = radio('e-tipo');
@@ -3877,7 +3869,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v10';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v11';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
@@ -4485,11 +4477,17 @@ const isoLocale = ms => { const d = new Date(ms); return `${d.getFullYear()}-${p
 /* campo scadenza: '' -> null (nessuna), data nel passato -> false, altrimenti millisecondi */
 const scadInput = id => { const v = val(id); if(!v) return null; const t = new Date(v).getTime(); return Number.isFinite(t) && t > Date.now() ? t : false; };
 const AVV_TIPI = {avviso: ['📢', 'Avviso', 'amber'], attenzione: ['⚠️', 'Attenzione', 'red'], info: ['ℹ️', 'Info', 'sky']};
-/* avvisi automatici di oggi: solo dati gia' in memoria (st.eventi), nessuna lettura ne' scrittura */
+/* avvisi automatici: eventi da oggi a 3 giorni. Solo dati gia' in memoria (st.eventi), nessuna lettura ne' scrittura */
 function avvisiAuto(){
-  const oggi = oggiISO();
-  return (st.eventi || []).filter(e => e && e.titolo && e.data && prossimaData(e) === oggi)
-    .map(e => e.tipo === 'compleanno' ? `🎂 Oggi è il compleanno di <b>${esc(e.titolo)}</b>! Ricordategli i pasticcini 🎉` : `📅 Oggi: <b>${esc(e.titolo)}</b>`);
+  return (st.eventi || []).filter(e => e && e.titolo && e.data)
+    .map(e => ({e, g: giorniA(prossimaData(e))})).filter(x => x.g >= 0 && x.g <= 3)
+    .sort((a, b) => a.g - b.g)
+    .map(({e, g}) => {
+      const [em, lab, , rgb, tc] = evTipo(e.tipo), cd = g === 0 ? 'Oggi!' : g === 1 ? 'Domani' : 'Tra ' + g + ' giorni';
+      const sub = g === 0 && e.tipo === 'compleanno' ? 'Ricordategli i pasticcini 🎉' : (e.autore ? 'Inserito da ' + esc(e.autore) : '');
+      return {g, tipo: e.tipo || 'altro', st: `--avc:rgba(${rgb},.75);--avb:rgba(${rgb},.14);--avt:${tc};--avg:${rgb}`,
+        t: `<div class="avv-t">${em} ${lab} · ${cd}</div><div class="avv-m">${esc(e.titolo)}</div>${sub ? `<div class="avv-t" style="margin-top:2px;opacity:.75;text-transform:none;font-weight:600">${sub}</div>` : ''}`};
+    });
 }
 const scadVivo = o => !o || !o.scad || Date.now() < o.scad;
 function avvisiHome(){
@@ -4504,7 +4502,7 @@ function avvisiHome(){
     const v = sondVoted(so.id);
     h += `<button class="avv violet" id="avviso-sondaggio" data-act="sond-apri"><div class="avv-t">🗳️ ${so.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'} · ${v ? (so.tipo === 'scelta' ? 'hai risposto · vedi i risultati' : 'risposta inviata') : 'tocca per rispondere (anonimo)'}</div><div class="avv-m">${esc(so.domanda)}</div></button>`;
   }
-  auto.forEach((t, i) => { h += `<div class="avv green" id="avviso-auto-${i}" role="status"><div class="avv-m">${t}</div></div>`; });
+  auto.forEach((x, i) => { h += `<div class="avv" id="avviso-evento-${i}" data-tipo="${esc(x.tipo)}" data-g="${x.g}" style="${x.st}" role="status">${x.t}</div>`; });
   const nc = nCpConv();   // promemoria al Supervisor: compiti svolti da convalidare
   if(nc) h += `<button class="avv violet" id="avviso-conv" data-act="go" data-p="notifiche"><div class="avv-t">🛡️ ${nc === 1 ? '1 compito da convalidare' : nc + ' compiti da convalidare'}</div><div class="avv-m"><b>Apri le Notifiche →</b></div></button>`;
   const mc = cpMiei();   // promemoria: compiti assegnati a me e ancora da svolgere
