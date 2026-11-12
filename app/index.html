@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.35.1';
+const VERSION = '1.35.2';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1720,8 +1720,31 @@ function cpRiga(m, me){
       <div class="d">+${m.punti || 0} pt · ${eta}${da}${m.stato === 'attesa' ? ' · svolto, da convalidare' : ''}</div></div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${az}</div></div>`;
 }
+const cpPerPt = (a, b) => b.pt - a.pt || (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome);
+const cpAperte = new Set();   // schede classifica espanse (tutte chiuse di default)
+/* classifica per compito: volte e punti dei soli incarichi convalidati nel periodo in memoria; in cima chi ha fatto meno (più probabile al prossimo sorteggio) */
+function cpClassifiche(){
+  const cat = cpLista().filter(c => c.on !== false).sort(cpPerPt); if(!cat.length) return '';
+  const inc = cpIncarichi().filter(m => m.stato === 'confermata'), att = membriAttivi();
+  const nm = id => esc(nomeBreve(id) || nomeM(id));
+  return `<div class="card" id="cp-classifiche"><h3>🏆 Classifica per compito</h3>
+    <p class="hint" style="margin:0 0 8px">Periodo corrente. In cima chi lo ha svolto meno volte: è il più probabile al prossimo sorteggio.</p>
+    ${cat.map(c => {
+      const R = {}; inc.filter(m => m.cp === c.id).forEach(m => { const r = R[m.mid] = R[m.mid] || {n: 0, pt: 0, t: 0}; r.n++; r.pt += m.punti || 0; r.t = Math.max(r.t, m.t || 0); });
+      const righe = att.filter(m => !c.esenti.includes(m.id)).map(m => ({id: m.id, nome: nm(m.id), ...(R[m.id] || {n: 0, pt: 0, t: 0})})).sort((a, b) => a.n - b.n || a.t - b.t || a.nome.localeCompare(b.nome));
+      const esenti = att.filter(m => c.esenti.includes(m.id)).map(m => nm(m.id));
+      const min = righe.length ? righe[0].n : 0, top = righe.filter(r => r.n === min), vis = top.slice(0, 3).map(r => r.nome).join(', ') + (top.length > 3 ? ` +${top.length - 3}` : '');
+      const open = cpAperte.has(c.id);
+      return `<div class="pbar" id="cp-sc-${c.id}" style="padding:0;overflow:hidden"><button class="btn ghost block" style="display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;border:0;padding:11px 14px;height:auto" data-act="cp-sc" data-id="${c.id}" aria-expanded="${open}">
+        <span style="min-width:0"><b>🎯 ${esc(c.nome)}</b> <span class="pill violet">+${c.pt} pt</span>${righe.length ? `<span class="hint" style="display:block;margin-top:3px;font-size:11.5px;white-space:normal">Più probabili: ${vis} (${min} ${min === 1 ? 'volta' : 'volte'})</span>` : ''}</span><span class="mut">${open ? '▲' : '▼'}</span></button>
+        ${open ? `<div style="padding:0 14px 12px">${righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">Volte</th><th class="c">Punti</th><th class="c">Ultima</th></tr></thead><tbody>
+          ${righe.map((r, i) => `<tr><td class="mut mono">${i + 1}</td><td><b>${r.nome}</b>${r.id === st.mid ? ' <span class="pill violet">tu</span>' : ''}</td><td class="c mono">${r.n}</td><td class="c mono violet">${r.pt}</td><td class="c mut" style="font-size:11px">${r.t ? quando(r.t) : '—'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nessun collega disponibile.</div>'}
+          ${esenti.length ? `<p class="hint" style="margin:8px 0 0;font-size:11.5px">Esenti: ${esenti.join(', ')}</p>` : ''}</div>` : ''}</div>`;
+    }).join('')}
+  </div>`;
+}
 function pCompiti(d){
-  const me = st.mid, cat = cpAttivi(), aperti = cpAperti().slice().sort((a, b) => a.t - b.t), nSp = nSpesa();
+  const me = st.mid, cat = cpAttivi().slice().sort(cpPerPt), aperti = cpAperti().slice().sort((a, b) => a.t - b.t), nSp = nSpesa();
   const occupato = id => aperti.some(m => m.cp === id);
   const link = nSp ? `<button class="avv amber" id="cp-spesa-link" data-act="go" data-p="spesa"><div class="avv-t">🛒 ${nSp} ${nSp === 1 ? 'articolo' : 'articoli'} da comprare in lista</div><div class="avv-m">Apri la Lista della spesa →</div></button>` : '';
   return `<h2>${ic('brush')} Compiti di oggi</h2><p class="sub" style="margin-bottom:12px">Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: un admin convalida e i punti arrivano.</p>
@@ -1732,7 +1755,8 @@ function pCompiti(d){
   </div>
   <div class="card" id="cp-incarichi"><h3>📋 Incarichi in corso ${aperti.length ? `<span class="pill violet">${aperti.length}</span>` : ''}</h3>
     ${aperti.length ? `<div class="list">${aperti.map(m => cpRiga(m, me)).join('')}</div>` : '<div class="empty" id="cp-nessuno">Nessun incarico in corso.</div>'}
-  </div>`;
+  </div>
+  ${cpClassifiche()}`;
 }
 
 /* ---------- EVENTI ---------- */
@@ -3161,6 +3185,7 @@ A['cp-annulla'] = ds => {
   if(!confirm('Annullare questo incarico?\n\nNessun punto: il compito torna sorteggiabile.')) return;
   C('movimenti').doc(m.id).update({stato: 'annullata', esitoDa: myName(), esitoTs: TS()}).then(() => toast('Incarico annullato')).catch(e => toast(errMsg(e), 'err'));
 };
+A['cp-sc'] = ds => { if(cpAperte.has(ds.id)) cpAperte.delete(ds.id); else cpAperte.add(ds.id); render(); };
 /* --- configurazione compiti (admin) --- */
 const cardCompiti = () => {
   const L = cpLista();
