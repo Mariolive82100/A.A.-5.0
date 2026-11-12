@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.34.5';
+const VERSION = '1.34.6';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2035,7 +2035,7 @@ function clConteggi(d, r){
 function clTitoli(d, r){
   const C = clConteggi(d, r), pc = clPerKey();
   const bfNome = pc === 'mese' ? 'Collega del Mese' : pc === 'settimana' ? 'Collega della Settimana' : 'Collega del Giorno';
-  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '✨', 'Mastro Lindo', 'turni'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
+  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '🎯', 'Mastro Lindo', 'obiettivi'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
   const att = membriAttivi();
   return def.map(([k, e, nome, u]) => {
     const vals = att.map(m => ({id: m.id, v: Math.max(0, nz(C[k], m.id))})), max = Math.max(0, ...vals.map(x => x.v));
@@ -2106,7 +2106,7 @@ function clSala(righe, key, G){
   const det = {
     tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
-    p: `<p class="hint" style="margin:6px 0 0">✨ ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno' : 'turni'} di pulizia svolti</p>`,
+    p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'obiettivo svolto' : 'obiettivi svolti'}</p>`,
     s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
     b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
   return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
@@ -2145,13 +2145,13 @@ function clClassifica(d, R, T, c){
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '✨ Punti obiettivi']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
+  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti obiettivi']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
   const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
   const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
   const podioH = podio.length ? `<div class="pod" id="cl-podio">${col(podio[1], 1)}${col(podio[0], 0)}${col(podio[2], 2)}</div>` : `<div class="empty">Nessun punto in questa categoria nel periodo.</div>`;
   const riga = (x, i) => `<div class="rk ${x.m.id === st.mid ? 'me' : ''} ${x[key] ? '' : 'z'}"><div class="n">${podio.length + i + 1}</div><div class="nm"><div class="nt"><b class="nn">${esc(x.nome)}</b>${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}${bdg(x.m.id)}</div>
-      <div class="mi"><span>☕ ${x.c}</span><span>✨ ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
+      <div class="mi"><span>☕ ${x.c}</span><span>🎯 ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
       <div class="v">${x[key]}${key !== 'tot' ? `<small>tot ${x.tot}</small>` : ''}</div></div>`;
   const albo = `<div class="card" id="cl-albo"><h3><span>🏅 Albo d'onore</span></h3>
     ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
@@ -3710,7 +3710,7 @@ A['tessera'] = () => {
   const usati = ptUsati(d, me);
   openSheet(`<h3>⭐ Punti Collega Modello</h3>
     <div class="stat" style="margin-bottom:10px"><small>Punti posseduti</small><b class="mono ${ok ? 'green' : 'amber'}">${pt} / ${r}</b></div>
-    <p class="tx2" style="font-size:14px;margin:0 0 12px">☕ ${nz(d.S.pcaf, me)} · ✨ ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
+    <p class="tx2" style="font-size:14px;margin:0 0 12px">☕ ${nz(d.S.pcaf, me)} · 🎯 ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
     <button class="btn green block big" id="btn-riscatta-punti" data-act="riscatta-punti" ${ok ? '' : 'disabled'}>🎉 Riscatta punti</button>
     <div id="regola-punti" style="margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:14px">
       <b style="font-size:16px;display:block;margin-bottom:6px">Regolamento Punti Collega Modello: come maturare punti</b>
@@ -3905,7 +3905,7 @@ A['rec-scollega'] = ds => {
 };
 A['punti-adm'] = ds => openSheet(`<h3>${ic('sparkles')} Modifica punti ${infoBtn(`Aggiunge o toglie punti a un collega (es. correzioni, premi). Usa il meno per togliere.`)}</h3>
   <label class="f"><span>Collega</span>${selMembro('pa-m', ds.id)}</label>
-  <label class="f"><span>Punti da modificare</span>${segOpts('pa-k', [['pulizia','✨ Pulizia'],['caffe','☕🍫 Consumi']], 'pulizia')}</label>
+  <label class="f"><span>Punti da modificare</span>${segOpts('pa-k', [['pulizia','🎯 Obiettivi'],['caffe','☕🍫 Consumi']], 'pulizia')}</label>
   <label class="f"><span>Variazione (+ / −)</span><input class="in mono" id="pa-n" inputmode="numeric" placeholder="es. 3 oppure -2"></label>
   <label class="f"><span>Motivo</span><input class="in" id="pa-caus" maxlength="60" placeholder="facoltativo"></label>
   <button class="btn amber block big" data-act="conferma-punti-adm">Registra</button>`);
@@ -4210,7 +4210,7 @@ function pArchivio(){
     <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">SPESE E RICARICHE</b>
     ${rigaTot('➕', 'Ricariche', eur(D.ricariche))}${rigaTot('🛒', 'Spese per il gruppo', eur(D.spese), D.nSpese ? D.nSpese + (D.nSpese === 1 ? ' spesa' : ' spese') : '')}
     <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">PULIZIE</b>
-    ${rigaTot('🧹', 'Compiti svolti', D.turni == null ? nd : D.turni)}${D.ptPul == null ? '' : rigaTot('✨', 'Punti pulizia assegnati', D.ptPul)}
+    ${rigaTot('🎯', 'Obiettivi svolti', D.turni == null ? nd : D.turni)}${D.ptPul == null ? '' : rigaTot('🎯', 'Punti obiettivi assegnati', D.ptPul)}
     <b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">CASSA ALLA CHIUSURA</b>
     ${rigaTot('📱', 'Conto Revolut', eur(D.revolut))}${rigaTot('💵', 'Contanti in sala', eur(D.contanti))}${rigaTot('🏦', 'Totale in cassa', eur(D.cassaTot))}${rigaTot('🟢', 'Crediti dei colleghi', eur(D.cred))}${rigaTot('🔴', 'Debiti da incassare', eur(-D.deb))}${rigaTot('⚖️', 'Fondo netto', eur(D.netto))}
     ${D.top.length ? `<b class="amber" style="font-size:12px;letter-spacing:.04em;display:block;margin-top:10px">CHI HA CONSUMATO DI PIÙ</b>${D.top.map((x, i) => rigaTot(['🥇', '🥈', '🥉', '4°', '5°'][i], esc(x.nome), eur(x.v))).join('')}` : ''}
