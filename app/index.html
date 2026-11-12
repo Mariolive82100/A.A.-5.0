@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.34.2';
+const VERSION = '1.34.3';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -803,6 +803,7 @@ const bfPeriodo = () => (st.gruppo && st.gruppo.bfPeriodo) === 'mese' ? 'mese' :
 /* macchinetta del caffè (parametri admin nel documento del gruppo: nessuna lettura in più) */
 const ptPulMacc = () => cfgN('ptPulMacc', 10);
 const pulMaccCaffe = () => Math.min(200, Math.max(1, cfgN('pulMaccCaffe', 20)));
+const pulMaccNome = () => { const v = st.gruppo && st.gruppo.pulMaccNome; return typeof v === 'string' && v.trim().length >= 2 ? v.trim().slice(0, 40) : 'Macchinetta caffè'; };
 /* scala punti ×10: scalaDa = istante del passaggio (scritto dall'admin). I movimenti e le chiusure PRECEDENTI si rivalutano solo in memoria:
    caffè, snack, spesa, «Ben fatto», riscatti ×10; i vecchi turni di pulizia valgono PUL_LEGACY (come la nuova «Pulizia generale») */
 const PUL_LEGACY = 50;
@@ -1644,7 +1645,7 @@ function pRegolamento(){
   const g = st.gruppo || {};
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
-  const spento = ptMaster() ? ['macc'].filter(k => !pulOn(k)).map(k => PUL_DEF[k][1]) : [];
+  const spento = ptMaster() ? ['macc'].filter(k => !pulOn(k)).map(() => pulMaccNome()) : [];
   const nota = (ok, txt) => ok ? '' : txt;
   return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.1 · novembre 2026</p>
   ${sez('🎯 Principi', [
@@ -1671,7 +1672,7 @@ function pRegolamento(){
     'Premi <b>Prendo in carico</b> e poi <b>Conferma completamento</b> entro la fine della fascia: solo allora ricevi i punti.',
     'Gli obiettivi sono disponibili <b>da lunedì a venerdì</b>: sabato e domenica sono esclusi. Un settimanale può essere legato a un giorno preciso.',
     'Se la fascia scade senza conferma l\'obiettivo risulta <b>non svolto</b> a tuo carico: niente punti e non torna disponibile fino al ciclo successivo, salvo storno di un admin.',
-    `☕ <b>Macchinetta:</b> ${pt(ptPulMacc())}, si sblocca ogni <b>${pulMaccCaffe()} caffè</b> del gruppo.`,
+    `☕ <b>${esc(pulMaccNome())}:</b> ${pt(ptPulMacc())}, si sblocca ogni <b>${pulMaccCaffe()} caffè</b> del gruppo.`,
     'Si registrano subito, senza date passate. Un admin può stornare registrazioni indebite.',
     !ptMaster() ? '⚠️ Sistema punti disattivato: gli obiettivi sono bloccati.' : spento.length ? `⚠️ Riscatto sospeso dall'admin: ${spento.join(', ')}.` : ''])}
     ${sez('⭐ Punti Collega Modello', [
@@ -1699,7 +1700,7 @@ function pRegolamento(){
 /* ---------- PULIZIE ---------- */
 const PUL_DEF = {macc: ['☕', 'Macchinetta caffè']};
 function pulBarra(k, ps, me){
-  const t = ps[k], disp = pulDisp(ps)[k], [em, nome] = PUL_DEF[k], chi = x => esc(nomeBreve(x.mid) || nomeM(x.mid));
+  const t = ps[k], disp = pulDisp(ps)[k], [em] = PUL_DEF[k], nome = esc(pulMaccNome()), chi = x => esc(nomeBreve(x.mid) || nomeM(x.mid));
   const off = !pulOn(k), pct = off ? 0 : Math.min(100, Math.round(t.n / t.soglia * 100));
   const stato = off ? MSG_PUL_OFF : `${Math.min(t.n, t.soglia)}/${t.soglia} caffè · ${t.pronto ? '<b>Pronta!</b>' : `Mancano <b>${t.soglia - t.n}</b>`}`;
   const adm = st.isAdmin && t.ult && t.ult.id ? `<p class="hint" style="margin:6px 0 0;font-size:11px" id="pul-ult-${k}">Ultima: <b>${chi(t.ult)}</b> · ${quando(t.ult.t)} · <button class="btn link" style="padding:0;font-size:11px" id="btn-storna-${k}" data-act="storno" data-id="${t.ult.id}">Storna</button></p>` : '';
@@ -2559,8 +2560,7 @@ const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
     ${infoBtn(`Il prezzo del caffè e il listino si gestiscono dalla scheda Magazzino dell'Amministrazione. Le regole dei punti sono nel menu, alla voce Regole Punti e Saletta.`, 'Come funziona')}
   </div>
 `;
-const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['rp-on-spesa', 'ptSpesaOn', '🧾 Punti spesa fondo'], ['rp-on-bf', 'ptBfOn', '👏 Punti «Ben fatto»'],
-  ['rp-on-macc', 'pulMaccOn', '☕ Pulizia macchinetta (riscatto)']];
+const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['rp-on-spesa', 'ptSpesaOn', '🧾 Punti spesa fondo'], ['rp-on-bf', 'ptBfOn', '👏 Punti «Ben fatto»']];
 const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Modello</h3>
     ${infoBtn(`Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore.`, 'Come funziona')}
     ${scalaDa() ? `<p class="hint" id="scala-attiva" style="margin:0 0 10px">✅ Scala punti ×10 attiva dal ${dataOra(scalaDa()).slice(0, 10)}.</p>`
@@ -2584,11 +2584,6 @@ const cardRegolePunti = () => `  <div class="card"><h3>Regole Punti Collega Mode
     <div class="grid2">
       <label class="f"><span>Gettoni «Ben fatto»</span><input class="in mono" id="rp-bfn" inputmode="numeric" value="${bfN()}"></label>
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
-    </div>
-    <h3 style="margin-top:14px">Macchinetta caffè</h3>
-    <div class="grid2">
-      <label class="f"><span>☕ Macchinetta: punti</span><input class="in mono" id="rp-pm" inputmode="numeric" value="${ptPulMacc()}"></label>
-      <label class="f"><span>…ogni quanti caffè</span><input class="in mono" id="rp-pmc" inputmode="numeric" value="${pulMaccCaffe()}"></label>
     </div>
         <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti">Salva le regole</button>
   </div>
@@ -3098,7 +3093,7 @@ A['pul'] = ds => {
   if(!pulOn(k)) return toast(MSG_PUL_OFF, 'err');
   const ps = pulStato(); if(!pulDisp(ps)[k]) return toast(pulMsg(ps, k), 'err');
   addMov({tipo: 'pulizia', task: k, mid: st.mid, mids: [st.mid], punti: ptPulK(k), giorno: oggiISO()});
-  toast(`${PUL_DEF[k][1]}: +${ptPulK(k)} punti ✨`);
+  toast(`${pulMaccNome()}: +${ptPulK(k)} punti ✨`);
 };
 
 /* --- Obiettivi del giorno: configurati dall'admin nel documento del gruppo (mappa obiettivi), nessuna lettura in più.
@@ -3176,6 +3171,8 @@ const cardObiettivi = () => {
   const L = obLista();
   return `<div class="card" id="card-obiettivi"><h3>🎯 Obiettivi del giorno</h3>
     <p class="hint" style="margin:0 0 8px">Compiti con fascia oraria e punteggio: li prende in carico una sola persona e i punti arrivano alla conferma. Disponibili solo da lunedì a venerdì.</p>
+    <div class="li" id="macc-row" style="flex-wrap:wrap;gap:8px;margin-bottom:6px"><div class="grow" style="flex-basis:100%"><div class="t">☕ ${esc(pulMaccNome())} <span class="pill violet">+${ptPulMacc()}</span>${flagOn('pulMaccOn') ? '' : ' <span class="pill">spento</span>'}</div><div class="d">Riscatto ogni ${pulMaccCaffe()} caffè del gruppo · obiettivo a conteggio caffè</div></div>
+      <div class="row" style="gap:6px;width:100%;justify-content:flex-end"><button class="btn sm ghost" data-act="macc-tgl">${flagOn('pulMaccOn') ? 'Spegni' : 'Accendi'}</button><button class="btn sm" id="btn-macc-edit" data-act="macc-edit">Modifica</button></div></div>
     ${L.length ? `<div class="list">${L.map((o, i) => `<div class="li" id="ob-row-${o.id}" style="flex-wrap:wrap;gap:8px"><div class="grow" style="flex-basis:100%"><div class="t">${esc(o.nome)} <span class="pill violet">+${o.pt}</span>${o.on === false ? ' <span class="pill">spento</span>' : ''}</div><div class="d">${obDescr(o)}</div></div>
       <div class="row" style="gap:6px;width:100%;justify-content:flex-end"><button class="btn sm ghost" data-act="ob-su" data-id="${o.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="ob-giu" data-id="${o.id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button>
       <button class="btn sm ghost" data-act="ob-tgl" data-id="${o.id}">${o.on === false ? 'Accendi' : 'Spegni'}</button><button class="btn sm" data-act="ob-edit" data-id="${o.id}">Modifica</button></div></div>`).join('')}</div>` : '<p class="hint">Nessun obiettivo configurato.</p>'}
@@ -3185,6 +3182,29 @@ const cardObiettivi = () => {
 };
 const obSalvaMappa = (M, msg) => G().update({obiettivi: M}).then(() => { closeSheet(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
 const obCopia = () => JSON.parse(JSON.stringify(obMap()));
+A['macc-edit'] = () => {
+  if(!st.isAdmin) return;
+  openSheet(`<h3>☕ Obiettivo macchinetta</h3>
+    <label class="f"><span>Descrizione</span><input class="in" id="mc-nome" maxlength="40" value="${esc(pulMaccNome())}"></label>
+    <div class="grid2"><label class="f"><span>Punteggio</span><input class="in mono" id="mc-pt" inputmode="numeric" value="${ptPulMacc()}"></label>
+    <label class="f"><span>Ogni quanti caffè</span><input class="in mono" id="mc-n" inputmode="numeric" value="${pulMaccCaffe()}"></label></div>
+    <p class="hint" style="margin:0 0 8px">Si sblocca quando il gruppo ha registrato questo numero di caffè dall'ultima pulizia.</p>
+    <label class="check"><input type="checkbox" id="mc-on" ${flagOn('pulMaccOn') ? 'checked' : ''}><b style="flex:1;font-size:14px">Obiettivo attivo</b></label>
+    <div class="grid2"><button class="btn" data-act="sheet-close">Annulla</button><button class="btn amber" id="btn-macc-salva" data-act="macc-salva">Salva</button></div>`);
+};
+A['macc-salva'] = () => {
+  if(!st.isAdmin) return;
+  const nome = val('mc-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('mc-pt'))), n = Math.floor(Number(val('mc-n'))), inR = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+  if(nome.length < 2) return toast('Scrivi la descrizione', 'err');
+  if(!inR(pt, 0, 500)) return toast('Punteggio non valido (0–500)', 'err');
+  if(!inR(n, 1, 200)) return toast('Numero di caffè non valido (1–200)', 'err');
+  G().set({pulMaccNome: nome, ptPulMacc: pt, pulMaccCaffe: n, pulMaccOn: !!($('mc-on') && $('mc-on').checked)}, {merge: true}).then(() => { closeSheet(); toast('Obiettivo macchinetta salvato'); }).catch(e => toast(errMsg(e), 'err'));
+};
+A['macc-tgl'] = () => {
+  if(!st.isAdmin) return;
+  const on = !flagOn('pulMaccOn');
+  G().set({pulMaccOn: on}, {merge: true}).then(() => toast(on ? 'Macchinetta accesa' : 'Macchinetta spenta')).catch(e => toast(errMsg(e), 'err'));
+};
 A['ob-edit'] = ds => {
   if(!st.isAdmin) return;
   const o = ds.id ? obMap()[ds.id] : null; if(ds.id && !o) return;
@@ -3745,11 +3765,9 @@ A['bf-invia'] = () => {
   closeSheet(); toast(`👏 Ben fatto a ${nomeBreve(dest)}!${ptBfE() ? ` +${ptBfE()} punti` : ''}`);
 };
 A['salva-punti'] = () => {
-  const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSnack: n('rp-snack'), ptSpesa: n('rp-spesa'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn'),
-    ptPulMacc: n('rp-pm'), pulMaccCaffe: n('rp-pmc')};
+  const n = id => Math.floor(Number(val(id))), v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptSnack: n('rp-snack'), ptSpesa: n('rp-spesa'), ptBenFatto: n('rp-bf'), bfN: n('rp-bfn')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
-  const ok = inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptSnack, 0, 100) && inR(v.ptSpesa, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.bfN, 1, 20)
-    && inR(v.ptPulMacc, 0, 500) && inR(v.pulMaccCaffe, 1, 200);
+  const ok = inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptSnack, 0, 100) && inR(v.ptSpesa, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.bfN, 1, 20);
   if(!ok) return toast('Valori non validi', 'err');
   const sw = {ptOn: !!($('rp-on') && $('rp-on').checked)};
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
@@ -3760,7 +3778,7 @@ A['scala10'] = () => {
   if(!st.isAdmin || scalaDa()) return;
   if(!confirm('Passare alla scala punti ×10?\n\nValori: soglia 300 punti = 1 credito · caffè 10 · snack 10 · spesa 20 · «Ben fatto» 20 · macchinetta 10.\nI punti già maturati vengono moltiplicati per 10 (i vecchi turni di pulizia valgono 50). L\'operazione non si annulla.')) return;
   // i campi della pagina conservano il testo digitato tra un render e l'altro: li aggiorno subito, altrimenti «Salva le regole» riscriverebbe i valori vecchi
-  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-spesa': 20, 'rp-bf': 20, 'rp-pm': 10, 'rp-pmc': 20}, prima = {};
+  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-spesa': 20, 'rp-bf': 20}, prima = {};
   Object.keys(campi).forEach(id => { const e = $(id); if(e){ prima[id] = e.value; e.value = campi[id]; } });
   G().set({scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: creditiSoglia(), ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20, ptPulMacc: 10, pulMaccCaffe: 20}, {merge: true})
     .then(() => toast('Scala ×10 attiva'))
