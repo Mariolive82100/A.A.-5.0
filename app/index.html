@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.36.4';
+const VERSION = '1.36.5';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -680,7 +680,9 @@ function applyMov(S, m, sg){
     case 'spesa':
       if(m.stato === 'confermata'){
         S.pspesa = S.pspesa || {}; add(S.pspesa, m.mid, sg*(m.pt ?? PUNTI_SPESA)*fx(m));   // 2 punti per ogni richiesta convalidata, qualunque sia il numero di articoli
-        if(m.fonte === 'tasca') add(S.saldi, m.mid, sg*m.importo); else if(m.fonte === 'contanti' || m.fonte === 'revolut') add(S.cassa, m.fonte, -sg*m.importo);
+        const qc = Number.isInteger(m.quotaCrediti) ? m.quotaCrediti : 0, qd = Number.isInteger(m.quotaDenaro) ? m.quotaDenaro : 0;
+        if(qc > 0 && qd > 0 && (m.fonte === 'contanti' || m.fonte === 'revolut')){ add(S.saldi, m.mid, sg*qc); add(S.cassa, m.fonte, -sg*qd); }   // rimborso misto: crediti al collega + denaro dalla cassa
+        else if(m.fonte === 'tasca') add(S.saldi, m.mid, sg*m.importo); else if(m.fonte === 'contanti' || m.fonte === 'revolut') add(S.cassa, m.fonte, -sg*m.importo);
       } break;
     case 'uscita': add(S.cassa, m.fonte, -sg*m.importo); break;
     case 'entrata': add(S.cassa, m.fonte, sg*m.importo); break;
@@ -1305,8 +1307,8 @@ function inboxAdmin(d){
     ${azioni.length ? `<div style="display:grid;grid-template-columns:repeat(${azioni.length},1fr);gap:8px;margin-top:10px">${azioni.join('')}</div>` : `<div class="mut" style="font-size:12px;margin-top:8px">È un tuo compito: lo convalida un altro admin o un Supervisor.</div>`}</div>`});
   st.richieste.forEach(r => card(r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now(), 'Accesso', 'sky', esc(r.nome), (r.nick ? '“' + esc(r.nick) + '” · ' : '') + 'chiede di entrare nel gruppo', [bt('approva', r.id, 'green', 'Valuta')]));
   d.pendenti.forEach(m => {
-    if(m.tipo === 'spesa') card(m.t, 'Spesa', 'violet', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.articoliNomi && m.articoliNomi.length ? '🛒 ' + m.articoliNomi.map(esc).join(', ') : esc(m.descr || '')}${m.note ? ' · «' + esc(m.note) + '»' : ''} · ${m.fonte === 'denaro' ? 'rimborso in denaro reale' : 'rimborso in crediti'}`,
-      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), m.fonte === 'denaro' ? bt('paga-spesa', m.id, 'green', 'Convalida e Paga') : bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
+    if(m.tipo === 'spesa') card(m.t, 'Spesa', 'violet', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.articoliNomi && m.articoliNomi.length ? '🛒 ' + m.articoliNomi.map(esc).join(', ') : esc(m.descr || '')}${m.note ? ' · «' + esc(m.note) + '»' : ''} · ${spesaMista(m) || (m.fonte === 'denaro' ? 'rimborso in denaro reale' : 'rimborso in crediti')}`,
+      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), (m.fonte === 'denaro' || m.fonte === 'misto') ? bt('paga-spesa', m.id, 'green', 'Convalida e Paga') : bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
     else if(m.tipo === 'ricarica') card(m.t, 'Versamento', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.fondo ? 'Quota fondo' : 'Ricarica crediti'} · ${esc(FONTI[m.metodo] || m.metodo || '')}`,
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma incasso', 'confermata')]);
     else if(m.tipo === 'riscatto') card(m.t, 'Riscatto', 'green', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `chiede al Fondo Gruppo · preferisce ${esc(FONTI[m.metodo] || m.metodo || '')} · saldo ${eurS(saldo(m.mid))}`,
@@ -1498,7 +1500,7 @@ function descMov(m){
     case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`, a: 0};
     case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti * fx(m)} Punti Collega Modello`, a: m.importo};
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · ${m.stato === 'attesa' ? 'richiesto al Fondo' : 'pagato dalla cassa'} (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
-    case 'spesa': return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: m.fonte !== 'tasca'};
+    case 'spesa': { const mx = spesaMista(m); return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${mx ? 'rimborso misto (' + mx + ')' : m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(mx ? (adminView() ? {a: -m.quotaDenaro} : {a: m.quotaCrediti}) : m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: mx ? true : m.fonte !== 'tasca'}; }
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
     case 'entrata': return {ic:'📥', t: `Entrata: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: m.importo, cassa: true};
     case 'giroconto': return {ic:'🔁', t: `Giroconto ${FONTI[m.da]} → ${FONTI[m.a]}`, a: 0, neutro: m.importo, cassa: true};
@@ -1549,7 +1551,7 @@ function righeMov(list, d, opt){
         <div class="amt mono ${annullato ? 'strike' : ''}">${amt}</div>${pill}
         ${annullabile ? `<button class="btn link" style="padding:0" data-act="annulla-consumo" data-id="${m.id}">Annulla</button>` : ''}
         ${!opt.noAct && !opt.compact && puoStornare(m, d) ? `<button class="btn link mut" style="padding:0;color:var(--mut)" data-act="storno" data-id="${m.id}">↩️ Storna</button>` : ''}
-        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && m.fonte === 'denaro' ? 'paga-spesa' : m.tipo === 'riscatto' ? 'riscatto-paga' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
+        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && (m.fonte === 'denaro' || m.fonte === 'misto') ? 'paga-spesa' : m.tipo === 'riscatto' ? 'riscatto-paga' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
       </div></div>`;
   }).join('')}</div>`;
 }
@@ -1672,6 +1674,7 @@ function pRegolamento(){
   ${sez('🛒 Spesa e rimborsi', [
     'La <b>Lista della spesa</b> è solo un <b>promemoria</b>: chiunque aggiunge ciò che manca e chi lo compra lo spunta per toglierlo dall\'elenco. Non genera rimborsi.',
     'Hai anticipato dei soldi per il gruppo (acquisti per la saletta o spese straordinarie come un telegramma o un omaggio autorizzato)? Da Home tocca <b>➕ Ricarica o rimborso → 🧾 Rimborso spesa</b>: indica motivo, importo e se vuoi il rimborso <b>in crediti</b> o in <b>denaro reale</b>.',
+    'Il rimborso può essere <b>tutto in crediti</b>, <b>tutto in denaro reale</b> oppure <b>misto</b> (una parte in denaro e una in crediti, con le due quote che sommano esattamente il totale). Per il denaro l\'admin sceglie contanti o Revolut: la cassa cala solo della quota in denaro e il tuo saldo sale solo della quota in crediti.',
     'Il rimborso vale solo dopo la <b>convalida</b> di un admin ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🎯 Compiti di oggi', [
@@ -1921,7 +1924,7 @@ function aggMov(G, m, sg){
   switch(m.tipo){
     case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ if(m.tipo === 'caffe') add(G.ptC, m.mid, sg*(m.pt ?? m.qta)*fx(m)); add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
     case 'snack': if(m.stato !== 'annullata'){ add(G.snack, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); add(G.ptC, m.mid, sg*(m.pt ?? 0)*fx(m)); } break;
-    case 'spesa': if(m.stato === 'confermata'){ add(G.ptS, m.mid, sg*(m.pt ?? PUNTI_SPESA)*fx(m)); add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*m.importo; } break;
+    case 'spesa': if(m.stato === 'confermata'){ add(G.ptS, m.mid, sg*(m.pt ?? PUNTI_SPESA)*fx(m)); add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*(Number.isInteger(m.quotaDenaro) && m.quotaDenaro > 0 ? m.quotaDenaro : m.importo); } break;
     case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*ptPulM(m)); add(G.ptP, x, sg*ptPulM(m)); }); break;
     case 'compito': if(m.stato === 'confermata'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
@@ -3049,14 +3052,36 @@ A['rimborso-nuovo'] = () => {
     <p class="sub">Hai anticipato una spesa per il gruppo? Un amministratore la convalida guardando lo scontrino o la ricevuta.</p>
     <label class="f"><span>Motivo del rimborso</span><input class="in" id="s-desc" maxlength="80" placeholder="es. Caffè in grani e bicchieri · Telegramma condoglianze" autofocus></label>
     <label class="f"><span>Importo speso €</span><input class="in mono" id="s-imp" inputmode="decimal" placeholder="12,50"></label>
-    <label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('s-rimb', [['crediti','🪙 In crediti'],['denaro','💶 Denaro reale']], 'crediti')}</label>
-    ${infoBtn(`In crediti: l'importo diventa un credito per te (lo riscatti dal Fondo Gruppo). In denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia. Alla convalida ricevi anche i punti spesa, qualunque sia il motivo.`, 'Come funziona')}
+    <div data-chg="rb-upd"><label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('s-rimb', [['crediti','🪙 Tutto in crediti'],['denaro','💶 Tutto in denaro reale'],['misto','⚖️ Misto (crediti + denaro)']], 'crediti')}</label></div>
+    <div id="rb-misto" hidden data-chg="rb-upd"><div class="grid2" style="gap:8px">
+      <label class="f" style="margin:0"><span>Quota in denaro reale €</span><input class="in mono" id="s-qd" inputmode="decimal" placeholder="0,00"></label>
+      <label class="f" style="margin:0"><span>Quota in crediti €</span><input class="in mono" id="s-qc" inputmode="decimal" placeholder="0,00"></label></div>
+      <p class="hint" id="rb-msg" style="margin:6px 0 0;font-size:12px"></p></div>
+    ${infoBtn(`Tutto in crediti: l'importo diventa un credito per te. Tutto in denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia. Misto: parte in denaro e parte in crediti; le due quote devono dare esattamente il totale. I punti spesa si calcolano sul totale, in ogni caso.`, 'Come funziona')}
     <button class="btn green block big" data-act="conferma-spesa">Invia la richiesta</button>`);
 };
+/* rimborso misto: tengo le due quote sincronizzate col totale (quella modificata per ultima comanda) */
+function rbAggiorna(ult){
+  const m = radio('s-rimb'), box = $('rb-misto'); if(!box) return;
+  box.hidden = m !== 'misto'; if(m !== 'misto') return;
+  const tot = parseEuro(val('s-imp')), qd = $('s-qd'), qc = $('s-qc'), msg = $('rb-msg');
+  if(!(tot > 0)){ if(msg) msg.textContent = 'Inserisci prima l\'importo totale.'; return; }
+  const f = c => (c / 100).toFixed(2).replace('.', ',');
+  if(ult === 'qc'){ const c = parseEuro(qc.value); if(Number.isFinite(c) && c >= 0 && c <= tot) qd.value = f(tot - c); }
+  else { const d = parseEuro(qd.value); if(Number.isFinite(d) && d >= 0 && d <= tot) qc.value = f(tot - d); }
+  const d = parseEuro(qd.value), c = parseEuro(qc.value), ok = d > 0 && c > 0 && d + c === tot;
+  if(msg){ msg.textContent = ok ? `Totale ${eur(tot)} → ${eur(d)} in denaro reale + ${eur(c)} in crediti` : 'Entrambe le quote devono essere maggiori di zero e dare insieme il totale.'; msg.className = 'hint ' + (ok ? 'green' : 'amber'); }
+}
 A['conferma-spesa'] = () => {
-  const descr = val('s-desc'), imp = parseEuro(val('s-imp')), fonte = (radio('s-rimb') || 'crediti') === 'denaro' ? 'denaro' : 'tasca';
+  const descr = val('s-desc'), imp = parseEuro(val('s-imp')), modo = radio('s-rimb') || 'crediti';
   if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi il motivo e un importo valido', 'err');
-  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'attesa'});
+  const mov = {tipo:'spesa', mid: st.mid, importo: imp, descr: descr.slice(0,80), stato: 'attesa'};
+  if(modo === 'misto'){
+    const qd = parseEuro(val('s-qd')), qc = parseEuro(val('s-qc'));
+    if(!(qd > 0) || !(qc > 0) || qd + qc !== imp) return toast('Le due quote devono essere maggiori di zero e dare esattamente il totale', 'err');
+    Object.assign(mov, {fonte: 'misto', quotaDenaro: qd, quotaCrediti: qc});
+  } else mov.fonte = modo === 'denaro' ? 'denaro' : 'tasca';
+  addMov(mov);
   closeSheet();
   toast('Richiesta di rimborso inviata, in attesa di convalida');
 };
@@ -3064,12 +3089,13 @@ A['paga-spesa'] = ds => {
   const m = derived().movs.find(x => x.id === ds.id); if(!m || m.stato !== 'attesa') return;
   const c = derived().S.cassa;
   openSheet(`<h3>${ic('banknote')} Convalida e Paga</h3>
-    <p class="sub"><b>${esc(nomeM(m.mid))}</b> ha anticipato <b class="mono">${eur(m.importo)}</b> per «${esc(m.descr || '')}». Paghi dalla cassa: il saldo del collega non cambia.</p>
-    <label class="f"><span>Da dove paghi?</span>${segOpts('ps-met', [['contanti','💶 Contanti (' + eur(c.contanti || 0) + ')'],['revolut','📱 Revolut (' + eur(c.revolut || 0) + ')']], 'contanti')}</label>
+    <p class="sub"><b>${esc(nomeM(m.mid))}</b> ha anticipato <b class="mono">${eur(m.importo)}</b> per «${esc(m.descr || '')}». ${spesaMista(m) ? `<br><b>${spesaMista(m)}</b>.<br>Paghi dalla cassa solo la quota in denaro (${eur(m.quotaDenaro)}); la quota in crediti (${eur(m.quotaCrediti)}) va sul saldo del collega.` : 'Paghi dalla cassa: il saldo del collega non cambia.'}</p>
+    <label class="f"><span>Da dove paghi${spesaMista(m) ? ' la quota in denaro' : ''}?</span>${segOpts('ps-met', [['contanti','💶 Contanti (' + eur(c.contanti || 0) + ')'],['revolut','📱 Revolut (' + eur(c.revolut || 0) + ')']], 'contanti')}</label>
     <button class="btn green block big" data-act="conferma-paga-spesa" data-id="${m.id}">Convalida e Paga</button>`);
 };
 A['conferma-paga-spesa'] = ds => {
   const met = radio('ps-met') || 'contanti', mv = derived().movs.find(x => x.id === ds.id);
+  if(mv && spesaMista(mv) && (((derived().S.cassa || {})[met]) || 0) < mv.quotaDenaro) return toast('Capienza di cassa insufficiente per la quota in denaro: scegli l\'altro metodo o fai un giroconto', 'err');
   C('movimenti').doc(ds.id).update({stato: 'confermata', fonte: met, esitoDa: myName(), esitoTs: TS(), pt: ptSpesaE(mv && mv.importo)})
     .then(() => { aggiornaArticoli(mv, true); closeSheet(); toast('Spesa pagata dalla cassa ✓'); }).catch(e => toast(errMsg(e), 'err'));
 };
@@ -3415,8 +3441,10 @@ A['carica-archivio'] = async () => {
 };
 
 /* --- storno ed esiti (admin) --- */
+/* rimborso misto: testo con la ripartizione (null se il movimento non e' misto) */
+const spesaMista = m => (m && Number.isInteger(m.quotaDenaro) && Number.isInteger(m.quotaCrediti) && m.quotaDenaro > 0 && m.quotaCrediti > 0) ? `Totale ${eur(m.importo)} → ${eur(m.quotaDenaro)} in denaro reale + ${eur(m.quotaCrediti)} in crediti` : null;
 function compactMov(m){
-  return clean({tipo:m.tipo, cp:m.cp, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id});
+  return clean({tipo:m.tipo, cp:m.cp, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, quotaDenaro:m.quotaDenaro, quotaCrediti:m.quotaCrediti, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -3432,6 +3460,7 @@ A['conferma-storno'] = ds => {
 A['esito'] = ds => {
   const mv = derived().movs.find(x => x.id === ds.id);
   if(mv && mv.tipo === 'compito' && !cpPuoConv(mv)) return toast('Non puoi convalidare questo compito', 'err');
+  if(mv && mv.tipo === 'spesa' && mv.fonte === 'misto' && ds.v === 'confermata') return A['paga-spesa'](ds);   // la spesa mista si convalida scegliendo il canale della quota in denaro
   C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesaE(mv.importo)} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
 };
@@ -3869,7 +3898,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v11';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v12';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
@@ -4371,6 +4400,7 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'rp-data'){ st.rpDa = ($('rp-da') || {}).value || ''; st.rpA = ($('rp-a') || {}).value || ''; render(); }
   if(el && el.dataset.chg === 'rp-sw') document.querySelectorAll('#rp-sw-lista input').forEach(i => { i.disabled = !el.checked; });
   if(el && el.dataset.chg === 'corr') corrAggiorna();
+  if(el && el.dataset.chg === 'rb-upd' && e.target.name === 's-rimb') rbAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
@@ -4380,6 +4410,7 @@ document.addEventListener('change', e => {
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
 document.addEventListener('input', e => {
+  if(e.target && (e.target.id === 's-qd' || e.target.id === 's-qc' || e.target.id === 's-imp')) rbAggiorna(e.target.id === 's-qc' ? 'qc' : 'qd');
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="ac-upd"]')) acAggiorna();
