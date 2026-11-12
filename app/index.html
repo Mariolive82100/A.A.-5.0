@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.34.3';
+const VERSION = '1.34.4';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -3135,6 +3135,11 @@ function obStato(o, now){
   else msg = o.freq === 'g' ? `Chiuso per oggi · riapre ${now.getDay() === 5 ? 'lunedì' : 'domani'} alle ${obH(o.da)}` : `Chiuso per oggi · prossima finestra dalle ${obH(o.da)}`;
   return {s: 'chiuso', msg};
 }
+const obInScadenza = () => {
+  if(!st.mid || !ptMaster()) return [];
+  const now = new Date(), tn = now.getTime();
+  return obAttivi().map(o => ({o, x: obStato(o, now)})).filter(r => r.x.s === 'carico' && r.x.mid === st.mid && r.x.scad - tn <= 3600e3);
+};
 const obAttivi = () => ptMaster() ? obLista().filter(o => o.on !== false) : [];
 const nObDisp = () => st.mid ? (pulDisp(pulStato()).macc ? 1 : 0) + obAttivi().filter(o => obStato(o).s === 'libero').length : 0;   // badge: attivi e non ancora presi
 const badgeObiettivi = () => { const n = ptMaster() ? nObDisp() : 0; return n ? `<span class="tb" id="badge-obiettivi" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${n}</span>` : ''; };
@@ -3164,7 +3169,7 @@ A['ob-conferma'] = ds => {
 let pulSig = '';
 setInterval(() => {
   if(!st.mid || !st.gid || document.hidden) return;
-  try { const sig = [pulDisp(pulStato()).macc].concat(obAttivi().map(o => obStato(o).s)).join() + '|' + (st.page === 'obiettivi' ? Math.floor(Date.now() / 60000) : ''); if(sig !== pulSig){ pulSig = sig; render(); } } catch(e){ /* dati non ancora pronti */ }
+  try { const sig = [pulDisp(pulStato()).macc, obInScadenza().length].concat(obAttivi().map(o => obStato(o).s)).join() + '|' + (st.page === 'obiettivi' ? Math.floor(Date.now() / 60000) : ''); if(sig !== pulSig){ pulSig = sig; render(); } } catch(e){ /* dati non ancora pronti */ }
 }, 20000);
 /* --- configurazione obiettivi (admin, in Impostazioni) --- */
 const cardObiettivi = () => {
@@ -4442,6 +4447,8 @@ function avvisiHome(){
     h += `<button class="avv violet" id="avviso-sondaggio" data-act="sond-apri"><div class="avv-t">🗳️ ${so.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'} · ${v ? (so.tipo === 'scelta' ? 'hai risposto · vedi i risultati' : 'risposta inviata') : 'tocca per rispondere (anonimo)'}</div><div class="avv-m">${esc(so.domanda)}</div></button>`;
   }
   auto.forEach((t, i) => { h += `<div class="avv green" id="avviso-auto-${i}" role="status"><div class="avv-m">${t}</div></div>`; });
+  const sc = obInScadenza();   // promemoria: obiettivi in carico a me che scadono entro un'ora
+  if(sc.length) h += `<button class="avv amber" id="avviso-obiettivi" data-act="go" data-p="obiettivi"><div class="avv-t">⏰ ${sc.length === 1 ? 'Obiettivo in scadenza' : sc.length + ' obiettivi in scadenza'}</div><div class="avv-m">${sc.map(r => `${esc(r.o.nome)} · tra ${pulCount(r.x.scad - Date.now())}`).join('<br>')}<br><b>Conferma il completamento prima della scadenza →</b></div></button>`;
   return h;
 }
 const scadPill = o => !o.scad ? '<span class="pill green">attivo</span>' : o.scad < Date.now() ? '<span class="pill red">Scaduto</span>' : `<span class="pill green">attivo fino al ${dataOra(o.scad)}</span>`;
