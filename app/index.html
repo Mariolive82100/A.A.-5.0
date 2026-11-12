@@ -289,6 +289,18 @@ aside.drawer{position:fixed;top:0;bottom:0;left:0;z-index:41;width:280px;max-wid
 aside.drawer.on{transform:none}
 aside.drawer .nb{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border-radius:13px;font-weight:600;font-size:14px;color:var(--tx2);text-align:left}
 aside.drawer .nb.on{background:var(--card2);color:var(--amber)}
+#qs-wrap{padding:0 4px 8px}
+#qs-wrap .qs-box{display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:13px;padding:0 10px}
+#qs-wrap .qs-box:focus-within{border-color:var(--amber)}
+#qs-in{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--tx);font:inherit;font-size:14px;padding:11px 0}
+#qs-res{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+#qs-res .qs-r{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:12px;background:var(--card2);color:var(--tx);font-size:13.5px;font-weight:600}
+#qs-res .qs-r small{display:block;font-weight:500;color:var(--tx2);font-size:11.5px}
+#qs-res .qs-r .qs-e{font-size:18px;flex:none}
+#qs-res .qs-sec{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2);padding:6px 4px 0}
+#qs-vuoto{font-size:12.5px;color:var(--tx2);padding:6px 4px}
+@keyframes qsflash{0%{box-shadow:0 0 0 3px var(--amber)}100%{box-shadow:0 0 0 0 transparent}}
+.qs-flash{animation:qsflash 1.6s ease-out 1}
 aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 
 /* sheet */
@@ -377,6 +389,7 @@ header.hasprize{padding-bottom:38px}
   </div>
   <button class="rankpill hidden" id="hdr-rank" data-act="go" data-p="classifiche" aria-label="La tua posizione in classifica nel mese"></button>
   <button class="prizepill hidden" id="hdr-prize" data-act="go" data-p="classifiche" aria-label="Premi del Podio del Mese"></button>
+  <button class="iconbtn hidden" id="hdr-search" data-act="qs-apri" aria-label="Cerca impostazione o socio" title="Cerca impostazione o socio"><svg class="i"><use href="#i-search"/></svg></button>
   <button class="iconbtn" id="hdr-update" style="margin-left:auto" data-act="aggiorna" aria-label="Aggiorna all'ultima versione" title="Aggiorna all'ultima versione"><svg class="i"><use href="#i-repeat"/></svg></button>
   <button class="sbadge pos hidden" id="hdr-sb" style="margin-left:6px" data-act="go" data-p="registro" aria-label="Saldo"></button>
 </header>
@@ -432,6 +445,7 @@ header.hasprize{padding-bottom:38px}
   <symbol id="i-brush" viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="i-banknote" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
 </svg>
@@ -447,7 +461,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.40.0';
+const VERSION = '1.41.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1007,7 +1021,7 @@ function doRender(){
   aggiornaPillola(d, false);
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
   $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
-  $('hdr-menu').classList.remove('hidden');
+  $('hdr-menu').classList.remove('hidden'); $('hdr-search').classList.toggle('hidden', !st.isAdmin);
   const tabs = [['bar','Home','coffee'],['briefing','Briefing','clipboard'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = cn.tot;
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
@@ -1034,18 +1048,68 @@ function renderDrawer(){
     if(can('compiti')) voci.push(nav('regole', 'sparkles', '⚙️ Regole punti &amp; premi', 'nb-regole'));
     if(can('sistema')) voci.push(nav('backup', 'download', 'Backup &amp; Ripristino', 'nb-backup'), nav('chiusura', 'archive', '📦 Chiusura periodo', 'nb-chiusura'));
   }
+  const qsFoc = document.activeElement && document.activeElement.id === 'qs-in';
   $('drawer').innerHTML = `
     <div class="row" style="padding:4px 6px 14px;border-bottom:1px solid var(--line);margin-bottom:8px">
       <div class="av" style="background:rgba(245,165,36,.12);color:var(--amber)">${ic('coffee')}</div>
       <div class="grow" style="flex:1"><b>${esc(st.gruppo.nome || 'Saletta')}</b><div class="mut" style="font-size:12px">${esc(myName())}${st.isAdmin ? ' · ' + ruolo() : ''}</div></div>
       <button class="iconbtn" data-act="drawer-close">${ic('x')}</button>
     </div>
+    ${st.isAdmin ? `<div id="qs-wrap"><div class="qs-box">${ic('search','s')}<input id="qs-in" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Cerca impostazione o socio..." aria-label="Cerca impostazione o socio" value="${esc(st.qsQ || '')}"></div><div id="qs-res"></div></div>` : ''}
     ${voci.length ? `<div class="mut" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px 2px">🛡️ Gestione</div>${voci.join('')}<div class="sep"></div>` : ''}
     <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}Impostazioni</button>
     <button class="nb ${st.page==='regolamento'?'on':''}" data-act="go" data-p="regolamento">${ic('receipt')}Regolamento</button>
     <button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>
     <button class="nb" data-act="info">${ic('info')}Info</button>
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
+  if(st.isAdmin){ qsFiltra(); if(qsFoc && $('qs-in')){ const i = $('qs-in'); i.focus({preventScroll:true}); i.setSelectionRange(i.value.length, i.value.length); } } else st.qsQ = '';
+}
+
+/* ---------- ricerca rapida (solo Creatore e Supervisor): tutto in memoria, nessuna lettura Firestore ----------
+   Ogni voce porta alla pagina giusta (e al riquadro, quando c'è) e compare solo se chi cerca ha il permesso. */
+const qsNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const QS_VOCI = [
+  {e:'☕', t:'Scorta caffè in grani', s:'Inventario · kg, resa, ciclo', perm:'inventario', p:'inventario', a:'inv-caffe', k:'scorta caffe kg grani resa ciclo tazzine carico buste'},
+  {e:'📦', t:'Inventario e listino', s:'Prezzi, snack, giacenze, Esaurito', perm:'inventario', p:'inventario', k:'inventario listino prezzi prezzo snack bibite esaurito giacenza giacenze articoli carico'},
+  {e:'📅', t:'Quote annuali', s:'Pagamenti dell\'anno', perm:'soci', p:'quote', k:'quote quota annuali annuale pagamenti pagamento anno importo'},
+  {e:'👥', t:'Gestione Soci', s:'Elenco soci, saldi, archivia, espelli', perm:'soci', p:'membri', k:'soci socio colleghi collega saldo saldi punti archivia espelli nickname gestione'},
+  {e:'🔐', t:'Gestione PIN', s:'Reset PIN, PIN temporaneo', perm:'soci', p:'pin', k:'pin reset temporaneo codice password sblocco'},
+  {e:'🛡️', t:'Gestione Supervisor', s:'Nomina, permessi e ruoli', perm:'creatore', p:'supervisor', k:'supervisor permessi permesso ruoli ruolo nomina revoca creatore admin amministratore'},
+  {e:'⚙️', t:'Regole punti e premi', s:'Punteggi, tessera, soglia, podio', perm:'compiti', p:'regole', k:'punti tessera fedelta ben fatto soglia podio premi regole punteggi scala credito conversione'},
+  {e:'🎯', t:'Gestione compiti', s:'Briefing · crea, modifica, elimina', perm:'compiti', p:'briefing', a:'card-compiti', k:'compiti compito briefing incarichi sorteggio esenti squadra'},
+  {e:'💾', t:'Backup e ripristino', s:'Esporta i dati, ripristina', perm:'sistema', p:'backup', k:'backup esporta esportazione ripristino ripristina scarica dati salvataggio'},
+  {e:'📦', t:'Chiusura periodo', s:'Chiusura, estratti, archivio', perm:'sistema', p:'chiusura', k:'chiusura periodo estratti estratto archivio chiudere'},
+  {e:'📣', t:'Avviso e sondaggio', s:'Home · Strumenti di sistema', perm:'sistema', p:'bar', a:'com-admin', k:'avviso avvisi sondaggio sondaggi domanda comunicazione home strumenti'},
+  {e:'💶', t:'Cassa: entrata, giroconto, correggi saldo', s:'Cassa e registro', perm:'cassa', p:'registro', a:'cassa-dash', k:'cassa entrata entrate giroconto correggi saldo revolut contanti giacenza uscite registro storno storni'},
+  {e:'✅', t:'Approva richieste', s:'Notifiche · ricariche, spese, riscatti, iscritti', perm:'inbox', p:'notifiche', k:'richieste richiesta approva approvazione ricariche ricarica spese riscatti iscritti notifiche inbox'},
+  {e:'🏷️', t:'Nome del gruppo', s:'Impostazioni', perm:'creatore', p:'impostazioni', k:'nome gruppo impostazioni rinomina'}
+];
+const qsPuo = perm => !perm || (perm === 'creatore' ? sonoCreatore() : can(perm));
+function qsRisultati(q){
+  const toks = qsNorm(q).split(' ').filter(Boolean);
+  if(!toks.length) return [];
+  const ok = txt => { const n = ' ' + qsNorm(txt); return toks.every(t => n.includes(' ' + t)); };   // ogni parola cercata deve iniziare una parola della voce
+  const sez = QS_VOCI.filter(v => qsPuo(v.perm) && pagineConsentite().includes(v.p) && ok(v.t + ' ' + v.k)).map(v => ({tipo:'sez', v}));
+  const soc = can('soci') ? membriAttivi().filter(m => ok((m.nome || '') + ' ' + (m.nick || ''))).sort((x, y) => (x.nome || '').localeCompare(y.nome || '', 'it')).slice(0, 6) : [];
+  return {sez: sez.slice(0, 8), soc};
+}
+function qsFiltra(){
+  const box = $('qs-res'); if(!box) return;
+  const q = (($('qs-in') || {}).value || '').trim();
+  st.qsQ = q;
+  if(!q){ box.innerHTML = ''; st.qsList = []; return; }
+  const r = qsRisultati(q), lista = [];
+  let h = '';
+  if(r.sez.length){ h += '<div class="qs-sec">Sezioni</div>'; r.sez.forEach(x => { lista.push({p:x.v.p, a:x.v.a}); h += `<button class="qs-r" data-act="qs-go" data-i="${lista.length - 1}"><span class="qs-e">${x.v.e}</span><span>${esc(x.v.t)}<small>${esc(x.v.s)}</small></span></button>`; }); }
+  if(r.soc.length){
+    h += '<div class="qs-sec">Soci</div>';
+    r.soc.forEach(m => {
+      lista.push({socio: m.id}); h += `<button class="qs-r" data-act="qs-go" data-i="${lista.length - 1}"><span class="qs-e">👤</span><span>${esc(m.nome)}${m.nick ? ' · ' + esc(m.nick) : ''}<small>Apri la scheda in Gestione Soci</small></span></button>`;
+      lista.push({pin: m.id}); h += `<button class="qs-r" data-act="qs-go" data-i="${lista.length - 1}" style="padding-left:34px"><span class="qs-e">🔐</span><span>PIN di ${esc(m.nick || m.nome)}<small>Reset o PIN temporaneo</small></span></button>`;
+    });
+  }
+  if(!h) h = '<div id="qs-vuoto">Nessun risultato per i tuoi permessi.</div>';
+  st.qsList = lista; box.innerHTML = h;
 }
 
 const SALETTA_SUB = ['saletta','eventi','inventario','gioco','ruota','perle','spesa'];
@@ -2720,6 +2784,22 @@ A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render
 
 
 
+A['qs-apri'] = () => { A['drawer'](); setTimeout(() => { const i = $('qs-in'); if(i) i.focus(); }, 280); };
+A['qs-go'] = ds => {
+  const x = (st.qsList || [])[+ds.i]; if(!x) return;
+  st.qsQ = '';
+  const vai = (p, a, dopo) => {
+    A['go']({p});
+    setTimeout(() => {
+      const el = a && $(a);
+      if(el){ if(el.scrollIntoView) el.scrollIntoView({block:'start', behavior:'smooth'}); el.classList.add('qs-flash'); setTimeout(() => el.classList.remove('qs-flash'), 1800); }
+      if(dopo) dopo();
+    }, 160);
+  };
+  if(x.socio){ if(!can('soci')) return; vai('membri', null, () => A['membro']({id: x.socio})); }
+  else if(x.pin){ if(!can('soci')) return; st.pinSel = x.pin; vai('pin', 'pin-azioni'); }
+  else vai(x.p, x.a);
+};
 A['drawer'] = () => { $('drawer').classList.add('on'); $('drawer-ov').classList.add('on'); };
 A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
   <p class="sub">Armieri 5.0 v${VERSION} · ${esc(st.gruppo.nome || '')}</p>
@@ -4503,6 +4583,7 @@ document.addEventListener('change', e => {
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
 document.addEventListener('input', e => {
+  if(e.target && e.target.id === 'qs-in'){ qsFiltra(); return; }
   if(e.target && (e.target.id === 's-qd' || e.target.id === 's-qc' || e.target.id === 's-imp')) rbAggiorna(e.target.id === 's-qc' ? 'qc' : 'qd');
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
