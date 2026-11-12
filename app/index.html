@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.35.2';
+const VERSION = '1.36.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -965,9 +965,9 @@ function doRender(){
   const nb = av ? cn.fondo : cn.pers;
   if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['classifiche','Classifica e statistiche','chart']);
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
-  sincronizzaGiacenze(d); sincronizzaEstratti();
+  sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
-  sincronizzaGiacenze(d); sincronizzaEstratti();
+  sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   renderDrawer();
 
   const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, compiti:pCompiti, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
@@ -1277,7 +1277,7 @@ const recuperiNuovi = () => { const v = recVisti(); return st.utenti.filter(u =>
 function contatori(d){
   const seen = notifSeen();
   const sc = scambiPerMe(d).length;
-  const pers = notifiche(d).filter(n => n.t > seen).length + sc;
+  const pers = notifiche(d).filter(n => n.t > seen).length + sc + nCpConv();
   const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + recuperiNuovi().length + sc : 0;
   return {pers, fondo};
 }
@@ -1287,7 +1287,7 @@ function pNotifiche(d){
   }
   const list = notifiche(d), seen = notifSeen();
   return `<h2>${ic('bell')} Notifiche</h2><p class="sub">Richieste da gestire ed esiti che ti riguardano.</p>
-  ${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
+  ${cpConvCard()}${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
   ${storicoRichieste(d)}
   <div class="card"><h3><span>Esiti e accrediti</span><button class="btn link" data-act="notif-letti">Segna tutte come lette</button></h3>
     ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>`;
@@ -1297,7 +1297,7 @@ function inboxAdmin(d){
   const bt = (act, id, cls, lab, v) => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}"${v ? ` data-v="${v}"` : ''}>${lab}</button>`;
   const card = (t, tag, cls, titolo, sub, azioni) => it.push({t, h: `<div class="card" style="margin-bottom:10px"><div class="between" style="margin-bottom:6px"><span class="pill ${cls}">${tag}</span><span class="mut" style="font-size:11.5px">${t ? quando(t) : ''}</span></div>
     <div style="font-size:14.5px;font-weight:700">${titolo}</div>${sub ? `<div class="tx2" style="font-size:13px;margin-top:2px">${sub}</div>` : ''}
-    <div style="display:grid;grid-template-columns:repeat(${azioni.length},1fr);gap:8px;margin-top:10px">${azioni.join('')}</div></div>`});
+    ${azioni.length ? `<div style="display:grid;grid-template-columns:repeat(${azioni.length},1fr);gap:8px;margin-top:10px">${azioni.join('')}</div>` : `<div class="mut" style="font-size:12px;margin-top:8px">È un tuo compito: lo convalida un altro admin o un Supervisor.</div>`}</div>`});
   st.richieste.forEach(r => card(r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now(), 'Accesso', 'sky', esc(r.nome), (r.nick ? '“' + esc(r.nick) + '” · ' : '') + 'chiede di entrare nel gruppo', [bt('approva', r.id, 'green', 'Valuta')]));
   d.pendenti.forEach(m => {
     if(m.tipo === 'spesa') card(m.t, 'Spesa', 'violet', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.articoliNomi && m.articoliNomi.length ? '🛒 ' + m.articoliNomi.map(esc).join(', ') : esc(m.descr || '')}${m.note ? ' · «' + esc(m.note) + '»' : ''} · ${m.fonte === 'denaro' ? 'rimborso in denaro reale' : 'rimborso in crediti'}`,
@@ -1307,7 +1307,7 @@ function inboxAdmin(d){
     else if(m.tipo === 'riscatto') card(m.t, 'Riscatto', 'green', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `chiede al Fondo Gruppo · preferisce ${esc(FONTI[m.metodo] || m.metodo || '')} · saldo ${eurS(saldo(m.mid))}`,
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('riscatto-paga', m.id, 'green', 'Paga e conferma')]);
     else if(m.tipo === 'compito') card(m.fattoTs || m.t, 'Compito', 'violet', `${esc(m.nome || 'Compito')} · ${esc(nomeM(m.mid))}`, `Segnala di aver svolto il compito · +${m.punti || 0} punti alla convalida`,
-      [bt('esito', m.id, 'ghost', 'Rifiuta / Riassegna', 'rifiutata'), bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
+      cpPuoConv(m) ? [bt('esito', m.id, 'ghost', 'Rifiuta / Riassegna', 'rifiutata'), bt('esito', m.id, 'green', 'Convalida', 'confermata')] : []);
     else card(m.t, 'Richiesta', 'mut', descMov(m).t, '', [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma', 'confermata')]);
   });
 
@@ -1649,7 +1649,7 @@ function pRegolamento(){
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
   const nota = (ok, txt) => ok ? '' : txt;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.3 · novembre 2026</p>
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.4 · novembre 2026</p>
   ${sez('🎯 Principi', [
     '<b>Registra subito</b> ogni consumo: ognuno risponde del proprio.',
     '<b>Contabilità, non denaro:</b> l\'app tiene crediti e debiti; i soldi passano in contanti o Revolut, fuori dall\'app.',
@@ -1674,6 +1674,8 @@ function pRegolamento(){
     'Chi esce deve essere <b>presente</b>: se non c\'è o non può, si scarta e si estrae un altro. L\'incarico vale solo dopo «È presente».',
     'Svolto il compito premi <b>Ho fatto!</b>: un admin convalida e solo allora ricevi i punti. Se rifiuta o annulla, niente punti e il compito torna sorteggiabile.',
     'Non ci sono scadenze né orari: l\'incarico resta aperto finché non viene concluso o annullato da un admin. Un solo incarico alla volta per compito.',
+    '🛡️ <b>Supervisor:</b> colleghi delegati dagli admin, senza scadenza finché non revocati: possono convalidare o rifiutare i compiti e creare nuovi compiti dalla pagina. Nessun accesso a cassa o impostazioni.',
+    'Nessuno convalida un <b>proprio</b> compito: serve un altro admin o un Supervisor (unica eccezione: un solo admin e nessun Supervisor).',
     '🛒 Anche <b>chi va a fare la spesa</b> si decide da qui; la Lista della spesa serve per articoli, spunte e rimborsi.',
     !ptMaster() ? '⚠️ Sistema punti disattivato: i compiti sono bloccati.' : ''])}
     ${sez('⭐ Punti Collega Modello', [
@@ -1711,9 +1713,9 @@ function cpRiga(m, me){
     az = mio ? `<button class="btn sm green" id="btn-cp-fatto-${m.id}" data-act="cp-fatto" data-id="${m.id}">✅ Ho fatto!</button>` : '<span class="pill amber">da svolgere</span>';
     if(st.isAdmin) az += ` <button class="btn link" style="padding:0;color:var(--mut)" id="btn-cp-annulla-${m.id}" data-act="cp-annulla" data-id="${m.id}">Annulla</button>`;
   } else if(m.stato === 'attesa'){
-    az = st.isAdmin
+    az = cpPuoConv(m)
       ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata" aria-label="Rifiuta">✕</button><button class="btn sm green" id="btn-cp-ok-${m.id}" data-act="esito" data-id="${m.id}" data-v="confermata">Convalida</button></div>`
-      : '<span class="pill violet">in attesa di convalida</span>';
+            : `<span class="pill violet">${mio ? 'in attesa di un altro admin o Supervisor' : 'in attesa di convalida'}</span>`;
   }
   return `<div class="li" id="cp-inc-${m.id}"><div class="av">🎯</div>
     <div class="grow"><div class="t" style="white-space:normal;font-weight:700">${esc(m.nome || 'Compito')} · <b>${chi(m.mid)}</b>${mio ? ' <span class="pill violet">tu</span>' : ''}</div>
@@ -1748,10 +1750,11 @@ function pCompiti(d){
   const occupato = id => aperti.some(m => m.cp === id);
   const link = nSp ? `<button class="avv amber" id="cp-spesa-link" data-act="go" data-p="spesa"><div class="avv-t">🛒 ${nSp} ${nSp === 1 ? 'articolo' : 'articoli'} da comprare in lista</div><div class="avv-m">Apri la Lista della spesa →</div></button>` : '';
   return `<h2>${ic('brush')} Compiti di oggi</h2><p class="sub" style="margin-bottom:12px">Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: un admin convalida e i punti arrivano.</p>
-  ${avvisoPuntiOff()}${link}
+  ${avvisoPuntiOff()}${bannerSup()}${link}
   <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo</h3>
     ${cat.length ? cat.map(c => `<button class="btn amber block" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left" id="btn-cp-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) ? '' : 'disabled'}><span>🎯 ${esc(c.nome)}</span><span class="mono">${occupato(c.id) ? 'in corso' : '+' + c.pt + ' pt'}</span></button>`).join('')
       : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato dagli amministratori.' : 'Sistema punti disattivato: i compiti sono bloccati.'}${st.isAdmin && ptMaster() ? ' Puoi crearli da Amministrazione › 🎯 Compiti.' : ''}</p>`}
+    ${ptMaster() && (st.isAdmin || isSup()) ? `<button class="btn block" id="btn-cp-nuovo-rapido" data-act="cp-nuovo" style="margin-top:4px" ${cpLista().length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>` : ''}
   </div>
   <div class="card" id="cp-incarichi"><h3>📋 Incarichi in corso ${aperti.length ? `<span class="pill violet">${aperti.length}</span>` : ''}</h3>
     ${aperti.length ? `<div class="list">${aperti.map(m => cpRiga(m, me)).join('')}</div>` : '<div class="empty" id="cp-nessuno">Nessun incarico in corso.</div>'}
@@ -3186,6 +3189,59 @@ A['cp-annulla'] = ds => {
   C('movimenti').doc(m.id).update({stato: 'annullata', esitoDa: myName(), esitoTs: TS()}).then(() => toast('Incarico annullato')).catch(e => toast(errMsg(e), 'err'));
 };
 A['cp-sc'] = ds => { if(cpAperte.has(ds.id)) cpAperte.delete(ds.id); else cpAperte.add(ds.id); render(); };
+
+/* --- Supervisor: colleghi delegati dagli admin (lista «supervisori» nel gruppo, senza scadenza) a convalidare i compiti e crearne di nuovi --- */
+const supervisoriIds = () => { const v = st.gruppo && st.gruppo.supervisori; return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; };
+const supervisori = () => membriAttivi().filter(m => supervisoriIds().includes(m.id));
+const isSup = () => !!st.mid && supervisoriIds().includes(st.mid);
+const cpSoloAdmin = () => st.isAdmin && supervisoriIds().length === 0 && (st.admins || []).length <= 1;   // unico admin e nessun Supervisor: può chiudere anche un compito proprio
+const cpPuoConv = m => m.stato === 'attesa' && !m._pending && !m._local && (m.mid !== st.mid ? (st.isAdmin || isSup()) : cpSoloAdmin());
+const nCpConv = () => (isSup() && ptMaster()) ? cpAperti().filter(m => m.stato === 'attesa' && m.mid !== st.mid).length : 0;
+const bannerSup = () => { const L = supervisori(); return L.length ? `<div class="banner" id="cp-sup" style="margin-bottom:10px"><div class="grow">🛡️ <b>Supervisor attivi:</b> ${L.map(m => esc(m.nick || m.nome)).join(', ')}<br><span style="font-size:12px" class="mut">Possono convalidare i compiti in assenza degli admin.</span></div></div>` : ''; };
+function cpConvCard(){
+  if(!isSup()) return '';
+  const l = cpAperti().filter(m => m.stato === 'attesa' && m.mid !== st.mid); if(!l.length) return '';
+  return `<div class="card" id="cp-conv"><h3>🛡️ Compiti da convalidare <span class="pill red">${l.length}</span></h3><div class="list">${l.map(m => cpRiga(m, st.mid)).join('')}</div></div>`;
+}
+let soloSent = '';
+function sincronizzaSolo(){   // l'admin tiene aggiornato il flag che le regole usano per l'eccezione «unico admin»
+  if(!st.isAdmin || st.sync !== 'ok' || modeKey !== 'admin' || !st.gruppo || !Array.isArray(st.admins) || !st.admins.length) return;
+  const solo = st.admins.length <= 1;
+  if((st.gruppo.soloAdmin === true) === solo || soloSent === String(solo)) return;
+  soloSent = String(solo); G().update({soloAdmin: solo}).catch(() => { soloSent = ''; });
+}
+A['cp-sup-edit'] = () => {
+  if(!st.isAdmin) return;
+  const att = supervisoriIds();
+  openSheet(`<h3>🛡️ Supervisor</h3><p class="hint" style="margin:0 0 8px">Possono convalidare o rifiutare i compiti e creare nuovi compiti. Nessun accesso a cassa o impostazioni. Restano attivi finché non li togli (massimo 10).</p>
+    <div id="cp-sv-lista" style="max-height:40vh;overflow:auto">${membriAttivi().map(m => `<label class="check"><input type="checkbox" class="cp-sv" value="${m.id}" ${att.includes(m.id) ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(m.nick || m.nome)}</b></label>`).join('')}</div>
+    <div class="grid2"><button class="btn" data-act="sheet-close">Annulla</button><button class="btn amber" id="btn-cp-sup-salva" data-act="cp-sup-salva">Salva</button></div>`);
+};
+A['cp-sup-salva'] = () => {
+  if(!st.isAdmin) return;
+  const mostrati = membriAttivi().map(m => m.id), nuovi = Array.from(document.querySelectorAll('#sheet input.cp-sv')).filter(b => b.checked).map(b => b.value);
+  const ids = supervisoriIds().filter(x => !mostrati.includes(x)).concat(nuovi);
+  if(ids.length > 10) return toast('Massimo 10 Supervisor', 'err');
+  G().update({supervisori: ids}).then(() => { closeSheet(); toast('Supervisor aggiornati'); }).catch(e => toast(errMsg(e), 'err'));
+};
+A['cp-nuovo'] = () => {
+  if(!(st.isAdmin || isSup()) || !ptMaster()) return;
+  openSheet(`<h3>🎯 Nuovo compito</h3>
+    <label class="f"><span>Descrizione</span><input class="in" id="cn-nome" maxlength="40" autofocus></label>
+    <label class="f"><span>Punteggio</span><input class="in mono" id="cn-pt" inputmode="numeric" value="10"></label>
+    <div class="grid2"><button class="btn" data-act="sheet-close">Annulla</button><button class="btn amber" id="btn-cn-salva" data-act="cp-nuovo-salva">Crea</button></div>`);
+};
+A['cp-nuovo-salva'] = () => {
+  if(!(st.isAdmin || isSup())) return;
+  const nome = val('cn-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('cn-pt'))), M = cpMap();
+  if(nome.length < 2) return toast('Scrivi la descrizione', 'err');
+  if(!Number.isInteger(pt) || pt < 0 || pt > 500) return toast('Punteggio non valido (0–500)', 'err');
+  if(Object.keys(M).length >= CP_MAX) return toast('Massimo ' + CP_MAX + ' compiti', 'err');
+  let slot = null; for(let i = 0; i < 20 && !slot; i++) if(!(('sv' + i) in M)) slot = 'sv' + i;
+  if(!slot) return toast('Nessuno spazio libero: chiedi a un admin', 'err');
+  const ord = Math.max(0, ...Object.keys(M).map(k => Number.isInteger(M[k].ord) ? M[k].ord : 0)) + 1;
+  G().update({['compiti.' + slot]: {nome, pt, on: true, ord, esenti: []}}).then(() => { closeSheet(); toast('Compito creato'); }).catch(e => toast(errMsg(e), 'err'));
+};
 /* --- configurazione compiti (admin) --- */
 const cardCompiti = () => {
   const L = cpLista();
@@ -3194,6 +3250,7 @@ const cardCompiti = () => {
     ${L.length ? `<div class="list">${L.map((c, i) => `<div class="li" id="cp-row-${c.id}" style="flex-wrap:wrap;gap:8px"><div class="grow" style="flex-basis:100%"><div class="t">${esc(c.nome)} <span class="pill violet">+${c.pt}</span>${c.on === false ? ' <span class="pill">spento</span>' : ''}</div><div class="d">${c.esenti.length ? c.esenti.length + (c.esenti.length === 1 ? ' collega escluso' : ' colleghi esclusi') : 'Nessuna esclusione'}</div></div>
       <div class="row" style="gap:6px;width:100%;justify-content:flex-end"><button class="btn sm ghost" data-act="cp-su" data-id="${c.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="cp-giu" data-id="${c.id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button>
       <button class="btn sm ghost" data-act="cp-tgl" data-id="${c.id}">${c.on === false ? 'Accendi' : 'Spegni'}</button><button class="btn sm" data-act="cp-edit" data-id="${c.id}">Modifica</button></div></div>`).join('')}</div>` : '<p class="hint" id="cp-cfg-vuoto">Nessun compito configurato.</p>'}
+    <div class="li" id="cp-sup-row" style="flex-wrap:wrap;gap:8px;margin:10px 0"><div class="grow" style="flex-basis:100%"><div class="t">🛡️ Supervisor</div><div class="d">${supervisori().length ? supervisori().map(m => esc(m.nick || m.nome)).join(', ') : 'Nessun Supervisor: solo gli admin convalidano.'}</div></div><div class="row" style="width:100%;justify-content:flex-end"><button class="btn sm" id="btn-cp-sup" data-act="cp-sup-edit">Gestisci</button></div></div>
     <button class="btn amber block" id="btn-cp-nuovo" data-act="cp-edit" data-id="" ${L.length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>
     ${L.length ? '' : `<button class="btn block" id="btn-cp-sugg" data-act="cp-sugg" style="margin-top:8px">Carica compiti suggeriti</button>`}
   </div>`;
@@ -3372,6 +3429,7 @@ A['conferma-storno'] = ds => {
 };
 A['esito'] = ds => {
   const mv = derived().movs.find(x => x.id === ds.id);
+  if(mv && mv.tipo === 'compito' && !cpPuoConv(mv)) return toast('Non puoi convalidare questo compito', 'err');
   C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesaE()} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
 };
@@ -3808,7 +3866,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v8';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v9';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
@@ -4436,6 +4494,8 @@ function avvisiHome(){
     h += `<button class="avv violet" id="avviso-sondaggio" data-act="sond-apri"><div class="avv-t">🗳️ ${so.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'} · ${v ? (so.tipo === 'scelta' ? 'hai risposto · vedi i risultati' : 'risposta inviata') : 'tocca per rispondere (anonimo)'}</div><div class="avv-m">${esc(so.domanda)}</div></button>`;
   }
   auto.forEach((t, i) => { h += `<div class="avv green" id="avviso-auto-${i}" role="status"><div class="avv-m">${t}</div></div>`; });
+  const nc = nCpConv();   // promemoria al Supervisor: compiti svolti da convalidare
+  if(nc) h += `<button class="avv violet" id="avviso-conv" data-act="go" data-p="notifiche"><div class="avv-t">🛡️ ${nc === 1 ? '1 compito da convalidare' : nc + ' compiti da convalidare'}</div><div class="avv-m"><b>Apri le Notifiche →</b></div></button>`;
   const mc = cpMiei();   // promemoria: compiti assegnati a me e ancora da svolgere
   if(mc.length) h += `<button class="avv amber" id="avviso-compiti" data-act="go" data-p="compiti"><div class="avv-t">🎯 ${mc.length === 1 ? 'Hai un compito da svolgere' : 'Hai ' + mc.length + ' compiti da svolgere'}</div><div class="avv-m">${mc.map(m => esc(m.nome || 'Compito')).join('<br>')}<br><b>Quando hai finito premi «Ho fatto!» →</b></div></button>`;
   return h;
