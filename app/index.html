@@ -127,19 +127,9 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .perla q{display:block;font-size:15.5px;font-weight:600;line-height:1.4;quotes:'«' '»';word-break:break-word}
 .gbtn .em{font-size:34px;line-height:1}
 .gbtn.adm{border-color:rgba(167,139,250,.38);background:linear-gradient(135deg,rgba(245,165,36,.13),rgba(124,58,237,.16))}
-body.adm header{border-bottom:2px solid var(--violet)}
 .tbw{position:relative;display:inline-flex}
 .tb{position:absolute;top:-5px;right:-9px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
 .tb.tbi{position:static;display:inline-flex;margin-left:6px;vertical-align:middle}
-.atabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:14px 0 12px;padding:4px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
-.atabs button{position:relative;padding:8px 1px;border-radius:12px;font-weight:700;font-size:10.5px;color:var(--tx2);display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1}
-.atabs button>span:first-child{font-size:17px}
-.atabs button.on{background:rgba(124,58,237,.18);color:#c4b5fd;box-shadow:inset 0 0 0 1px var(--violet)}
-.atabs .tb{top:2px;right:6px}
-.swbar{display:flex;gap:6px;margin-bottom:12px;padding:4px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
-.swbar button{flex:1;padding:10px 6px;border-radius:12px;font-weight:700;font-size:12.5px;color:var(--tx2)}
-.swbar button.on{background:var(--card2);color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
-.swbar button.on.adm{color:#c4b5fd;box-shadow:inset 0 0 0 1px var(--violet);background:rgba(124,58,237,.18)}
 .sbadge{padding:6px 11px;border-radius:99px;font-weight:800;font-size:13px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap;border:1px solid transparent}
 .sbadge.pos{background:rgba(16,185,129,.14);color:var(--green);border-color:rgba(16,185,129,.35)}
 .sbadge.neg{background:rgba(251,113,133,.14);color:var(--red);border-color:rgba(251,113,133,.35)}
@@ -456,7 +446,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.38.0';
+const VERSION = '1.39.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -538,7 +528,7 @@ function errMsg(e){
 
 /* ---------- stato ---------- */
 const st = {
-  page: LS.get('page','bar'), vista: LS.get('vista','admin'), buste: [], uid: null, gid: LS.get('gid', null), mid: LS.get('mid', null),
+  page: LS.get('page','bar'), buste: [], uid: null, gid: LS.get('gid', null), mid: LS.get('mid', null),
   gruppo: null, membri: [], prodotti: [], eventi: [], chiusure: [], movimenti: [], pending: {},
   admins: [], utenti: [], isAdmin: false,
   ready: {}, sync: 'conn', syncErr: '', entry: null, busy: false,
@@ -964,7 +954,7 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
 const PAGES = {
   bar:['Bar','coffee'], feed:['Feed movimenti','activity'], compiti:['Compiti di oggi','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
-  regolamento:['Regolamento','receipt'], membri:['Colleghi','users'], statistiche:['Classifica e statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
+  regolamento:['Regolamento','receipt'], membri:['Soci & Ruoli','users'], statistiche:['Classifica e statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
 
 // Modello prepagato: la quota non genera piu' addebiti sul saldo. Resta la funzione (vuota) per i punti di chiamata.
@@ -1012,18 +1002,15 @@ function doRender(){
   $('hdr-sub').textContent = st.sync === 'err' ? 'Errore: ' + st.syncErr : st.sync === 'off' ? 'Offline · si sincronizza dopo' : st.sync === 'ok' ? (st.gruppo.nome || 'Saletta') : 'Collegamento…';
   if(!pagineConsentite().includes(st.page)) st.page = 'bar';
   if(st.page === 'statistiche'){ st.page = 'classifiche'; st.clMod = 'stat'; }
-  const av = adminView();
-  document.body.classList.toggle('adm', av);
   const cn = contatori(d);
-  $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(av ? 'Amministrazione' : nomeBreve(st.mid))}`;
-  const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos') + (av ? ' hidden' : ''); sb.textContent = eurS(s); sb.dataset.p = av ? 'registro' : 'crediti'; sb.setAttribute('aria-label', av ? 'Saldo' : 'Saldo: tocca per ricaricare');
-  aggiornaPillola(d, av);
+  $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(nomeBreve(st.mid))}`;
+  const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos'); sb.textContent = eurS(s); sb.dataset.p = 'crediti'; sb.setAttribute('aria-label', 'Saldo: tocca per ricaricare');
+  aggiornaPillola(d, false);
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
   $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden');
   const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
-  const nb = av ? cn.fondo : cn.pers;
-  if(av) tabs.splice(0, tabs.length, ['bar','Home','coffee'],['registro','Cassa e registro','receipt'],['notifiche','Inbox','bell'],['classifiche','Classifica e statistiche','chart']);
+  const nb = cn.tot;
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
@@ -1031,10 +1018,8 @@ function doRender(){
   renderDrawer();
 
   const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, compiti:pCompiti, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
-  main.classList.remove('wide'); main.dataset.p = (st.page === 'bar' && !av) ? 'bar' : st.page;
-  const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
-  const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
-  main.innerHTML = sw + fn(d);
+  main.classList.remove('wide'); main.dataset.p = st.page;
+  main.innerHTML = fn(d);
   restore();
   rimettiScroll();
   perleSync();
@@ -1048,10 +1033,12 @@ function renderDrawer(){
       <div class="grow" style="flex:1"><b>${esc(st.gruppo.nome || 'Saletta')}</b><div class="mut" style="font-size:12px">${esc(myName())}${st.isAdmin ? ' · amministratore' : ''}</div></div>
       <button class="iconbtn" data-act="drawer-close">${ic('x')}</button>
     </div>
-    ${adminView() ? `<button class="nb ${st.page==='regole'?'on':''}" data-act="go" data-p="regole">${ic('sparkles')}⚙️ Regole punti &amp; premi</button>
+    ${st.isAdmin ? `<div class="mut" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px 2px">🛡️ Amministrazione</div>
+    <button class="nb ${st.page==='membri'?'on':''}" id="nb-soci" data-act="go" data-p="membri">${ic('users')}👥 Soci &amp; Ruoli</button>
+    <button class="nb ${st.page==='regole'?'on':''}" data-act="go" data-p="regole">${ic('sparkles')}⚙️ Regole punti &amp; premi</button>
     <button class="nb ${st.page==='backup'?'on':''}" data-act="go" data-p="backup">${ic('download')}Backup &amp; Ripristino</button>
-    <button class="nb ${st.page==='chiusura'?'on':''}" data-act="go" data-p="chiusura">${ic('archive')}Chiusura Periodo</button>` : ''}
-    <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}${adminView() ? 'Impostazioni &amp; PIN' : 'Impostazioni'}</button>
+    <button class="nb ${st.page==='chiusura'?'on':''}" data-act="go" data-p="chiusura">${ic('archive')}📦 Chiusura periodo</button><div class="sep"></div>` : ''}
+    <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}${st.isAdmin ? 'Impostazioni &amp; PIN' : 'Impostazioni'}</button>
     <button class="nb ${st.page==='regolamento'?'on':''}" data-act="go" data-p="regolamento">${ic('receipt')}Regolamento</button>
     <button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>
     <button class="nb" data-act="info">${ic('info')}Info</button>
@@ -1062,9 +1049,8 @@ function renderDrawer(){
 const SALETTA_SUB = ['saletta','eventi','inventario','gioco','ruota','perle','spesa'];
 const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','compiti','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADMIN = ['regole','bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','statistiche','cassa','feed','compiti','impostazioni','regolamento'];
-const adminView = () => st.isAdmin && st.vista === 'admin';
-const pagineConsentite = () => !st.isAdmin ? PAGINE_COLLEGA : adminView() ? PAGINE_ADMIN : PAGINE_UTENTE;
+const PAGINE_ADM = PAGINE_UTENTE.concat(['regole','backup','chiusura','membri','quote','statistiche','cassa','feed','admin']);
+const pagineConsentite = () => st.isAdmin ? PAGINE_ADM : PAGINE_COLLEGA;
 
 /* ---------- installazione dell'app (PWA) ----------
    Browser e app installata conservano i dati separati: chi si registra dal browser e poi installa
@@ -1260,7 +1246,6 @@ function entryPinGate(){
 
 /* ---------- pagina BAR ---------- */
 function pBar(d){
-  if(adminView()) return pAdminHome(d);
   const s = d.S.saldi[st.mid] || 0;
   const g = st.gruppo, pc = g.prezzoCaffe || 0, q = st.caffeQta;
   const mie = d.pendenti.filter(m => m.mid === st.mid && m.tipo !== 'compito');
@@ -1272,6 +1257,7 @@ function pBar(d){
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
   const scRic = scambiPerMe(d).length;
   return `
+  ${st.isAdmin ? strumentiAdmin() : ''}
   ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
   ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un amministratore: la registrerà lui.</div></div>` : ''}
   <div class="card" style="text-align:center">
@@ -1339,15 +1325,13 @@ function contatori(d){
   const sc = scambiPerMe(d).length;
   const pers = notifiche(d).filter(n => n.t > seen).length + sc + nCpConv();
   const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + recuperiNuovi().length + sc : 0;
-  return {pers, fondo};
+  return {pers, fondo, tot: st.isAdmin ? fondo + pers - sc - nCpConv() : pers};
 }
 function pNotifiche(d){
-  if(adminView()){
-    return scambiRicevuti(d) + pAdminHome(d, 'inbox');
-  }
   const list = notifiche(d), seen = notifSeen();
-  return `<h2>${ic('bell')} Notifiche</h2><p class="sub">Richieste da gestire ed esiti che ti riguardano.</p>
-  ${cpConvCard()}${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
+  const daApp = st.isAdmin ? `<div class="card" id="da-approvare" style="padding-bottom:4px"><h3><span>🛡️ Da approvare</span></h3>${inboxAdmin(d)}</div>` : '';
+  return `<h2>${ic('bell')} Notifiche</h2><p class="sub">${st.isAdmin ? 'Richieste da approvare e notifiche che ti riguardano.' : 'Richieste da gestire ed esiti che ti riguardano.'}</p>
+  ${daApp}${st.isAdmin ? '' : cpConvCard()}${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
   ${storicoRichieste(d)}
   <div class="card"><h3><span>Esiti e accrediti</span><button class="btn link" data-act="notif-letti">Segna tutte come lette</button></h3>
     ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>`;
@@ -1397,61 +1381,13 @@ function tesoro(d){
   Object.keys(d.S.saldi).forEach(k => { const v = d.S.saldi[k] || 0; if(v > 0) cred += v; else deb += -v; });
   return {cassa, cont: c.contanti || 0, rev: c.revolut || 0, cred, deb, netto: cassa - cred + deb};
 }
-const ADM_TABS = [['inbox','📥','Inbox'],['cassa','💶','Cassa'],['soci','👥','Soci']];
-/* scheda attiva dell'Amministrazione: all'apertura Inbox se ci sono richieste, altrimenti l'ultima usata */
-function admTabCur(d){
-  const ok = k => ADM_TABS.some(x => x[0] === k);
-  if(!st.admTab){
-    const ult = LS.get('admTab');
-    if(!st.ready.mv) return ok(ult) ? ult : 'cassa';   // dati non ancora pronti: non fisso la scelta
-    st.admTab = contatori(d).fondo > 0 ? 'inbox' : (ok(ult) ? ult : 'cassa');
-  }
-  return st.admTab;
-}
-function pAdminHome(d, forza){
-  const t = tesoro(d), tab = forza || admTabCur(d), cn = contatori(d);
-  const soci = membriAttivi().slice().sort((a, b) => a.nome.localeCompare(b.nome));
-  const a = anno(), qPag = soci.filter(m => statoQuota(d, m.id, a) === 'pagata').length;
-  const tabs = `<div class="atabs" role="tablist">${ADM_TABS.map(([k, e, l]) => `<button role="tab" aria-selected="${tab === k}" class="${tab === k ? 'on' : ''}" id="atab-${k}" data-act="adm-tab" data-v="${k}"><span>${e}</span>${l}${k === 'inbox' && cn.fondo ? `<span class="tb">${cn.fondo}</span>` : ''}</button>`).join('')}</div>`;
-  const inbox = `${inboxAdmin(d)}${storicoRichieste(d)}`;
-  const cassa = `<button class="card rvsw ${revolutOn() ? 'on' : ''}" id="sw-revolut" role="switch" aria-checked="${revolutOn()}" data-act="revolut-toggle" style="margin-bottom:10px"><span class="trk"></span><span class="grow"><b>Canale Revolut ${revolutOn() ? 'attivo' : 'sospeso'}</b><span class="mut" style="display:block;font-size:12px;margin-top:2px">${revolutOn() ? 'I colleghi possono scegliere Revolut per ricariche e riscatti.' : 'Ricariche e riscatti dei colleghi solo in contanti. Il saldo Revolut resta com\'è.'}</span></span></button>
-  <div class="grid2" style="margin-bottom:8px">
-    <button class="btn green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Registra entrata</button>
-    <button class="btn red" data-act="cassa-op" data-v="uscita">${ic('out','s')} Registra uscita</button>
-    <button class="btn" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button>
-    <button class="btn amber" data-act="cassa-corr">${ic('edit','s')} Correggi saldo</button>
-  </div>
-  <button class="btn sm block ghost" style="margin-bottom:8px" data-act="spesa-admin">${ic('receipt','s')} Registra spesa</button>
-  <button class="btn sm block ghost" data-act="go" data-p="registro">${ic('receipt','s')} Registro dei movimenti di cassa (con storno)</button>`;
-  const sociT = `<button class="card between" style="width:100%;text-align:left" data-act="go" data-p="quote"><span>${ic('wallet','s')} <b>Quote fondo ${a}</b></span><span class="pill ${qPag === soci.length ? 'green' : 'amber'}">${qPag} su ${soci.length} pagate</span></button>
-  <div class="card">${cercaBox('soci-lista')}<div class="list" id="soci-lista">${soci.map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
-      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">⭐ ${ptDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
-      <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>${cercaVuoto('soci-lista')}
-    <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button><button class="btn sm ghost" data-act="go" data-p="membri">${ic('users','s')} Tutti i colleghi</button></div>
-  </div>
-  <button class="btn amber block big" id="adm-classifiche" data-act="go" data-p="classifiche" style="margin-top:10px">📊 Classifica e statistiche</button>`;
-
-  return `${bannerBackup()}${avvisiHome()}${avvisoAdminBtn()}
-  <div class="card tesoro">
-    <div class="between"><small class="mut">Saldo Disponibile del Fondo (Cassa Totale)</small>${d.pendenti.length ? `<button class="pill red" style="border:0" data-act="adm-tab" data-v="inbox">${d.pendenti.length} in attesa</button>` : ''}</div>
-    <div class="big mono amber" id="t-cassa">${eur(t.cassa)}</div>
-    <div class="list" style="margin:6px 0 12px">
-      <div class="between" style="font-size:14px;padding:4px 0"><span>Saldo in contanti</span><b class="mono" id="t-cont">${eur(t.cont)}</b></div>
-      <div class="between" style="font-size:14px;padding:4px 0"><span>Saldo sul conto (Revolut)</span><b class="mono" id="t-rev">${eur(t.rev)}</b></div>
-    </div>
-    <div class="between"><small class="mut">Fondo Netto</small><b class="mono ${t.netto < 0 ? 'red' : 'green'}" id="t-netto" style="font-size:20px">${eurS(t.netto)}</b></div>
-    <div class="mut" style="font-size:11.5px;margin-top:4px">cassa ${eur(t.cassa)} − crediti dei colleghi ${eur(t.cred)} + debiti dei colleghi ${eur(t.deb)}</div>
-  </div>${tabs}
-  <div role="tabpanel" id="atab-pannello">${tab === 'inbox' ? inbox : tab === 'cassa' ? cassa : tab === 'soci' ? sociT : cassa}</div>`;
-}
-
 /* ---------- registro movimenti, notifiche ---------- */
 const tms = x => x && x.toMillis ? x.toMillis() : (typeof x === 'number' ? x : 0);
 function saldoDisp(d){ const s = d.S.saldi[st.mid] || 0; return s > 0 ? creditoLibero() : s; }
 function pRegistro(d){ return pFeed(d); }
 /* storico delle richieste gia' decise (accettate, rifiutate, annullate): solo dati gia' in memoria, nessuna lettura in piu' */
 function storicoRichieste(d){
-  const me = st.mid, adm = adminView(), N = st.storicoN || 30;
+  const me = st.mid, adm = st.isAdmin, N = st.storicoN || 30;
   const src = (adm && st.arcMov ? st.arcMov : []).concat(d.movs);
   const st_ = new Set(src.filter(m => m.tipo === 'storno').map(m => m.rif));
   const list = src.filter(m => ['spesa', 'ricarica', 'riscatto', 'scambio'].includes(m.tipo) && ['confermata', 'rifiutata', 'annullata'].includes(m.stato) && (adm || [m.mid, m.dest, m.daMid, m.aMid].includes(me)))
@@ -1559,13 +1495,13 @@ function descMov(m){
     case 'scambio': return m.aMid === m.mid
       ? {ic:'🤝', t: `${esc(nomeM(m.aMid))} compra ${eur(m.importo)} di crediti da ${esc(nomeM(m.daMid))} (paga fuori dall'app)`, a: 0, neutro: m.importo}
       : {ic:'🔄', t: `${esc(nomeM(m.daMid))} vende ${eur(m.importo)} di crediti a ${esc(nomeM(m.aMid))}${m.causale ? ': ' + esc(m.causale) : ''}`, a: 0, neutro: m.importo};
-    case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = !adminView();
+    case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = true;
       return {ic: m.trasf ? '🤝' : '🎁', t: `${esc(nomeM(m.daMid))} ${m.trasf ? 'ha ceduto (scambio)' : 'ha regalato'} ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
     case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`, a: 0};
     case 'bonus_podio': return {ic:['🥇','🥈','🥉'][(m.pos || 1) - 1] || '🏅', t: `Podio del mese ${esc(m.mese || '')}: ${n} (${m.pos || '?'}° posto, +${m.punti || 0} punti)`, a: 0};
     case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti * fx(m)} Punti Collega Modello`, a: m.importo};
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · ${m.stato === 'attesa' ? 'richiesto al Fondo' : 'pagato dalla cassa'} (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
-    case 'spesa': { const mx = spesaMista(m); return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${mx ? 'rimborso misto (' + mx + ')' : m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(mx ? (adminView() ? {a: -m.quotaDenaro} : {a: m.quotaCrediti}) : m.fonte === 'tasca' ? {a: m.importo} : adminView() ? {a: -m.importo} : {a: 0, neutro: m.importo}), cassa: mx ? true : m.fonte !== 'tasca'}; }
+    case 'spesa': { const mx = spesaMista(m); return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${mx ? 'rimborso misto (' + mx + ')' : m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(mx ? {a: m.quotaCrediti} : m.fonte === 'tasca' ? {a: m.importo} : {a: 0, neutro: m.importo}), cassa: mx ? true : m.fonte !== 'tasca'}; }
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
     case 'entrata': return {ic:'📥', t: `Entrata: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: m.importo, cassa: true};
     case 'giroconto': return {ic:'🔁', t: `Giroconto ${FONTI[m.da]} → ${FONTI[m.a]}`, a: 0, neutro: m.importo, cassa: true};
@@ -1654,7 +1590,7 @@ function feedLista(d){
     list = list.filter(m => [m.mid, m.dest, m.daMid, m.aMid, ...(m.mids || []), m.orig && m.orig.mid].some(hit) || txt(m).includes(nq));
   }
   const info = q ? `${list.length} ${list.length === 1 ? 'movimento' : 'movimenti'} per «${esc(st.feedQ.trim())}»` : (adm ? `${list.length} ${list.length === 1 ? 'movimento' : 'movimenti'} · ${esc(rp.label)}` : '');
-  return (info ? `<div class="mut" style="font-size:12px;margin:0 0 8px">${info}</div>` : '') + (list.length ? righeMov(list.slice(0, 300), d, {noAct: adm && !adminView()}) : '<div class="empty">Nessun movimento nel periodo scelto.</div>');
+  return (info ? `<div class="mut" style="font-size:12px;margin:0 0 8px">${info}</div>` : '') + (list.length ? righeMov(list.slice(0, 300), d) : '<div class="empty">Nessun movimento nel periodo scelto.</div>');
 }
 /* entrate/uscite di cassa del periodo dai movimenti gia' in memoria (storni inclusi) */
 function cassaRange(r){
@@ -1699,6 +1635,13 @@ function pFeed(d){
       <div class="stat"><small>📥 Entrate del periodo</small><b class="mono green" id="cd-in">${eur(C.inC + C.inR)}</b><small>Contanti ${eur(C.inC)} · Revolut ${eur(C.inR)}</small></div>
       <div class="stat"><small>📤 Uscite del periodo</small><b class="mono red" id="cd-out">${eur(uscTot)}</b><small>Spese ${eur(C.spese)} · Uscite ${eur(C.uscite)} · Riscatti ${eur(C.risc)}</small></div>
       <div class="stat cd-wide"><small>🧾 Totale pagato</small><b class="mono amber" id="cd-pagato">${eur(consumiRange(r).tot)}</b><small>Caffè e snack pagati dai colleghi nel periodo</small></div></div>
+    <div class="grid3 cd-tes" id="cd-tesoreria" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+      <button class="btn green" id="btn-cassa-entrata" data-act="cassa-op" data-v="entrata">${ic('in','s')} Entrata cassa</button>
+      <button class="btn red" id="btn-cassa-uscita" data-act="cassa-op" data-v="uscita">${ic('out','s')} Uscita cassa</button>
+      <button class="btn" id="btn-cassa-giro" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>
+    <div class="grid2" style="gap:8px;margin-bottom:8px">
+      <button class="btn sm ghost rvsw ${revolutOn() ? 'on' : ''}" id="sw-revolut" role="switch" aria-checked="${revolutOn()}" data-act="revolut-toggle" title="${revolutOn() ? 'I colleghi possono scegliere Revolut per ricariche e riscatti' : 'Ricariche e riscatti dei colleghi solo in contanti'}">📱 Canale Revolut: <b>${revolutOn() ? 'attivo' : 'sospeso'}</b></button>
+      <button class="btn sm ghost" id="btn-cassa-corr" data-act="cassa-corr">${ic('edit','s')} Correggi saldo cassa</button></div>
     ${hintArc(r)}
     ${infoBtn(`Entrate: ricariche convalidate, quote versate, entrate di cassa e caffè pagati subito. Uscite: spese convalidate (anche quelle anticipate e rimborsate), uscite di cassa e riscatti pagati. I giroconti tra contanti e Revolut non contano. Giacenza e fondo netto sono sempre lo stato di adesso. Gli storni correggono i totali.`, 'Come funziona')}
     <button class="btn block ghost" style="margin-top:8px" data-act="rendiconto">${ic('share','s')} Condividi rendiconto di cassa (immagine)</button></div>`;
@@ -1765,7 +1708,7 @@ function pRegolamento(){
     `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
   ${sez('🔑 Ruoli', [
     '<b>Collega:</b> registra consumi, spese, ricariche e regali; svolge i compiti assegnati; riceve notifiche personali.',
-    '<b>Amministratore:</b> conferma ricariche, spese e riscatti; gestisce inventario (dalla pagina Inventario), listino, cassa, regole punti, storni e chiusure.',
+    '<b>Amministratore:</b> usa le stesse schermate di tutti, con in più i controlli operativi: «Da approvare» nelle Notifiche, tasti di tesoreria e Storna in Cassa e registro, modifica di listino e scorte in Inventario, «Strumenti admin» in Home. Dal menu ☰ gestisce Soci &amp; Ruoli, Regole punti &amp; premi, Backup e Chiusura periodo.',
     '<b>Creatore:</b> non può essere revocato. Il gruppo tiene almeno due admin.',
     'Solo gli admin cambiano regole e parametri.'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
@@ -1858,7 +1801,7 @@ const EV_TIPI = {
 const evTipo = t => EV_TIPI[t] || EV_TIPI.altro;
 function giorniA(iso){ const [y,m,d] = iso.split('-').map(Number); const t = new Date(y, m-1, d), o = new Date(); o.setHours(0,0,0,0); return Math.round((t - o) / 86400000); }
 const backHome = () => `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="bar">← Home</button>`;
-const backSaletta = () => adminView() ? '' : `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="saletta">← Saletta</button>`;
+const backSaletta = () => `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="saletta">← Saletta</button>`;
 /* lista della spesa: articoli ancora da comprare (badge su pulsanti e schede) */
 const nSpesa = () => (st.listaSpesa || []).filter(x => x.stato === 'da_comprare').length;
 const badgeSpesa = () => nSpesa() ? `<span class="tb tbi" id="badge-spesa">${nSpesa()}</span>` : '';
@@ -2625,11 +2568,16 @@ function labelChiusura(c){
 
 /* ---------- COLLEGHI (elenco membri) ---------- */
 function pMembri(d){
-  return `<h2>${ic('users')} Colleghi ${infoBtn(`Tutti i membri del gruppo. Tocca un nome per modificarlo, accreditare, nominarlo amministratore o archiviarlo.`)}</h2>
-  <div class="card"><h3><span>Colleghi</span><button class="btn link" data-act="membro" data-id="">${ic('plus','s')} Aggiungi</button></h3>
-    ${cercaBox('mb-lista')}<div class="list" id="mb-lista">${membriAttivi().map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
-      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t ${m.attivo === false ? 'strike' : ''}">${esc(m.nome)}</div><div class="d">${m.nick ? '“' + esc(m.nick) + '” · ' : ''}${m.attivo === false ? 'non attivo' : st.utenti.filter(u => u.mid === m.id).length + ' telefono/i'}${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''}</div></div>
+  const a = anno(), att = membriAttivi().slice().sort((x, y) => x.nome.localeCompare(y.nome, 'it')), qOn = (st.gruppo.quotaAnnua || 0) > 0;
+  const qPag = att.filter(m => statoQuota(d, m.id, a) === 'pagata').length;
+  const qPill = m => !qOn ? '' : statoQuota(d, m.id, a) === 'pagata' ? '<span class="pill green">quota ✓</span>' : '<span class="pill amber">quota da pagare</span>';
+  return `<h2>${ic('users')} Soci &amp; Ruoli ${infoBtn(`Elenco dei colleghi con saldo e stato della quota annuale. Tocca un nome per accreditare un regalo/omaggio (senza toccare la cassa), rettificare saldo o punti, incassare la quota, nominare o revocare un amministratore, archiviare o ripristinare, resettare il PIN.`)}</h2>
+  ${qOn ? `<button class="card between" id="soci-quote" style="width:100%;text-align:left" data-act="go" data-p="quote"><span>${ic('wallet','s')} <b>Quote fondo ${a}</b></span><span class="pill ${qPag === att.length ? 'green' : 'amber'}">${qPag} su ${att.length} pagate</span></button>` : ''}
+  <div class="card"><h3><span>Soci</span><button class="btn link" data-act="membro" data-id="">${ic('plus','s')} Aggiungi</button></h3>
+    ${cercaBox('mb-lista')}<div class="list" id="mb-lista">${att.map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
+      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">${m.nick ? '“' + esc(m.nick) + '” · ' : ''}⭐ ${ptDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''} ${qPill(m)}</div></div>
       <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>${cercaVuoto('mb-lista')}
+    <button class="btn sm ghost block" style="margin-top:8px" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button>
     ${st.membri.some(m => m.attivo === false) ? `<details style="margin-top:8px"><summary class="mut" style="cursor:pointer;font-size:12.5px;padding:6px 2px">Archiviati ed espulsi (${st.membri.filter(m => m.attivo === false).length})</summary>
       <div class="list">${st.membri.filter(m => m.attivo === false).map(m => `<button class="li" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
         <div class="av">${ic(m.espulso ? 'logout' : 'archive','s')}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d">${m.espulso ? 'espulso' : 'archiviato'}</div></div>
@@ -2653,7 +2601,7 @@ const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
     <label class="f"><span>Quota annua €</span><input class="in mono" id="ad-quota" inputmode="decimal" value="${(st.gruppo.quotaAnnua/100).toFixed(2).replace('.',',')}"></label>
     <label class="f"><span>Nome gruppo</span><input class="in" id="ad-nome" value="${esc(st.gruppo.nome||'')}" maxlength="40"></label>
     <button class="btn amber block" data-act="salva-gruppo">Salva</button>
-    ${infoBtn(`Il prezzo del caffè e il listino si gestiscono dalla scheda Magazzino dell'Amministrazione. Le regole dei punti sono nel menu, alla voce Regole Punti e Saletta.`, 'Come funziona')}
+    ${infoBtn(`Il prezzo del caffè e il listino si gestiscono da Saletta → Inventario. Regole punti, soci, backup e chiusura sono nel menu ☰, sezione Amministrazione.`, 'Come funziona')}
   </div>
 `;
 const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['rp-on-bf', 'ptBfOn', '👏 Punti «Ben fatto»']];
@@ -2781,8 +2729,7 @@ A['fab'] = () => { st.fab = !st.fab; render(); };
 A['fab-close'] = () => { st.fab = false; render(); };
 A['fab-go'] = ds => { st.fab = false; render(); A[ds.v]({}); };
 A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render(); };
-A['adm-tab'] = ds => { if(!ADM_TABS.some(x => x[0] === ds.v)) return; st.admTab = ds.v; LS.set('admTab', ds.v); st.page = 'bar'; LS.set('page', 'bar'); render(); };
-A['vista'] = ds => { st.vista = ds.v === 'user' ? 'user' : 'admin'; LS.set('vista', st.vista); st.page = 'bar'; LS.set('page', 'bar'); closeSheet(); window.scrollTo(0,0); render(); };
+
 
 
 A['drawer'] = () => { $('drawer').classList.add('on'); $('drawer-ov').classList.add('on'); };
@@ -4757,9 +4704,10 @@ function avvisiHome(){
   return h;
 }
 const scadPill = o => !o.scad ? '<span class="pill green">attivo</span>' : o.scad < Date.now() ? '<span class="pill red">Scaduto</span>' : `<span class="pill green">attivo fino al ${dataOra(o.scad)}</span>`;
+const strumentiAdmin = () => bannerBackup() + avvisoAdminBtn();
 const avvisoAdminBtn = () => {
   const av = st.gruppo.avviso, so = st.gruppo.sondaggio, tr = (t, n) => esc(t.length > n ? t.slice(0, n - 1) + '…' : t);
-  return `<div class="card" id="com-admin"><h3>📢 Comunicazioni in Home</h3><div class="list">
+  return `<div class="card" id="com-admin"><h3>🛡️ Strumenti admin</h3><div class="list">
     <div class="li"><div class="grow"><div class="t">Avviso</div><div class="d">${av && av.testo ? tr(av.testo, 46) + ' ' + scadPill(av) : 'Nessun avviso'}</div></div>
       <button class="btn sm" id="btn-avviso-nuovo" data-act="avviso-nuovo">${av ? 'Sostituisci' : 'Nuovo'}</button>${av ? `<button class="iconbtn" style="width:32px;height:32px" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>
     <div class="li"><div class="grow"><div class="t">Sondaggio / domanda</div><div class="d">${so && so.domanda ? tr(so.domanda, 46) + ' ' + scadPill(so) : 'Nessun sondaggio'}</div></div>
@@ -5017,7 +4965,7 @@ function indietro(){
   if($('drawer').classList.contains('on')){ A['drawer-close'](); return true; }
   if(!inAppOra()){ if(st.entry){ st.entry = null; render(); return true; } return false; }
   if(st.pinDoc === null || (st.pinDoc && st.pinDoc.temporaneo)) return false;   // schermata bloccante: nessuna navigazione
-  if(st.page !== 'bar'){ A['go']({p: !adminView() && SALETTA_SUB.includes(st.page) && st.page !== 'saletta' ? 'saletta' : 'bar'}); return true; }
+  if(st.page !== 'bar'){ A['go']({p: SALETTA_SUB.includes(st.page) && st.page !== 'saletta' ? 'saletta' : 'bar'}); return true; }
   return false;
 }
 window.addEventListener('popstate', () => {
