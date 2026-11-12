@@ -428,6 +428,7 @@ header.hasprize{padding-bottom:38px}
   <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/></symbol>
   <symbol id="i-brush" viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
@@ -446,12 +447,13 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.39.0';
+const VERSION = '1.40.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
 const SOGLIA_SCORTA = 2;          // giacenza sotto cui un articolo e' "da ricomprare"
 const ANNULLA_MIN = 10;           // minuti per annullare un caffe'/snack preso per sbaglio
+const CHIUSURA_RECENTE_GG = 15, CHIUSURA_MIN_NUOVI = 5;   // sotto questi valori una nuova chiusura chiede una doppia conferma
 const CHIUSURA_MARGINE = 15 * 60000; // i movimenti degli ultimi 15 minuti restano nel periodo aperto
 const ARCHIVIO_CHUNK = 1500;
 const PID_CAFFE = 'caffe';        // articolo speciale: scorta di buste di caffe'
@@ -530,7 +532,7 @@ function errMsg(e){
 const st = {
   page: LS.get('page','bar'), buste: [], uid: null, gid: LS.get('gid', null), mid: LS.get('mid', null),
   gruppo: null, membri: [], prodotti: [], eventi: [], chiusure: [], movimenti: [], pending: {},
-  admins: [], utenti: [], isAdmin: false,
+  admins: [], utenti: [], admDoc: false,
   ready: {}, sync: 'conn', syncErr: '', entry: null, busy: false,
   caffeQta: 1, riscSel: {}, riscMet: 'contanti', invSort: {k:'nome', asc:true}, feedFiltro: 'tutti', statPeriodo: 'corrente', salPer: 'mese', rpPer: 'oggi', rpDa: '', rpA: '', salDa: '', salA: '', scSel: null, listaSpesa: [], spesaSel: {}, arcMov: null, arcLoading: false,
   archivio: null, skipInstall: false, installata: false
@@ -557,6 +559,8 @@ function initFirebase(){
 }
 
 function onErr(e){ console.error(e); st.sync = 'err'; st.syncErr = e.code || e.message; render(); }
+/* st.isAdmin = ha un ruolo di gestione (Supervisor con documento admin, oppure Creatore). Cosa può fare lo dice can(permesso). */
+Object.defineProperty(st, 'isAdmin', {configurable: true, enumerable: true, get(){ return !!st.admDoc || sonoCreatore(); }, set(v){ st.admDoc = !!v; }});
 function setSync(s){
   if(!s || !s.metadata) return;
   st.sync = s.metadata.fromCache ? (navigator.onLine ? 'conn' : 'off') : 'ok';
@@ -581,12 +585,11 @@ function connect(gid){
       if(!s.metadata.fromCache){ toast('Il gruppo non esiste più su questo codice', 'err'); A['esci-gruppo'](true); }
       return;
     }
-    st.gruppo = {id: s.id, ...s.data()}; st.ready.g = true; setSync(s); render();
+    st.gruppo = {id: s.id, ...s.data()}; st.ready.g = true; setSync(s); if(st.ready.a && st.ready.u) syncMode(); render();
   }, onErr));
   unsubs.push(g.collection('richieste').doc(st.uid).onSnapshot(s => {
     st.richiesta = s.exists ? s.data() : null; st.ready.r = true; render();
   }, onErr));
-  unsubs.push(g.collection('richiesteAdmin').doc(st.uid).onSnapshot(s => { st.reqAdmin = s.exists ? s.data() : null; render(); }, () => {}));
   unsubs.push(g.collection('utenti').doc(st.uid).onSnapshot(s => {
     if(s.exists){ st.mid = s.data().mid; LS.set('mid', st.mid); }
     else if(!s.metadata.fromCache){ st.mid = null; LS.del('mid'); }
@@ -595,14 +598,14 @@ function connect(gid){
     render();
   }, onErr));
   unsubs.push(g.collection('admin').doc(st.uid).onSnapshot(s => {
-    const era = st.isAdmin;
-    st.isAdmin = s.exists && !s.metadata.hasPendingWrites ? true : (s.exists && era);
-    if(!s.exists) st.isAdmin = false;
+    const era = st.admDoc;
+    st.admDoc = s.exists && !s.metadata.hasPendingWrites ? true : (s.exists && era);
+    if(!s.exists) st.admDoc = false;
     st.ready.a = true; syncMode(); render();
   }, onErr));
 }
 
-/* Dati riservati: l'amministratore scarica registro, chiusure e anagrafica telefoni;
+/* Dati riservati: il Supervisor scarica registro, chiusure e anagrafica telefoni;
    il collega scarica solo i propri movimenti e il proprio estratto (saldo all'ultima chiusura). */
 let dataUnsubs = [], modeKey = null;
 function stopData(){
@@ -658,7 +661,6 @@ function syncMode(){
     }, onDataErr));
     dataUnsubs.push(C('admin').onSnapshot(s => { st.admins = s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps:'estimate'})})); render(); }, onDataErr));
     dataUnsubs.push(C('utenti').onSnapshot(s => { st.utenti = s.docs.map(d => ({id: d.id, ...d.data()})); render(); }, onDataErr));
-    dataUnsubs.push(C('richiesteAdmin').onSnapshot(s => { st.richAdmin = s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps:'estimate'})})).filter(r => r.stato === 'attesa'); render(); }, onDataErr));
     dataUnsubs.push(C('richieste').onSnapshot(s => { st.richieste = s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps:'estimate'})})).filter(r => r.stato === 'attesa'); render(); }, onDataErr));
   } else if(st.mid){
     const mid = st.mid;
@@ -729,7 +731,7 @@ function applyMov(S, m, sg){
     case 'quota':
       S.quote[m.anno] = S.quote[m.anno] || {}; add(S.quote[m.anno], m.mid, sg);
       if(typeof m.cred === 'boolean'){
-        // modello prepagato: la quota e' un contributo al fondo; i crediti si accreditano solo se l'admin lo sceglie (cred)
+        // modello prepagato: la quota e' un contributo al fondo; i crediti si accreditano solo se il Supervisor lo sceglie (cred)
         if(m.metodo === 'contanti' || m.metodo === 'revolut') add(S.cassa, m.metodo, sg*m.importo);
         if(m.cred) add(S.saldi, m.mid, sg*m.importo);
       } else if(m.metodo === 'contanti' || m.metodo === 'revolut'){ add(S.saldi, m.mid, sg*m.importo); add(S.cassa, m.metodo, sg*m.importo); }
@@ -752,7 +754,7 @@ function applyMov(S, m, sg){
     case 'punti_adj': add(m.kind === 'caffe' ? S.pcaf : S.punti, m.mid, sg*m.punti*fx(m)); break;
     case 'pulizia': (m.mids || []).forEach(x => { add(S.turni, x, sg); add(S.punti, x, sg*ptPulM(m)); if(sg > 0) S.ultimo[x] = Math.max(S.ultimo[x] || 0, m.giorno ? new Date(m.giorno + 'T12:00:00').getTime() : (m.t || 0)); }); break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(S.turni, m.mid, sg); add(S.punti, m.mid, sg*(m.punti || 0)); if(sg > 0) S.ultimo[m.mid] = Math.max(S.ultimo[m.mid] || 0, m.t || 0); } break;   // il «carico» non assegna nulla: i punti arrivano alla conferma
-    case 'compito': if(m.stato === 'confermata'){ add(S.turni, m.mid, sg); add(S.punti, m.mid, sg*(m.punti || 0)); if(sg > 0) S.ultimo[m.mid] = Math.max(S.ultimo[m.mid] || 0, m.t || 0); } break;   // i punti arrivano solo alla convalida dell'admin
+    case 'compito': if(m.stato === 'confermata'){ add(S.turni, m.mid, sg); add(S.punti, m.mid, sg*(m.punti || 0)); if(sg > 0) S.ultimo[m.mid] = Math.max(S.ultimo[m.mid] || 0, m.t || 0); } break;   // i punti arrivano solo alla convalida del Supervisor
     case 'storno': if(m.orig) applyMov(S, m.orig, -sg); break;
   }
 }
@@ -822,7 +824,7 @@ function debitoLibero(){
   return Math.max(0, -s - inCorso);
 }
 const PUNTI_SPESA = 2;
-/* regole punti e ricompense (configurabili dagli admin, salvate nel documento del gruppo: nessuna lettura in più) */
+/* regole punti e ricompense (configurabili dai Supervisor, salvate nel documento del gruppo: nessuna lettura in più) */
 const cfgN = (k, def) => { const v = st.gruppo && st.gruppo[k]; return Number.isInteger(v) && v >= 0 ? v : def; };
 const ptCaffe = () => cfgN('ptCaffe', 10);
 const ptBenFatto = () => cfgN('ptBenFatto', 2);
@@ -834,7 +836,7 @@ const ptCaffeE = () => onP('ptCaffeOn') ? ptCaffe() : 0;
 /* snack: punti proporzionali al prezzo (punti per ogni 1,00 €, arrotondati all'intero), calcolati dal prezzo senza impostarli articolo per articolo */
 const ptSnackEuro = () => Math.min(100, cfgD('ptSnackEuro', 10));
 const ptSnackP = prezzo => onP('ptCaffeOn') ? Math.max(0, Math.round((Number(prezzo) || 0) / 100 * ptSnackEuro())) : 0;
-/* podio del mese: bonus ai primi 3 (attivabile dall'admin); il bonus entra nella Tessera Fedeltà ma non nella classifica a punti */
+/* podio del mese: bonus ai primi 3 (attivabile dal Supervisor); il bonus entra nella Tessera Fedeltà ma non nella classifica a punti */
 const podioOn = () => ptMaster() && !!(st.gruppo && st.gruppo.podioOn === true);
 const podioPt = i => Math.min(1000, cfgN('podio' + i, [0, 50, 30, 20][i]));
 /* punti spesa (importo in centesimi → euro): proporzionali all'importo (rapporto punti/€ × importo, arrotondati all'intero, con tetto per singola spesa); il rimborso in denaro/crediti resta al 100% */
@@ -847,7 +849,7 @@ const sogliaPunti = () => Math.max(1, cfgN('sogliaPunti', 500));
 const creditiSoglia = () => Math.max(1, cfgN('creditiSoglia', 5));
 const bfN = () => Math.max(1, cfgN('bfN', 1));
 const bfPeriodo = () => (st.gruppo && st.gruppo.bfPeriodo) === 'mese' ? 'mese' : 'settimana';
-/* scala punti ×10: scalaDa = istante del passaggio (scritto dall'admin). I movimenti e le chiusure PRECEDENTI si rivalutano solo in memoria:
+/* scala punti ×10: scalaDa = istante del passaggio (scritto dal Supervisor). I movimenti e le chiusure PRECEDENTI si rivalutano solo in memoria:
    caffè, snack, spesa, «Ben fatto», riscatti ×10; i vecchi turni di pulizia valgono PUL_LEGACY (come la nuova «Pulizia generale») */
 const PUL_LEGACY = 50;
 const scalaDa = () => (st.gruppo && Number.isInteger(st.gruppo.scalaDa)) ? st.gruppo.scalaDa : 0;
@@ -944,7 +946,7 @@ function segOpts(name, opts, sel, off){
   return `<div class="seg">${opts.map(([v,l]) => { const no = off.includes(v);
     return `<input type="radio" name="${name}" id="${name}-${v}" value="${v}" ${v===sel&&!no?'checked':''} ${no?'disabled':''}><label for="${name}-${v}"${no?' class="off" aria-disabled="true"':''}>${l}${no?'<small class="nd">(Non disponibile)</small>':''}</label>`; }).join('')}</div>`;
 }
-/* canale Revolut: sospendibile dall'admin (campo revolutAttivo nel documento gruppo, assente = attivo) */
+/* canale Revolut: sospendibile dal Supervisor (campo revolutAttivo nel documento gruppo, assente = attivo) */
 const revolutOn = () => !st.gruppo || st.gruppo.revolutAttivo !== false;
 const revOff = () => revolutOn() ? [] : ['revolut'];
 
@@ -952,9 +954,9 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], compiti:['Compiti di oggi','brush'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
-  cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote fondo','banknote'],
-  regolamento:['Regolamento','receipt'], membri:['Soci & Ruoli','users'], statistiche:['Classifica e statistiche','chart'], admin:['Amministrazione','shield'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], compiti:['Briefing','clipboard'], briefing:['Briefing','clipboard'], supervisor:['Gestione Supervisor','shield'], pin:['Gestione PIN','lock'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'], eventi:['Eventi & compleanni','cake'],
+  cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote annuali','banknote'],
+  regolamento:['Regolamento','receipt'], membri:['Gestione Soci','users'], statistiche:['Classifica e statistiche','chart'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
 
 // Modello prepagato: la quota non genera piu' addebiti sul saldo. Resta la funzione (vuota) per i punti di chiamata.
@@ -985,10 +987,6 @@ function doRender(){
     $('hdr').classList.add('hidden'); $('dock').classList.add('hidden'); closeSheet(); A['drawer-close']();
     main.classList.remove('wide'); main.innerHTML = entryPinGate(); restore(); return;
   }
-  if(!offertaAdminAperta && !st.isAdmin && st.ready.a && st.ready.u && LS.get('offriAdmin_' + st.gid) === st.mid){   // dopo il recupero su un nuovo telefono: ruolo admin opzionale
-    offertaAdminAperta = true; LS.del('offriAdmin_' + st.gid); setTimeout(() => A['offri-admin'](), 400);
-  }
-
   if(!regModalAperto && !LS.get(REG_KEY) && st.mid && st.ready.m && st.ready.mv){   // avviso «Regolamento aggiornato» (solo localStorage, nessuna scrittura su Firestore)
     regModalAperto = true; setTimeout(() => { if(!$('sheet').classList.contains('on') && !LS.get(REG_KEY) && st.page !== 'regolamento') A['reg-avviso'](); }, 700);
   }
@@ -1002,6 +1000,7 @@ function doRender(){
   $('hdr-sub').textContent = st.sync === 'err' ? 'Errore: ' + st.syncErr : st.sync === 'off' ? 'Offline · si sincronizza dopo' : st.sync === 'ok' ? (st.gruppo.nome || 'Saletta') : 'Collegamento…';
   if(!pagineConsentite().includes(st.page)) st.page = 'bar';
   if(st.page === 'statistiche'){ st.page = 'classifiche'; st.clMod = 'stat'; }
+  if(st.page === 'compiti') st.page = 'briefing';
   const cn = contatori(d);
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos'); sb.textContent = eurS(s); sb.dataset.p = 'crediti'; sb.setAttribute('aria-label', 'Saldo: tocca per ricaricare');
@@ -1009,7 +1008,7 @@ function doRender(){
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
   $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden');
-  const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['briefing','Briefing','clipboard'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = cn.tot;
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}${p === 'saletta' && nEventiNuovi() ? `<span class="tb" id="tb-saletta">${nEventiNuovi()}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
@@ -1017,7 +1016,7 @@ function doRender(){
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, compiti:pCompiti, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, briefing:pBriefing, compiti:pBriefing, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide'); main.dataset.p = st.page;
   main.innerHTML = fn(d);
   restore();
@@ -1027,30 +1026,35 @@ function doRender(){
 }
 
 function renderDrawer(){
+  const nav = (p, icona, label, id) => `<button class="nb ${st.page===p?'on':''}"${id ? ` id="${id}"` : ''} data-act="go" data-p="${p}">${ic(icona)}${label}</button>`;
+  const voci = [];
+  if(st.isAdmin){
+    if(sonoCreatore()) voci.push(nav('supervisor', 'shield', '🛡️ Gestione Supervisor', 'nb-supervisor'));
+    if(can('soci')) voci.push(nav('quote', 'banknote', '📅 Quote annuali', 'nb-quote'), nav('membri', 'users', '👥 Gestione Soci', 'nb-soci'), nav('pin', 'lock', '🔐 Gestione PIN', 'nb-pin'));
+    if(can('compiti')) voci.push(nav('regole', 'sparkles', '⚙️ Regole punti &amp; premi', 'nb-regole'));
+    if(can('sistema')) voci.push(nav('backup', 'download', 'Backup &amp; Ripristino', 'nb-backup'), nav('chiusura', 'archive', '📦 Chiusura periodo', 'nb-chiusura'));
+  }
   $('drawer').innerHTML = `
     <div class="row" style="padding:4px 6px 14px;border-bottom:1px solid var(--line);margin-bottom:8px">
       <div class="av" style="background:rgba(245,165,36,.12);color:var(--amber)">${ic('coffee')}</div>
-      <div class="grow" style="flex:1"><b>${esc(st.gruppo.nome || 'Saletta')}</b><div class="mut" style="font-size:12px">${esc(myName())}${st.isAdmin ? ' · amministratore' : ''}</div></div>
+      <div class="grow" style="flex:1"><b>${esc(st.gruppo.nome || 'Saletta')}</b><div class="mut" style="font-size:12px">${esc(myName())}${st.isAdmin ? ' · ' + ruolo() : ''}</div></div>
       <button class="iconbtn" data-act="drawer-close">${ic('x')}</button>
     </div>
-    ${st.isAdmin ? `<div class="mut" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px 2px">🛡️ Amministrazione</div>
-    <button class="nb ${st.page==='membri'?'on':''}" id="nb-soci" data-act="go" data-p="membri">${ic('users')}👥 Soci &amp; Ruoli</button>
-    <button class="nb ${st.page==='regole'?'on':''}" data-act="go" data-p="regole">${ic('sparkles')}⚙️ Regole punti &amp; premi</button>
-    <button class="nb ${st.page==='backup'?'on':''}" data-act="go" data-p="backup">${ic('download')}Backup &amp; Ripristino</button>
-    <button class="nb ${st.page==='chiusura'?'on':''}" data-act="go" data-p="chiusura">${ic('archive')}📦 Chiusura periodo</button><div class="sep"></div>` : ''}
-    <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}${st.isAdmin ? 'Impostazioni &amp; PIN' : 'Impostazioni'}</button>
+    ${voci.length ? `<div class="mut" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px 2px">🛡️ Gestione</div>${voci.join('')}<div class="sep"></div>` : ''}
+    <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}Impostazioni</button>
     <button class="nb ${st.page==='regolamento'?'on':''}" data-act="go" data-p="regolamento">${ic('receipt')}Regolamento</button>
     <button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>
     <button class="nb" data-act="info">${ic('info')}Info</button>
-    ${!st.isAdmin ? `<div class="sep"></div><button class="nb ${st.page==='admin'?'on':''}" data-act="go" data-p="admin">${ic('lock')}Accesso amministratore</button>` : ''}
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
 }
 
 const SALETTA_SUB = ['saletta','eventi','inventario','gioco','ruota','perle','spesa'];
-const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','compiti','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche','admin'];
+const PAGINE_COLLEGA = ['bar','briefing','saletta','classifiche','spesa','gioco','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADM = PAGINE_UTENTE.concat(['regole','backup','chiusura','membri','quote','statistiche','cassa','feed','admin']);
-const pagineConsentite = () => st.isAdmin ? PAGINE_ADM : PAGINE_COLLEGA;
+const PAGINE_ADM = PAGINE_UTENTE.concat(['regole','backup','chiusura','membri','quote','pin','supervisor','statistiche','cassa','feed']);
+/* ogni voce di gestione compare solo a chi ha il permesso (il Creatore ha tutto) */
+const PAGINE_PERM = {membri: 'soci', quote: 'soci', pin: 'soci', regole: 'compiti', backup: 'sistema', chiusura: 'sistema'};
+const pagineConsentite = () => st.isAdmin ? PAGINE_ADM.filter(p => (!PAGINE_PERM[p] || can(PAGINE_PERM[p])) && (p !== 'supervisor' || sonoCreatore())) : PAGINE_COLLEGA;
 
 /* ---------- installazione dell'app (PWA) ----------
    Browser e app installata conservano i dati separati: chi si registra dal browser e poi installa
@@ -1083,7 +1087,6 @@ function renderEntry(){
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
   if(st.entry === 'recupero') return entryRecupero();
-  if(st.entry === 'creatore-pin') return entryCreatorePin();
   if(!st.gid) return st.entry === 'crea' ? entryCrea() : st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
@@ -1131,7 +1134,7 @@ function entryInstall(){
 
 function entryWelcome(){
   return `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1><p>Caffè, snack, cassa e turni della saletta,<br>condivisi con i colleghi.</p></div>
-  <button class="tile" data-act="entry" data-v="join" style="margin-bottom:12px"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Me l'ha mandato un collega o l'amministratore</span></button>
+  <button class="tile" data-act="entry" data-v="join" style="margin-bottom:12px"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Me l'ha mandato un collega o il Supervisor</span></button>
   <button class="tile" data-act="entry" data-v="crea"><div class="ic violet">${ic('shield')}</div><b>Crea un nuovo gruppo</b><span>Diventi amministratore e inviti i colleghi</span></button>`;
 }
 
@@ -1151,23 +1154,14 @@ function entryCreatore(){
     <button class="btn amber block big" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo</button>
     <p class="hint" style="margin:6px 0 12px">Eri già nel gruppo (nuovo telefono, app reinstallata…): ti ritrovi con il tuo PIN personale.</p>
     <button class="btn block big" data-act="join-collega">${ic('user','s')} Sono un nuovo collega</button>
-    <p class="hint" style="margin:6px 0 0">Invii una richiesta che un amministratore deve approvare.</p>
+    <p class="hint" style="margin:6px 0 0">Invii una richiesta che un Supervisor deve approvare.</p>
   </div>
   <button class="btn link" data-act="entry" data-v="join">← Cambia codice</button>`;
 }
 
-function entryCreatorePin(){
-  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>Sono il creatore</h1><p>Rientra con il PIN amministratore</p></div>
-  <div class="card">
-    <p class="mut" style="font-size:13px;margin:0 0 10px">Usa questa strada solo se hai creato il gruppo e non hai (o non ricordi) il PIN personale. Serve il <b>PIN amministratore</b> scelto alla creazione del gruppo, non il PIN personale a 6 cifre.</p>
-    <label class="f"><span>PIN amministratore</span><input class="in" id="jc-pin" type="password" autocomplete="off" autocapitalize="off"></label>
-    <button class="btn amber block big" data-act="join-creatore" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Rientra come creatore'}</button>
-  </div>
-  <button class="btn link" data-act="entry" data-v="recupero">← Indietro</button>`;
-}
 
 function entryCrea(){
-  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>Nuovo gruppo</h1><p>Sarai il primo amministratore</p></div>
+  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>Nuovo gruppo</h1><p>Sarai il Creatore del gruppo</p></div>
   <div class="card">
     <label class="f"><span>Nome del gruppo</span><input class="in" id="c-nome" placeholder="es. Saletta 3° piano" maxlength="40"></label>
     <div class="grid2">
@@ -1182,8 +1176,7 @@ function entryCrea(){
       <label class="f"><span>Contanti in cassa €</span><input class="in mono" id="c-contanti" inputmode="decimal" placeholder="0,00"></label>
       <label class="f"><span>Saldo Revolut €</span><input class="in mono" id="c-revolut" inputmode="decimal" placeholder="0,00"></label>
     </div>
-    <label class="f"><span>PIN amministratore</span><input class="in mono" id="c-pin" type="password" autocomplete="new-password" placeholder="almeno 6 caratteri"></label>
-    <p class="hint">Chi conosce il PIN può diventare amministratore. Usa lettere e numeri e dallo solo ai tuoi delegati.</p>
+    <p class="hint">Sarai il <b>Creatore</b> del gruppo: potrai nominare dei Supervisor e scegliere cosa possono fare.</p>
     <button class="btn amber block big" data-act="crea" ${st.busy?'disabled':''}>${st.busy ? 'Creo il gruppo…' : 'Crea gruppo'}</button>
   </div>
   <button class="btn link" data-act="entry" data-v="">← Indietro</button>`;
@@ -1195,17 +1188,17 @@ function entryRichiesta(){
     <div class="card" style="text-align:center">
       <p class="tx2" style="margin:0 0 6px;font-size:14px">Hai chiesto di entrare come</p>
       <b style="font-size:18px">${esc(r.nome)}</b>${r.nick ? `<div class="mut" style="margin-top:2px">“${esc(r.nick)}”</div>` : ''}
-      <p class="mut" style="font-size:13px;margin:14px 0 0">Un amministratore deve approvarla. Questa pagina si aggiorna da sola appena succede.</p>
+      <p class="mut" style="font-size:13px;margin:14px 0 0">Un Supervisor deve approvarla. Questa pagina si aggiorna da sola appena succede.</p>
     </div>
     <div class="grid2"><button class="btn ghost" data-act="richiesta-modifica">${ic('edit','s')} Correggi</button><button class="btn ghost" data-act="richiesta-ritira">Ritira richiesta</button></div>
     <div style="text-align:center;margin-top:12px"><button class="btn link" data-act="esci-gruppo">Usa un altro codice</button></div>`;
   if(r && r.stato === 'espulso') return `<div class="hero"><div class="logo" style="color:var(--red);border-color:rgba(251,113,133,.4);background:rgba(251,113,133,.1)">${ic('logout','l')}</div><h1>Accesso rimosso</h1><p>${g}</p></div>
-    <div class="card"><p class="tx2" style="margin:0;font-size:14px">Un amministratore ti ha rimosso dal gruppo. Per chiarimenti rivolgiti a chi gestisce la saletta.</p></div>
+    <div class="card"><p class="tx2" style="margin:0;font-size:14px">Un Supervisor ti ha rimosso dal gruppo. Per chiarimenti rivolgiti a chi gestisce la saletta.</p></div>
     <button class="btn link" data-act="esci-gruppo">Esci</button>`;
   const rifiutata = r && r.stato === 'rifiutata', archiviato = r && r.stato === 'archiviato';
   return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('user','l')}</div><h1>Chiedi di entrare</h1><p>${g}</p></div>
-  ${rifiutata ? `<div class="banner red">${ic('alert')}<div>La tua richiesta precedente non è stata accettata. Controlla i dati o chiedi all'amministratore.</div></div>` : ''}
-  ${archiviato ? `<div class="banner amber">${ic('archive')}<div>Il tuo profilo è stato archiviato da un amministratore. Se fai di nuovo parte della saletta puoi chiedere di rientrare.</div></div>` : ''}
+  ${rifiutata ? `<div class="banner red">${ic('alert')}<div>La tua richiesta precedente non è stata accettata. Controlla i dati o chiedi al Supervisor.</div></div>` : ''}
+  ${archiviato ? `<div class="banner amber">${ic('archive')}<div>Il tuo profilo è stato archiviato da un Supervisor. Se fai di nuovo parte della saletta puoi chiedere di rientrare.</div></div>` : ''}
   <div class="card">
     <label class="f"><span>Nome e cognome</span><input class="in" id="r-nome" maxlength="30" placeholder="es. Elena Gialli" value="${esc(r ? r.nome : '')}" autocomplete="name"></label>
     <label class="f"><span>Nickname (facoltativo)</span><input class="in" id="r-nick" maxlength="20" placeholder="es. Ele" value="${esc(r && r.nick ? r.nick : '')}"></label>
@@ -1224,16 +1217,15 @@ function entryRecupero(){
     <label class="f"><span>Il tuo nome</span><select class="in" id="rc-mid">${l.map(m => `<option value="${m.id}">${esc(m.nome)}${m.nick ? ' (' + esc(m.nick) + ')' : ''}</option>`).join('')}</select></label>
     <label class="f"><span>PIN personale (6 cifre)</span><input class="in mono" id="rc-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••"></label>
     <button class="btn amber block big" data-act="recupera" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Verifico…' : 'Recupera il mio profilo'}</button>
-    <p class="hint" style="margin:10px 0 0">Non ricordi il PIN? Chiedi a un amministratore un PIN temporaneo: ti permette di rientrare e poi ne scegli uno nuovo.</p>` : '<div class="empty">Nessun profilo trovato in questo gruppo.</div>'}
+    <p class="hint" style="margin:10px 0 0">Non ricordi il PIN? Chiedi a un Supervisor un PIN temporaneo: ti permette di rientrare e poi ne scegli uno nuovo.</p>` : '<div class="empty">Nessun profilo trovato in questo gruppo.</div>'}
   </div>
-  <div style="text-align:center;margin-top:4px"><button class="btn link" style="color:var(--mut);font-size:12.5px" data-act="entry" data-v="creatore-pin">Sono il creatore e non ho il PIN personale</button></div>
   <button class="btn link" data-act="recupero-indietro">← Indietro</button>`;
 }
 
 function entryPinGate(){
   const m = membro(st.mid), temp = st.pinDoc && st.pinDoc.temporaneo;
   return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('lock','l')}</div><h1>Ciao${m ? ' ' + esc(m.nome) : ''}!</h1><p>${temp ? 'Scegli un nuovo PIN personale' : 'Imposta il tuo PIN personale'}</p></div>
-  ${temp ? `<div class="banner sky">${ic('info')}<div>Un amministratore ha impostato per te un PIN temporaneo: scegline uno nuovo, solo tuo.</div></div>` : ''}
+  ${temp ? `<div class="banner sky">${ic('info')}<div>Un Supervisor ha impostato per te un PIN temporaneo: scegline uno nuovo, solo tuo.</div></div>` : ''}
   <div class="banner amber">${ic('alert')}<div>Il PIN ti serve per ritrovare il tuo profilo (saldo, crediti e storico) se cambi telefono o svuoti i dati. Ricordalo e non darlo a nessuno.</div></div>
   <div class="card">
     <label class="f"><span>PIN (6 cifre)</span><input class="in mono" id="pg-1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••"></label>
@@ -1257,9 +1249,9 @@ function pBar(d){
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
   const scRic = scambiPerMe(d).length;
   return `
-  ${st.isAdmin ? strumentiAdmin() : ''}
+  ${can('sistema') ? strumentiAdmin() : ''}
   ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
-  ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un amministratore: la registrerà lui.</div></div>` : ''}
+  ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un Supervisor: la registrerà lui.</div></div>` : ''}
   <div class="card" style="text-align:center">
     <small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" id="home-saldo" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
@@ -1283,7 +1275,7 @@ function pBar(d){
       <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
       <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
-      <button class="gbtn" id="btn-compiti" data-act="go" data-p="compiti"><span class="em">🎯</span>Compiti di oggi<small>${!ptMaster() ? 'punti disattivati' : nCpAperti() ? nCpAperti() + (nCpAperti() === 1 ? ' incarico in corso' : ' incarichi in corso') : 'nessun incarico'}</small>${badgeCompiti()}</button>
+      <button class="gbtn" id="btn-compiti" data-act="go" data-p="briefing"><span class="em">🎯</span>Compiti di oggi<small>${!ptMaster() ? 'punti disattivati' : nCpAperti() ? nCpAperti() + (nCpAperti() === 1 ? ' incarico in corso' : ' incarichi in corso') : 'nessun incarico'}</small>${badgeCompiti()}</button>
     </div>
   </div>
 
@@ -1296,7 +1288,7 @@ const testoAttesa = m => m.tipo === 'ricarica' ? (m.fondo ? 'Quota fondo ' : 'Ri
 function richiesteUtente(d){
   const mie = d.pendenti.filter(m => m.mid === st.mid && m.tipo !== 'compito');
   return mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `
-      <div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div>
+      <div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un Supervisor</div></div>
       <button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : '';
 }
 function richiesteFondo(d){
@@ -1310,12 +1302,6 @@ function richiesteFondo(d){
   <div class="card"><h3><span>Richieste da confermare</span>${pend.length ? `<span class="pill red">${pend.length}</span>` : ''}</h3>
     ${pend.length ? righeMov(pend.slice().reverse(), d) : '<div class="empty">Nessuna richiesta in attesa.</div>'}
   </div>
-
-  <div class="card"><h3><span>Richieste amministratore</span>${st.richAdmin.length ? `<span class="pill red">${st.richAdmin.length}</span>` : ''}</h3>
-    ${st.richAdmin.length ? `<div class="list">${st.richAdmin.map(r => `<div class="li"><div class="av">${ic('shield','s')}</div><div class="grow"><div class="t">${esc(r.nome || 'telefono')}</div><div class="d">chiede di diventare amministratore</div></div>
-      <button class="btn sm green" data-act="approva-admin" data-id="${r.id}">Nomina</button><button class="btn sm ghost" data-act="rifiuta-admin" data-id="${r.id}">No</button></div>`).join('')}</div>` : '<div class="empty">Nessuna richiesta.</div>'}
-  </div>
-
 `;
 }
 const recVisti = () => LS.get('recVisti_' + st.gid, []);
@@ -1323,13 +1309,14 @@ const recuperiNuovi = () => { const v = recVisti(); return st.utenti.filter(u =>
 function contatori(d){
   const seen = notifSeen();
   const sc = scambiPerMe(d).length;
-  const pers = notifiche(d).filter(n => n.t > seen).length + sc + nCpConv();
-  const fondo = st.isAdmin ? d.pendenti.length + st.richieste.length + st.richAdmin.length + recuperiNuovi().length + sc : 0;
-  return {pers, fondo, tot: st.isAdmin ? fondo + pers - sc - nCpConv() : pers};
+  const nc = nCpConv();
+  const pers = notifiche(d).filter(n => n.t > seen).length + sc;
+  const fondo = st.isAdmin ? (can('inbox') ? d.pendenti.filter(m => m.tipo !== 'compito').length + st.richieste.length : 0) + (canAccessi() ? recuperiNuovi().length : 0) + nc : 0;
+  return {pers: pers + nc, fondo, tot: pers + (st.isAdmin ? fondo : nc)};
 }
 function pNotifiche(d){
   const list = notifiche(d), seen = notifSeen();
-  const daApp = st.isAdmin ? `<div class="card" id="da-approvare" style="padding-bottom:4px"><h3><span>🛡️ Da approvare</span></h3>${inboxAdmin(d)}</div>` : '';
+  const daApp = st.isAdmin && (can('inbox') || can('compiti') || canAccessi()) ? `<div class="card" id="da-approvare" style="padding-bottom:4px"><h3><span>🛡️ Da approvare</span></h3>${inboxAdmin(d)}</div>` : '';
   return `<h2>${ic('bell')} Notifiche</h2><p class="sub">${st.isAdmin ? 'Richieste da approvare e notifiche che ti riguardano.' : 'Richieste da gestire ed esiti che ti riguardano.'}</p>
   ${daApp}${st.isAdmin ? '' : cpConvCard()}${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
   ${storicoRichieste(d)}
@@ -1341,9 +1328,10 @@ function inboxAdmin(d){
   const bt = (act, id, cls, lab, v) => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}"${v ? ` data-v="${v}"` : ''}>${lab}</button>`;
   const card = (t, tag, cls, titolo, sub, azioni) => it.push({t, h: `<div class="card" style="margin-bottom:10px"><div class="between" style="margin-bottom:6px"><span class="pill ${cls}">${tag}</span><span class="mut" style="font-size:11.5px">${t ? quando(t) : ''}</span></div>
     <div style="font-size:14.5px;font-weight:700">${titolo}</div>${sub ? `<div class="tx2" style="font-size:13px;margin-top:2px">${sub}</div>` : ''}
-    ${azioni.length ? `<div style="display:grid;grid-template-columns:repeat(${azioni.length},1fr);gap:8px;margin-top:10px">${azioni.join('')}</div>` : `<div class="mut" style="font-size:12px;margin-top:8px">È un tuo compito: lo convalida un altro admin o un Supervisor.</div>`}</div>`});
-  st.richieste.forEach(r => card(r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now(), 'Accesso', 'sky', esc(r.nome), (r.nick ? '“' + esc(r.nick) + '” · ' : '') + 'chiede di entrare nel gruppo', [bt('approva', r.id, 'green', 'Valuta')]));
+    ${azioni.length ? `<div style="display:grid;grid-template-columns:repeat(${azioni.length},1fr);gap:8px;margin-top:10px">${azioni.join('')}</div>` : `<div class="mut" style="font-size:12px;margin-top:8px">È un tuo compito: lo convalida un altro Supervisor o il Creatore.</div>`}</div>`});
+  if(can('inbox')) st.richieste.forEach(r => card(r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now(), 'Accesso', 'sky', esc(r.nome), (r.nick ? '“' + esc(r.nick) + '” · ' : '') + 'chiede di entrare nel gruppo', [bt('approva', r.id, 'green', 'Valuta')]));
   d.pendenti.forEach(m => {
+    if(m.tipo === 'compito' ? !can('compiti') : !can('inbox')) return;
     if(m.tipo === 'spesa') card(m.t, 'Spesa', 'violet', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.articoliNomi && m.articoliNomi.length ? '🛒 ' + m.articoliNomi.map(esc).join(', ') : esc(m.descr || '')}${m.note ? ' · «' + esc(m.note) + '»' : ''} · ${spesaMista(m) || (m.fonte === 'denaro' ? 'rimborso in denaro reale' : 'rimborso in crediti')}`,
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), (m.fonte === 'denaro' || m.fonte === 'misto') ? bt('paga-spesa', m.id, 'green', 'Convalida e Paga') : bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
     else if(m.tipo === 'ricarica') card(m.t, 'Versamento', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.fondo ? 'Quota fondo' : 'Ricarica crediti'} · ${esc(FONTI[m.metodo] || m.metodo || '')}`,
@@ -1355,21 +1343,20 @@ function inboxAdmin(d){
     else card(m.t, 'Richiesta', 'mut', descMov(m).t, '', [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma', 'confermata')]);
   });
 
-  st.richAdmin.forEach(r => card(msDoc(r), 'Admin', 'red', esc(r.nome || 'telefono'), 'chiede di diventare amministratore', [bt('rifiuta-admin', r.id, 'ghost', 'Rifiuta'), bt('approva-admin', r.id, 'green', 'Nomina')]));
-  recuperiNuovi().forEach(u => card(tms(u.ts) || Date.now(), 'Profilo recuperato', 'amber', `${esc(nomeM(u.mid))} è rientrato da un nuovo telefono`, 'Ha usato il PIN personale. Se non è stato lui, scollega il telefono: il PIN viene azzerato.', [bt('rec-ok', u.id, 'ghost', 'Va bene'), bt('rec-scollega', u.id, 'red', 'Scollega')]));
+  if(canAccessi()) recuperiNuovi().forEach(u => card(tms(u.ts) || Date.now(), 'Profilo recuperato', 'amber', `${esc(nomeM(u.mid))} è rientrato da un nuovo telefono`, 'Ha usato il PIN personale. Se non è stato lui, scollega il telefono: il PIN viene azzerato.', [bt('rec-ok', u.id, 'ghost', 'Va bene'), bt('rec-scollega', u.id, 'red', 'Scollega')]));
   it.sort((a, b) => b.t - a.t);
   return it.length ? `<div class="mut" style="font-size:12.5px;margin:0 2px 10px">${it.length} ${it.length === 1 ? 'richiesta' : 'richieste'} in sospeso</div>${it.map(x => x.h).join('')}` : '<div class="card"><div class="empty">Nessuna richiesta in sospeso. 🎉</div></div>';
 }
 function pCrediti(d){
   const s = saldo(st.mid) || 0, mie = d.pendenti.filter(m => m.mid === st.mid && ['ricarica', 'riscatto'].includes(m.tipo));
-  return `<h2>${ic('wallet')} Crediti ${infoBtn(`1 credito = 1 €. I soldi passano fuori dall'app e un amministratore conferma.`)}</h2>
+  return `<h2>${ic('wallet')} Crediti ${infoBtn(`1 credito = 1 €. I soldi passano fuori dall'app e un Supervisor conferma.`)}</h2>
   <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica o rimborso</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
     <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn regalo block" id="btn-regala" data-act="regala">🎁 Regala crediti</button><button class="btn acquisto block" id="btn-acquista" data-act="acquista">🤝 Acquista crediti da un collega</button></div></div>
   ${scambiRicevuti(d)}${scambiInviati(d)}
-  ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un amministratore</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
-  ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando l\'amministratore conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché l\'amministratore non ti paga.<br><br><b>Tra colleghi:</b> «Regala crediti» è immediato e senza approvazioni; «Acquista crediti da un collega» richiede che il venditore confermi di aver ricevuto il denaro.', 'Come funzionano ricariche e riscatti')}`;
+  ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un Supervisor</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
+  ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando il Supervisor conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché il Supervisor non ti paga.<br><br><b>Tra colleghi:</b> «Regala crediti» è immediato e senza approvazioni; «Acquista crediti da un collega» richiede che il venditore confermi di aver ricevuto il denaro.', 'Come funzionano ricariche e riscatti')}`;
 }
 
 /* ---------- tesoreria / home amministratore ---------- */
@@ -1419,7 +1406,7 @@ function notifiche(d){
       const nm = esc(m.nome || 'Compito');
       if(m.stato === 'confermata') out.push({t, e: '✅', x: `Compito «${nm}» convalidato: +${m.punti || 0} punti`});
       else if(m.stato === 'rifiutata') out.push({t, e: '❌', x: `Compito «${nm}» non convalidato: nessun punto`});
-      else if(m.stato === 'annullata') out.push({t, e: '↩️', x: `L'incarico «${nm}» è stato annullato da un admin`});
+      else if(m.stato === 'annullata') out.push({t, e: '↩️', x: `L'incarico «${nm}» è stato annullato da un Supervisor`});
       else out.push({t: m.t || 0, e: '🎯', x: `Ti è stato assegnato il compito «${nm}» (+${m.punti || 0} punti)`});
     }
     else if(m.tipo === 'scambio'){
@@ -1430,13 +1417,13 @@ function notifiche(d){
   });
   return out.sort((a, b) => b.t - a.t).slice(0, 40);
 }
-/* ---------- giacenze (copia pubblica, aggiornata dagli admin) ---------- */
+/* ---------- giacenze (copia pubblica, aggiornata dai Supervisor) ---------- */
 const giacSent = {};
-/* i colleghi calcolano il Totale Fondo dall'estratto: l'admin completa gli estratti vecchi con saldi e cassa dell'ultima chiusura */
+/* i colleghi calcolano il Totale Fondo dall'estratto: il Supervisor completa gli estratti vecchi con saldi e cassa dell'ultima chiusura */
 let estrSent = '';
 function sincronizzaEstratti(){
   const last = ultimaChiusura();
-  if(!st.isAdmin || st.sync !== 'ok' || modeKey !== 'admin' || !last || !last.stato || estrSent === last.id) return;
+  if(!(can('sistema') || canAccessi()) || st.sync !== 'ok' || modeKey !== 'admin' || !last || !last.stato || estrSent === last.id) return;
   estrSent = last.id;
   const ls = last.stato, mp = {};
   ['pcaf','pcafConv','punti','puntiConv','turni','ultimo','pspesa','pbf','pRisc'].forEach(k => { mp[k] = ls[k] || {}; });
@@ -1453,7 +1440,7 @@ function sincronizzaGiacenze(d){
 }
 const giacenza = (d, p) => st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 1);
 
-/* buste di caffe' in scorta = buste caricate dall'admin (articolo speciale 'caffe'); nessuna apertura manuale */
+/* buste di caffe' in scorta = buste caricate dal Supervisor (articolo speciale 'caffe'); nessuna apertura manuale */
 const prodCaffe = () => prodotto(PID_CAFFE);
 function busteCaricate(d){
   const p = prodCaffe(); if(!p) return 0;
@@ -1476,7 +1463,7 @@ function statoCaffe(d){
     pct: cap > 0 ? reg / cap * 100 : null, parz, capChiusi: Math.round(hk * resa)};
 }
 /* lotto di un articolo: caricati = pezzi del lotto in corso; lotto.{hc,ha} = pezzi caricati / ammanco dei lotti gia' chiusi.
-   Il lotto in corso si consolida quando la giacenza digitale arriva a 0 oppure l'admin attiva «Esaurito» (ammanco = pezzi ancora a sistema) */
+   Il lotto in corso si consolida quando la giacenza digitale arriva a 0 oppure il Supervisor attiva «Esaurito» (ammanco = pezzi ancora a sistema) */
 function statoProd(d, p){
   const l = p.lotto && typeof p.lotto === 'object' ? p.lotto : {}, hc = Number(l.hc) || 0, ha = Number(l.ha) || 0;
   const gia = Math.max(0, giacenza(d, p)), car = Number(p.caricati) || 0, es = p.esaurito === true, chiuso = car > 0 && (es || gia <= 0);
@@ -1526,7 +1513,7 @@ function descMov(m){
 }
 
 function puoStornare(m, d){
-  return st.isAdmin && !m._pending && m.tipo !== 'storno' && !d.stornati.has(m.id)
+  return can('cassa') && !m._pending && m.tipo !== 'storno' && !d.stornati.has(m.id)
     && !['assegnato','attesa','rifiutata','annullata'].includes(m.stato);
 }
 
@@ -1552,7 +1539,7 @@ function righeMov(list, d, opt){
         <div class="amt mono ${annullato ? 'strike' : ''}">${amt}</div>${pill}
         ${annullabile ? `<button class="btn link" style="padding:0" data-act="annulla-consumo" data-id="${m.id}">Annulla</button>` : ''}
         ${!opt.noAct && !opt.compact && puoStornare(m, d) ? `<button class="btn link mut" style="padding:0;color:var(--mut)" data-act="storno" data-id="${m.id}">↩️ Storna</button>` : ''}
-        ${!opt.noAct && st.isAdmin && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && (m.fonte === 'denaro' || m.fonte === 'misto') ? 'paga-spesa' : m.tipo === 'riscatto' ? 'riscatto-paga' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
+        ${!opt.noAct && st.isAdmin && (m.tipo === 'compito' ? can('compiti') : can('inbox')) && m.stato === 'attesa' && m.tipo !== 'scambio' && !opt.compact ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata">✕</button><button class="btn sm green" data-act="${m.tipo === 'spesa' && (m.fonte === 'denaro' || m.fonte === 'misto') ? 'paga-spesa' : m.tipo === 'riscatto' ? 'riscatto-paga' : 'esito'}" data-id="${m.id}" data-v="confermata">✓</button></div>` : ''}
       </div></div>`;
   }).join('')}</div>`;
 }
@@ -1635,13 +1622,12 @@ function pFeed(d){
       <div class="stat"><small>📥 Entrate del periodo</small><b class="mono green" id="cd-in">${eur(C.inC + C.inR)}</b><small>Contanti ${eur(C.inC)} · Revolut ${eur(C.inR)}</small></div>
       <div class="stat"><small>📤 Uscite del periodo</small><b class="mono red" id="cd-out">${eur(uscTot)}</b><small>Spese ${eur(C.spese)} · Uscite ${eur(C.uscite)} · Riscatti ${eur(C.risc)}</small></div>
       <div class="stat cd-wide"><small>🧾 Totale pagato</small><b class="mono amber" id="cd-pagato">${eur(consumiRange(r).tot)}</b><small>Caffè e snack pagati dai colleghi nel periodo</small></div></div>
-    <div class="grid3 cd-tes" id="cd-tesoreria" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+    ${can('cassa') ? `<div class="grid2 cd-tes" id="cd-tesoreria" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
       <button class="btn green" id="btn-cassa-entrata" data-act="cassa-op" data-v="entrata">${ic('in','s')} Entrata cassa</button>
-      <button class="btn red" id="btn-cassa-uscita" data-act="cassa-op" data-v="uscita">${ic('out','s')} Uscita cassa</button>
       <button class="btn" id="btn-cassa-giro" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>
     <div class="grid2" style="gap:8px;margin-bottom:8px">
       <button class="btn sm ghost rvsw ${revolutOn() ? 'on' : ''}" id="sw-revolut" role="switch" aria-checked="${revolutOn()}" data-act="revolut-toggle" title="${revolutOn() ? 'I colleghi possono scegliere Revolut per ricariche e riscatti' : 'Ricariche e riscatti dei colleghi solo in contanti'}">📱 Canale Revolut: <b>${revolutOn() ? 'attivo' : 'sospeso'}</b></button>
-      <button class="btn sm ghost" id="btn-cassa-corr" data-act="cassa-corr">${ic('edit','s')} Correggi saldo cassa</button></div>
+      <button class="btn sm ghost" id="btn-cassa-corr" data-act="cassa-corr">${ic('edit','s')} Correggi saldo cassa</button></div>` : ''}
     ${hintArc(r)}
     ${infoBtn(`Entrate: ricariche convalidate, quote versate, entrate di cassa e caffè pagati subito. Uscite: spese convalidate (anche quelle anticipate e rimborsate), uscite di cassa e riscatti pagati. I giroconti tra contanti e Revolut non contano. Giacenza e fondo netto sono sempre lo stato di adesso. Gli storni correggono i totali.`, 'Come funziona')}
     <button class="btn block ghost" style="margin-top:8px" data-act="rendiconto">${ic('share','s')} Condividi rendiconto di cassa (immagine)</button></div>`;
@@ -1665,16 +1651,16 @@ function pRegolamento(){
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
   const nota = (ok, txt) => ok ? '' : txt;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.5 · novembre 2026</p>
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.6 · novembre 2026</p>
   ${sez('🎯 Principi', [
     '<b>Registra subito</b> ogni consumo: ognuno risponde del proprio.',
     '<b>Contabilità, non denaro:</b> l\'app tiene crediti e debiti; i soldi passano in contanti o Revolut, fuori dall\'app.',
     '<b>Trasparenza:</b> il Registro è visibile a tutti; i saldi degli altri no.'])}
   ${sez('💳 Crediti', [
     '<b>1 credito = 1,00 €</b>, senza commissioni.',
-    '<b>Ricarica:</b> la chiedi dal pulsante «Ricarica»; i crediti arrivano quando un admin conferma l\'incasso.',
+    '<b>Ricarica:</b> la chiedi dal pulsante «Ricarica»; i crediti arrivano quando un Supervisor conferma l\'incasso.',
     '<b>Saldo mai sotto zero:</b> senza credito non si registrano caffè, snack, regali o vendite.',
-    '<b>Riscatto in denaro:</b> l\'importo resta riservato finché un admin non lo paga dalla cassa.',
+    '<b>Riscatto in denaro:</b> l\'importo resta riservato finché un Supervisor non lo paga dalla cassa.',
     '<b>Regala crediti:</b> immediato e definitivo. <b>Acquista da un collega:</b> il venditore conferma dopo aver ricevuto il denaro.'])}
   ${sez('☕ Caffè e snack', [
     `Prezzo da listino (caffè ${eur(g.prezzoCaffe || 0)}), addebitato subito sul saldo.`,
@@ -1683,22 +1669,22 @@ function pRegolamento(){
   ${sez('🛒 Spesa e rimborsi', [
     'La <b>Lista della spesa</b> è solo un <b>promemoria</b>: chiunque aggiunge ciò che manca e chi lo compra lo spunta per toglierlo dall\'elenco. Non genera rimborsi.',
     'Hai anticipato dei soldi per il gruppo (acquisti per la saletta o spese straordinarie come un telegramma o un omaggio autorizzato)? Da Home tocca <b>➕ Ricarica o rimborso → 🧾 Rimborso spesa</b>: indica motivo, importo e se vuoi il rimborso <b>in crediti</b> o in <b>denaro reale</b>.',
-    'Il rimborso può essere <b>tutto in crediti</b>, <b>tutto in denaro reale</b> oppure <b>misto</b> (una parte in denaro e una in crediti, con le due quote che sommano esattamente il totale). Per il denaro l\'admin sceglie contanti o Revolut: la cassa cala solo della quota in denaro e il tuo saldo sale solo della quota in crediti.',
-    'Il rimborso vale solo dopo la <b>convalida</b> di un admin ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
+    'Il rimborso può essere <b>tutto in crediti</b>, <b>tutto in denaro reale</b> oppure <b>misto</b> (una parte in denaro e una in crediti, con le due quote che sommano esattamente il totale). Per il denaro il Supervisor sceglie contanti o Revolut: la cassa cala solo della quota in denaro e il tuo saldo sale solo della quota in crediti.',
+    'Il rimborso vale solo dopo la <b>convalida</b> di un Supervisor ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🎯 Compiti di oggi', [
-    'Dal pulsante «Compiti di oggi» in Home: gli admin decidono i compiti (pulizie, macchinetta, secchio, spesa…), ciascuno con il suo punteggio.',
-    'Tocchi un compito e parte il <b>sorteggio</b>: chi ha svolto meno incarichi di quel tipo nel periodo ha più probabilità di uscire. Chi è escluso dagli admin non partecipa.',
+    'Nella scheda <b>📋 Briefing</b> (la seconda in basso, dopo Home): il Creatore e i Supervisor con il permesso «Compiti e Regole» decidono i compiti (pulizie, macchinetta, secchio, spesa…), ciascuno con il suo punteggio. Tutti i colleghi li consultano e registrano quelli svolti.',
+    'Tocchi un compito e parte il <b>sorteggio</b>: chi ha svolto meno incarichi di quel tipo nel periodo ha più probabilità di uscire. Chi è escluso da chi gestisce i compiti non partecipa.',
     'Chi esce deve essere <b>presente</b>: se non c\'è o non può, si scarta e si estrae un altro. L\'incarico vale solo dopo «È presente».',
-    'Svolto il compito premi <b>Ho fatto!</b>: un admin convalida e solo allora ricevi i punti. Se rifiuta o annulla, niente punti e il compito torna sorteggiabile.',
-    'Non ci sono scadenze né orari: l\'incarico resta aperto finché non viene concluso o annullato da un admin. Un solo incarico alla volta per compito.',
-    '🛡️ <b>Supervisor:</b> colleghi delegati dagli admin, senza scadenza finché non revocati: possono convalidare o rifiutare i compiti e creare nuovi compiti dalla pagina. Nessun accesso a cassa o impostazioni.',
-    'Nessuno convalida un <b>proprio</b> compito: serve un altro admin o un Supervisor (unica eccezione: un solo admin e nessun Supervisor).',
+    'Svolto il compito premi <b>Ho fatto!</b>: chi gestisce i compiti convalida e solo allora ricevi i punti. Se rifiuta o annulla, niente punti e il compito torna sorteggiabile.',
+    'Non ci sono scadenze né orari: l\'incarico resta aperto finché non viene concluso o annullato da chi gestisce i compiti. Un solo incarico alla volta per compito.',
+    '🛡️ <b>Supervisor:</b> colleghi di fiducia nominati dal Creatore, senza scadenza finché non revocati. Ognuno ha solo i permessi che il Creatore gli concede (vedi «Ruoli»).',
+    'Nessuno convalida un <b>proprio</b> compito: serve un altro Supervisor con il permesso «Compiti e Regole» o il Creatore (unica eccezione: il Creatore, se è l\'unico a poter convalidare).',
     '🛒 Anche <b>chi va a fare la spesa</b> si decide da qui; la Lista della spesa è solo un promemoria degli articoli da comprare.',
     !ptMaster() ? '⚠️ Sistema punti disattivato: i compiti sono bloccati.' : ''])}
     ${sez('⭐ Punti Collega Modello', [
-    !ptMaster() ? '⚠️ <b>Sistema punti disattivato dall\'admin:</b> nessun accredito; i punti già maturati restano.' : '',
-    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati (sopra) · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).${podioOn() ? ` 🏅 Podio del mese: bonus di ${podioPt(1)}, ${podioPt(2)} e ${podioPt(3)} punti ai primi tre in classifica del mese solare, assegnati dall'admin a inizio mese.` : ''}`,
+    !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
+    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati (sopra) · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).${podioOn() ? ` 🏅 Podio del mese: bonus di ${podioPt(1)}, ${podioPt(2)} e ${podioPt(3)} punti ai primi tre in classifica del mese solare, assegnati dal Supervisor a inizio mese.` : ''}`,
     `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}). La classifica non cambia.`,
     `<b>Ben fatto!</b> riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
@@ -1707,15 +1693,15 @@ function pRegolamento(){
     '<b>Statistiche · Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati) e un indice per ogni articolo.',
     `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
   ${sez('🔑 Ruoli', [
-    '<b>Collega:</b> registra consumi, spese, ricariche e regali; svolge i compiti assegnati; riceve notifiche personali.',
-    '<b>Amministratore:</b> usa le stesse schermate di tutti, con in più i controlli operativi: «Da approvare» nelle Notifiche, tasti di tesoreria e Storna in Cassa e registro, modifica di listino e scorte in Inventario, «Strumenti admin» in Home. Dal menu ☰ gestisce Soci &amp; Ruoli, Regole punti &amp; premi, Backup e Chiusura periodo.',
-    '<b>Creatore:</b> non può essere revocato. Il gruppo tiene almeno due admin.',
-    'Solo gli admin cambiano regole e parametri.'])}
+    '<b>Collega:</b> registra consumi, spese, ricariche e regali; consulta e svolge i compiti nel Briefing; riceve notifiche personali.',
+    '<b>Creatore:</b> ha tutti i poteri, non può essere revocato ed è l\'unico che nomina e revoca i Supervisor e ne sceglie i permessi (☰ → Gestione Supervisor). Solo lui può ripristinare un backup.',
+    '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti, PIN, archivia / espelli) · 🎯 <i>Compiti e Regole</i> (compiti nel Briefing, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (avvisi e sondaggi, backup, chiusura periodo).',
+    'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
     `${eur(g.quotaAnnua)} di contributo al fondo, <b>separato dal saldo</b>: non crea debiti né blocca i consumi.`,
-    'La registra un admin dopo il versamento; fino ad allora in Home compare un avviso.']) : ''}
+    'La registra il Creatore o un Supervisor con il permesso «Quote e Saldi Soci» (☰ → Quote annuali) dopo il versamento; fino ad allora in Home compare un avviso.']) : ''}
   ${sez('🗂️ Chiusure e backup', [
-    'L\'admin chiude i periodi: i dati vanno nell\'Archivio (solo admin) e i saldi ripartono.',
+    'Il Creatore o un Supervisor con «Strumenti di Sistema» chiude i periodi: i dati vanno nell\'Archivio (visibile a chi gestisce) e i saldi ripartono. L\'app mostra chi ha eseguito l\'ultima chiusura e chiede una doppia conferma se è stata fatta meno di 15 giorni fa.',
     'Backup (.json e .csv) almeno ogni 7 giorni.'])}`;
 }
 
@@ -1730,11 +1716,11 @@ function cpRiga(m, me){
   if(m._pending || m._local) az = '<span class="pill mut">invio…</span>';
   else if(m.stato === 'assegnato'){
     az = mio ? `<button class="btn sm green" id="btn-cp-fatto-${m.id}" data-act="cp-fatto" data-id="${m.id}">✅ Ho fatto!</button>` : '<span class="pill amber">da svolgere</span>';
-    if(st.isAdmin) az += ` <button class="btn link" style="padding:0;color:var(--mut)" id="btn-cp-annulla-${m.id}" data-act="cp-annulla" data-id="${m.id}">Annulla</button>`;
+    if(can('compiti')) az += ` <button class="btn link" style="padding:0;color:var(--mut)" id="btn-cp-annulla-${m.id}" data-act="cp-annulla" data-id="${m.id}">Annulla</button>`;
   } else if(m.stato === 'attesa'){
     az = cpPuoConv(m)
       ? `<div class="row" style="gap:4px"><button class="btn sm red" data-act="esito" data-id="${m.id}" data-v="rifiutata" aria-label="Rifiuta">✕</button><button class="btn sm green" id="btn-cp-ok-${m.id}" data-act="esito" data-id="${m.id}" data-v="confermata">Convalida</button></div>`
-            : `<span class="pill violet">${mio ? 'in attesa di un altro admin o Supervisor' : 'in attesa di convalida'}</span>`;
+            : `<span class="pill violet">${mio ? 'in attesa di un altro Supervisor o del Creatore' : 'in attesa di convalida'}</span>`;
   }
   return `<div class="li" id="cp-inc-${m.id}"><div class="av">🎯</div>
     <div class="grow"><div class="t" style="white-space:normal;font-weight:700">${esc(m.nome || 'Compito')} · <b>${chi(m.mid)}</b>${mio ? ' <span class="pill violet">tu</span>' : ''}</div>
@@ -1764,21 +1750,21 @@ function cpClassifiche(){
     }).join('')}
   </div>`;
 }
-function pCompiti(d){
+function pBriefing(d){
   const me = st.mid, cat = cpAttivi().slice().sort(cpPerPt), aperti = cpAperti().slice().sort((a, b) => a.t - b.t), nSp = nSpesa();
-  const occupato = id => aperti.some(m => m.cp === id);
+  const occupato = id => aperti.some(m => m.cp === id), gest = can('compiti');
   const link = nSp ? `<button class="avv amber" id="cp-spesa-link" data-act="go" data-p="spesa"><div class="avv-t">🛒 ${nSp} ${nSp === 1 ? 'articolo' : 'articoli'} da comprare in lista</div><div class="avv-m">Apri la Lista della spesa →</div></button>` : '';
-  return `<h2>${ic('brush')} Compiti di oggi</h2><p class="sub" style="margin-bottom:12px">Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: un admin convalida e i punti arrivano.</p>
-  ${avvisoPuntiOff()}${bannerSup()}${link}
+  return `<h2>${ic('clipboard')} Briefing</h2><p class="sub" style="margin-bottom:12px">I compiti della saletta. Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: chi gestisce i compiti convalida e i punti arrivano.</p>
+  ${avvisoPuntiOff()}${bannerSup()}${link}${cpConvCard()}
   <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo</h3>
     ${cat.length ? cat.map(c => `<button class="btn amber block" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left" id="btn-cp-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) ? '' : 'disabled'}><span>🎯 ${esc(c.nome)}</span><span class="mono">${occupato(c.id) ? 'in corso' : '+' + c.pt + ' pt'}</span></button>`).join('')
-      : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato dagli amministratori.' : 'Sistema punti disattivato: i compiti sono bloccati.'}${st.isAdmin && ptMaster() ? ' Puoi crearli da Amministrazione › 🎯 Compiti.' : ''}</p>`}
-    ${ptMaster() && (st.isAdmin || isSup()) ? `<button class="btn block" id="btn-cp-nuovo-rapido" data-act="cp-nuovo" style="margin-top:4px" ${cpLista().length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>` : ''}
+      : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato.' : 'Sistema punti disattivato: i compiti sono bloccati.'}${gest && ptMaster() ? ' Creali qui sotto in «Gestione compiti».' : ''}</p>`}
   </div>
   <div class="card" id="cp-incarichi"><h3>📋 Incarichi in corso ${aperti.length ? `<span class="pill violet">${aperti.length}</span>` : ''}</h3>
     ${aperti.length ? `<div class="list">${aperti.map(m => cpRiga(m, me)).join('')}</div>` : '<div class="empty" id="cp-nessuno">Nessun incarico in corso.</div>'}
   </div>
-  ${cpClassifiche()}`;
+  ${cpClassifiche()}
+  ${gest ? cardCompiti() : ''}`;
 }
 
 /* ---------- EVENTI ---------- */
@@ -1972,7 +1958,7 @@ function clRange(){
   if(p === 'mese') return {da: new Date(y, m, 1).getTime(), a: Infinity, label: 'Podio del mese (mese solare corrente)'};
   return {da: ini(new Date(y, m, o.getDate())), a: Infinity, label: 'Oggi'};
 }
-/* storico dei periodi chiusi: i colleghi lo leggono dal proprio estratto, l'admin lo ricava dalle chiusure (nessuna lettura in più) */
+/* storico dei periodi chiusi: i colleghi lo leggono dal proprio estratto, il Supervisor lo ricava dalle chiusure (nessuna lettura in più) */
 function riepDaChiusura(c){
   if(c.riep) return c.riep;
   const T = c.stats || {};
@@ -2056,7 +2042,7 @@ function aggiornaPillola(d, av){
   const el = $('hdr-rank'), hd = $('hdr'); if(!el || !hd) return;
   let x = null;
   if(!av && st.mid && ptMaster()){ try { x = posMese(d); } catch(e){ x = null; } }
-  /* premi del Podio del Mese, sempre sott'occhio accanto alla posizione (nascosti se il podio e' spento dall'admin) */
+  /* premi del Podio del Mese, sempre sott'occhio accanto alla posizione (nascosti se il podio e' spento dal Supervisor) */
   const pz = $('hdr-prize'), premi = (!av && st.mid && podioOn()) ? [1, 2, 3].filter(i => podioPt(i) > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} +${podioPt(i)} pt`) : [];
   if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio a fine mese'; } }
   hd.classList.toggle('hasrank', !!x); el.classList.toggle('hidden', !x);
@@ -2120,8 +2106,8 @@ function cardOnesta(d){
   const pcCh = S && S.capChiusi > 0 ? Math.min(100, S.hc / S.capChiusi * 100) : null;
   if(pcCh != null){ num += Math.min(S.hc, S.capChiusi); den += S.capChiusi; }
   let det = '';
-  if(S && S.attivo) det = `Ciclo in corso: <b>${S.registrati}</b> caffè registrati su <b>${S.capienza}</b> teorici (${kgTxt(S.kg)} kg × ${resa}) · ${pctTxt(Math.min(100, S.pct))} · ${kgTxt(S.restKg)} kg rimasti. Il voto si consolida quando l'admin azzera il ciclo.`;
-  else det = S && S.hk > 0 ? 'Nessun ciclo in corso: l\'admin ne avvia uno dall\'Inventario.' : 'Nessun ciclo di caffè avviato: l\'admin lo imposta dall\'Inventario.';
+  if(S && S.attivo) det = `Ciclo in corso: <b>${S.registrati}</b> caffè registrati su <b>${S.capienza}</b> teorici (${kgTxt(S.kg)} kg × ${resa}) · ${pctTxt(Math.min(100, S.pct))} · ${kgTxt(S.restKg)} kg rimasti. Il voto si consolida quando il Supervisor azzera il ciclo.`;
+  else det = S && S.hk > 0 ? 'Nessun ciclo in corso: il Supervisor ne avvia uno dall\'Inventario.' : 'Nessun ciclo di caffè avviato: il Supervisor lo imposta dall\'Inventario.';
   if(S && S.attivo && S.parz) det += ' Il ciclo attraversa una chiusura di periodo: i caffè del periodo chiuso a metà non sono inclusi.';
   if(pcCh != null) det = `Cicli conclusi: <b>${S.hc}</b> caffè su <b>${S.capChiusi}</b> teorici (${kgTxt(S.hk)} kg). ` + det;
   righe.push(`<div class="onr" id="on-caffe" style="font-size:14px"><div class="between"><span>☕ <b>Caffè in grani</b></span><b class="mono ${pcCh == null ? 'mut' : onCls(pcCh)}">${pcCh == null ? 'n/d' : pctTxt(pcCh)}</b></div>
@@ -2137,7 +2123,7 @@ function cardOnesta(d){
       ${t.pct == null ? '' : `<div class="bar"><i style="width:${t.pct}%;background:${onCol(t.pct)}"></i></div>`}<p class="hint" style="margin:4px 0 0">${dt}</p></div>`);
   });
   const g = den > 0 ? num / den * 100 : null;
-  const info = infoBtn(`Indice globale: media ponderata tra caffè in grani e prodotti confezionati (peso = caffè teorici e pezzi caricati nei cicli/lotti conclusi). Caffè: caffè registrati (giri offerti inclusi) ÷ (kg caricati × ${resa} caffè/kg), valutato quando l'admin azzera il ciclo. Snack e bibite: pezzi registrati ÷ pezzi caricati, valutato quando la giacenza arriva a 0 o l'admin segna «Esaurito» (i pezzi ancora a sistema sono l'ammanco). Verde da 85%, giallo 70–84%, rosso sotto 70%. Nessuna lettura aggiuntiva.`, 'Come funziona');
+  const info = infoBtn(`Indice globale: media ponderata tra caffè in grani e prodotti confezionati (peso = caffè teorici e pezzi caricati nei cicli/lotti conclusi). Caffè: caffè registrati (giri offerti inclusi) ÷ (kg caricati × ${resa} caffè/kg), valutato quando il Supervisor azzera il ciclo. Snack e bibite: pezzi registrati ÷ pezzi caricati, valutato quando la giacenza arriva a 0 o il Supervisor segna «Esaurito» (i pezzi ancora a sistema sono l'ammanco). Verde da 85%, giallo 70–84%, rosso sotto 70%. Nessuna lettura aggiuntiva.`, 'Come funziona');
   return `<div class="card" id="cl-onesta"><h3><span>🛡️ Tasso di Onestà</span><b class="mono ${g == null ? 'mut' : onCls(g)}" id="cl-onesta-pct">${g == null ? 'n/d' : pctTxt(g)}</b></h3>
     <p class="hint" style="margin:0 0 8px">${g == null ? 'Indice globale della saletta: disponibile appena un ciclo di caffè o un lotto di snack si conclude.' : 'Indice globale della saletta (caffè + snack e bibite)'}</p>
     ${g == null ? '' : `<div class="bar" style="margin:0 0 10px"><i style="width:${g}%;background:${onCol(g)}"></i></div>`}
@@ -2204,7 +2190,7 @@ function clClassifica(d, R, T, c){
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
+    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un Supervisor. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
   return {podio: podioCard, albo};
@@ -2412,12 +2398,11 @@ function pCassa(d){
     <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Debiti dei colleghi (da incassare)</span><b class="mono red">${eur(-deb)}</b></div>
     <div class="between" style="font-size:14px;border-top:1px solid var(--line);padding-top:8px"><span><b>Fondo netto</b><div class="mut" style="font-size:11px">cassa − crediti + debiti</div></span><b class="mono ${netto < 0 ? 'red' : 'amber'}" style="font-size:16px">${eur(netto)}</b></div>
   </div>
-  ${st.isAdmin ? `<div class="grid3" style="margin-bottom:12px">
-    <button class="btn sm red" data-act="cassa-op" data-v="uscita">${ic('out','s')} Uscita</button>
+  ${can('cassa') ? `<div class="grid2" style="margin-bottom:12px">
     <button class="btn sm green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Entrata</button>
     <button class="btn sm" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>
     <button class="btn sm block" style="margin:-4px 0 12px" data-act="cassa-corr">${ic('edit','s')} Correggi saldo (contanti / Revolut)</button>`
-    : `<div class="banner sky">${ic('lock')}<div>Uscite, entrate e storni li registrano gli amministratori. Se hai preso soldi dalla cassa per fare la spesa chiedi il rimborso da <b>➕ Ricarica o rimborso → Rimborso spesa</b> in Home.</div></div>`}
+    : `<div class="banner sky">${ic('lock')}<div>Entrate, giroconti e storni li registrano il Creatore e i Supervisor autorizzati. Se hai preso soldi dalla cassa per fare la spesa chiedi il rimborso da <b>➕ Ricarica o rimborso → Rimborso spesa</b> in Home.</div></div>`}
   <div class="card"><h3>Movimenti di cassa</h3>${righeMov(movC.slice(0, 200), d)}</div>`;
 }
 
@@ -2434,13 +2419,13 @@ function cardCaffeScorta(d, ad){
       <p class="hint" style="margin:6px 0 0">${kgTxt(S.kg)} kg caricati dal ${dBr(S.da)} · ${S.registrati} caffè registrati su ${S.capienza} (${resa} per kg, giri offerti inclusi)${S.parz ? ' · il ciclo attraversa una chiusura di periodo: i caffè del periodo chiuso a metà non sono inclusi' : ''}.</p>
       ${ad ? `<div class="grid2" style="margin-top:8px"><button class="btn sm" id="btn-caffe-carica" data-act="caffe-ciclo" data-v="carica">${ic('plus', 's')} Carica kg</button><button class="btn sm ghost" id="btn-caffe-azzera" data-act="caffe-ciclo" data-v="azzera">Azzera ciclo</button></div>` : ''}`;
   } else {
-    corpo = `<p class="hint" style="margin:12px 0 0">Nessun ciclo di caffè in grani in corso.${ad ? '' : ' La scorta la imposta un amministratore.'}</p>
+    corpo = `<p class="hint" style="margin:12px 0 0">Nessun ciclo di caffè in grani in corso.${ad ? '' : ' La scorta la imposta un Supervisor.'}</p>
       ${ad ? `<button class="btn sm amber block" id="btn-caffe-avvia" style="margin-top:8px" data-act="caffe-ciclo" data-v="avvia">${ic('bean', 's')} Avvia ciclo (kg iniziali)</button>` : ''}`;
   }
   return `<div class="card" id="inv-caffe"><h3><span>${ic('bean', 's')} Caffè in grani</span></h3>${prezzo}${corpo}</div>`;
 }
 function pInventario(d){
-  const ad = st.isAdmin;
+  const ad = can('inventario');
   const k = st.invSort.k, asc = st.invSort.asc ? 1 : -1;
   const v = p => k === 'stock' ? giacenza(d, p) : k === 'prezzo' ? p.prezzo : k === 'categoria' ? p.categoria : (p.nome||'').toLowerCase();
   const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && (ad || p.attivo !== false)).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
@@ -2451,7 +2436,7 @@ function pInventario(d){
   return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e scorta del caffè</p></div>
     ${ad ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
   <div class="banner sky">${ic('info')}<div>Materiali di consumo (palette, zucchero, bicchieri, detersivi…) non si contano: sono spese generali, aggiungili alla <b>Lista della spesa</b> come promemoria e, se li anticipi, chiedi il <b>Rimborso spesa</b> dalla Home.</div></div>
-  ${!ad ? `<div class="banner sky">${ic('lock')}<div>Prezzi, giacenze e scorte li modificano solo gli amministratori.</div></div>` : ''}
+  ${!ad ? `<div class="banner sky">${ic('lock')}<div>Prezzi, giacenze e scorte li modificano solo il Creatore e i Supervisor.</div></div>` : ''}
   ${ric.length ? `<div class="card" id="inv-ricomprare"><h3><span>🛒 Da ricomprare</span></h3><div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px">${ric.map(x => `<span>${x}</span>`).join('')}</div></div>` : ''}
   ${cardCaffeScorta(d, ad)}
   <div class="card" style="padding:6px 8px;overflow-x:auto">
@@ -2465,7 +2450,7 @@ function pInventario(d){
         <div><button class="btn link" style="font-size:11px;padding:2px" data-act="carico-n" data-id="${p.id}">carico…</button></div>` : `<b class="mono ${sk <= SOGLIA_SCORTA || es ? 'red' : ''}">${es ? 'Esaurito' : sk}</b>`}</td></tr>`; }).join('')}
   </tbody></table>
   ${list.length ? '' : `<div class="empty">Nessun altro articolo. ${ad ? 'Aggiungi il primo con “Nuovo”.' : ''}</div>`}
-  ${infoBtn(`«Esaurito» (solo admin) toglie l'articolo da «Acquista snack» anche se a sistema risultano ancora pezzi: quei pezzi sono l'ammanco. Un nuovo carico, o «Torna disponibile», lo rimette in vendita. La scorta del caffè scala 1 ÷ ${resaKg()} kg per ogni caffè registrato (giri offerti inclusi).`, 'Come funziona')}
+  ${infoBtn(`«Esaurito» (solo chi gestisce) toglie l'articolo da «Acquista snack» anche se a sistema risultano ancora pezzi: quei pezzi sono l'ammanco. Un nuovo carico, o «Torna disponibile», lo rimette in vendita. La scorta del caffè scala 1 ÷ ${resaKg()} kg per ogni caffè registrato (giri offerti inclusi).`, 'Come funziona')}
   </div>`;
 }
 
@@ -2487,13 +2472,18 @@ function pQuote(d){
   const list = membriAttivi().map(m => ({...m, sq: statoQuota(d, m.id, a), qm: quotaMov(d, m.id, a)}))
     .sort((x,y) => (x.sq === 'pagata') - (y.sq === 'pagata') || x.nome.localeCompare(y.nome));
   const pagati = list.filter(m => m.sq === 'pagata').length, mig = quoteMigra(d);
-  return `<h2>${ic('users')} Quote fondo ${a}</h2><p class="sub">Quota annuale di ${eur(st.gruppo.quotaAnnua||0)} · pagate ${pagati} su ${list.length}</p>
+  const dovuti = (st.gruppo.quotaAnnua || 0) * (list.length - pagati);
+  return `<h2>${ic('banknote')} Quote annuali ${a}</h2><p class="sub">Quota di ${eur(st.gruppo.quotaAnnua||0)} · pagate ${pagati} su ${list.length}</p>
+  <div class="card" id="quote-riepilogo"><div class="grid2">
+    <div class="stat"><small>✅ Pagate</small><b class="mono green" id="q-pagate" style="font-size:24px">${pagati}</b></div>
+    <div class="stat"><small>⏳ Da pagare</small><b class="mono ${list.length - pagati ? 'red' : 'green'}" id="q-dapagare" style="font-size:24px">${list.length - pagati}</b><small>${eur(dovuti)} ancora da incassare</small></div></div>
+    ${can('soci') ? `<label class="f" style="margin-top:10px"><span>Importo della quota annuale €</span><div class="row" style="gap:8px"><input class="in mono" id="q-importo" inputmode="decimal" value="${((st.gruppo.quotaAnnua || 0) / 100).toFixed(2).replace('.', ',')}" style="flex:1"><button class="btn amber" id="btn-q-importo" data-act="quota-importo">Salva</button></div></label>` : ''}</div>
   <div class="banner sky">${ic('wallet')}<div>La quota è un contributo al fondo, separato dal portafoglio: non crea debiti e non cambia il saldo. Attiva l'interruttore quando la ricevi e scegli se accreditarla anche come crediti consumabili.</div></div>
   ${mig.length ? `<div class="banner amber">${ic('alert')}<div class="grow">${mig.length} ${mig.length === 1 ? 'collega ha' : 'colleghi hanno'} ancora un addebito di quota del vecchio modello non pagato (${eur(mig.reduce((t, x) => t + x.imp, 0))} in meno nei saldi).</div><button class="btn sm amber" id="btn-quota-migra" data-act="quota-migra">Azzera addebiti quota pregressi</button></div>` : ''}
   <div class="card">${cercaBox('quote-lista')}<div class="list" id="quote-lista">${list.map(m => `<div class="li" data-q="${qMem(m)}">
     <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d mono">saldo ${eurS(saldo(m.id))}${m.sq === 'pagata' && m.qm && typeof m.qm.cred === 'boolean' ? ' · ' + (m.qm.cred ? 'accreditata come crediti' : 'solo fondo') : ''}</div></div>
     <span class="pill ${m.sq === 'pagata' ? 'green' : 'red'}">${m.sq === 'pagata' ? 'pagata' : 'da pagare'}</span>
-    <button class="tgl ${m.sq === 'pagata' ? 'on' : ''}" role="switch" aria-checked="${m.sq === 'pagata'}" aria-label="Quota pagata: ${esc(nomeM(m.id))}" data-act="quota-toggle" data-id="${m.id}"></button></div>`).join('')}</div>${cercaVuoto('quote-lista')}</div>`;
+    ${can('soci') ? `<button class="tgl ${m.sq === 'pagata' ? 'on' : ''}" role="switch" aria-checked="${m.sq === 'pagata'}" aria-label="Quota pagata: ${esc(nomeM(m.id))}" data-act="quota-toggle" data-id="${m.id}"></button>` : ''}</div>`).join('')}</div>${cercaVuoto('quote-lista')}</div>`;
 }
 
 /* ---------- STATISTICHE ---------- */
@@ -2571,11 +2561,11 @@ function pMembri(d){
   const a = anno(), att = membriAttivi().slice().sort((x, y) => x.nome.localeCompare(y.nome, 'it')), qOn = (st.gruppo.quotaAnnua || 0) > 0;
   const qPag = att.filter(m => statoQuota(d, m.id, a) === 'pagata').length;
   const qPill = m => !qOn ? '' : statoQuota(d, m.id, a) === 'pagata' ? '<span class="pill green">quota ✓</span>' : '<span class="pill amber">quota da pagare</span>';
-  return `<h2>${ic('users')} Soci &amp; Ruoli ${infoBtn(`Elenco dei colleghi con saldo e stato della quota annuale. Tocca un nome per accreditare un regalo/omaggio (senza toccare la cassa), rettificare saldo o punti, incassare la quota, nominare o revocare un amministratore, archiviare o ripristinare, resettare il PIN.`)}</h2>
+  return `<h2>${ic('users')} Gestione Soci ${infoBtn(`Elenco dei colleghi con saldo, punti e stato della quota annuale. Tocca un nome per cambiare nome e nickname, modificare saldo o punti, archiviare o espellere. I PIN si gestiscono da Gestione PIN, i Supervisor da Gestione Supervisor.`)}</h2>
   ${qOn ? `<button class="card between" id="soci-quote" style="width:100%;text-align:left" data-act="go" data-p="quote"><span>${ic('wallet','s')} <b>Quote fondo ${a}</b></span><span class="pill ${qPag === att.length ? 'green' : 'amber'}">${qPag} su ${att.length} pagate</span></button>` : ''}
   <div class="card"><h3><span>Soci</span><button class="btn link" data-act="membro" data-id="">${ic('plus','s')} Aggiungi</button></h3>
     ${cercaBox('mb-lista')}<div class="list" id="mb-lista">${att.map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="membro" data-id="${m.id}">
-      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">${m.nick ? '“' + esc(m.nick) + '” · ' : ''}⭐ ${ptDisp(d, m.id)} punti${isCreatore(m.id) ? ' · creatore' : adminDiMembro(m.id).length ? ' · admin' : ''} ${qPill(m)}</div></div>
+      <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(m.nome)}</div><div class="d">${m.nick ? '“' + esc(m.nick) + '” · ' : ''}⭐ ${ptDisp(d, m.id)} punti${isCreatore(m.id) ? ' · Creatore' : adminDiMembro(m.id).length ? ' · Supervisor' : ''} ${qPill(m)}</div></div>
       <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}" style="font-size:13px">${eurS(saldo(m.id))}</b></button>`).join('')}</div>${cercaVuoto('mb-lista')}
     <button class="btn sm ghost block" style="margin-top:8px" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button>
     ${st.membri.some(m => m.attivo === false) ? `<details style="margin-top:8px"><summary class="mut" style="cursor:pointer;font-size:12.5px;padding:6px 2px">Archiviati ed espulsi (${st.membri.filter(m => m.attivo === false).length})</summary>
@@ -2585,23 +2575,25 @@ function pMembri(d){
   </div>`;
 }
 
-/* ---------- AMMINISTRAZIONE ---------- */
-function pAdmin(d){
-  if(!st.isAdmin) return `<h2>${ic('lock')} Amministrazione</h2><p class="sub">Riservata agli amministratori del gruppo.</p>
-    <div class="card"><label class="f"><span>PIN amministratore</span><input class="in mono" id="a-pin" type="password" autocomplete="current-password" placeholder="PIN"></label>
-    <button class="btn amber block" data-act="diventa-admin" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Accedi come amministratore'}</button>
-    <p class="hint" style="margin:6px 0 10px">Il PIN te lo dà chi gestisce la saletta. Vale per questo telefono finché non esci dal ruolo.</p></div>`;
-  return pImpostazioni();
+/* ---------- GESTIONE PIN ---------- */
+function pPin(d){
+  const att = membriAttivi().slice().sort((x, y) => x.nome.localeCompare(y.nome, 'it')), sel = st.pinSel && att.find(m => m.id === st.pinSel);
+  return `<h2>${ic('lock')} Gestione PIN ${infoBtn(`Il PIN personale (6 cifre) serve a ritrovare il profilo su un nuovo telefono. «Reset PIN» lo azzera: alla prossima apertura il collega ne sceglie uno nuovo. «PIN temporaneo» ne imposta uno che comunichi di persona; poi il collega dovrà sceglierne uno suo. Il PIN del Creatore lo può resettare solo il Creatore.`)}</h2>
+  <div class="card"><h3>Scegli il collega</h3>${cercaBox('pin-lista')}<div class="list" id="pin-lista">${att.map(m => `<button class="li" id="pin-${m.id}" data-q="${qMem(m)}" style="width:100%;text-align:left;${sel && sel.id === m.id ? 'border-color:var(--amber)' : ''}" data-act="pin-sel" data-id="${m.id}"><div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div></div>${sel && sel.id === m.id ? '<span class="pill amber">scelto</span>' : ''}</button>`).join('')}</div>${cercaVuoto('pin-lista')}</div>
+  ${sel ? `<div class="card" id="pin-azioni"><h3>${esc(nomeM(sel.id))}</h3>
+    ${pinGestibile(sel.id) ? `<div class="grid2"><button class="btn ghost" id="btn-pin-reset" data-act="pin-reset" data-id="${sel.id}">${ic('lock','s')} Reset PIN</button><button class="btn amber" id="btn-pin-temp" data-act="pin-temp" data-id="${sel.id}">${ic('lock','s')} PIN temporaneo</button></div>`
+      : `<div class="banner amber">${ic('shield')}<div>Il PIN del Creatore lo può resettare solo il Creatore.</div></div>`}</div>`
+    : `<p class="hint" id="pin-hint">Scegli un collega per resettare il suo PIN o impostarne uno temporaneo.</p>`}`;
 }
+A['pin-sel'] = ds => { st.pinSel = ds.id; render(); };
 
 /* ---------- strumenti amministratore (menù a panino) ---------- */
 const uidNome = uid => { const u = st.utenti.find(x => x.id === uid); return u ? nomeM(u.mid) : null; };
 const bannerBackup = () => { const b = LS.get('backup_' + st.gid); return (!b || Date.now() - b > 7 * 864e5) ? `<div class="banner amber">${ic('alert')}<div>${b ? 'L\'ultimo backup risale a più di una settimana fa.' : 'Non hai ancora fatto un backup dei dati.'} <a href="#" data-act="go" data-p="backup" style="color:inherit;font-weight:800">Vai al backup</a></div></div>` : ''; };
-const cardParametri = () => `  <div class="card"><h3>Parametri del gruppo</h3>
-    <label class="f"><span>Quota annua €</span><input class="in mono" id="ad-quota" inputmode="decimal" value="${(st.gruppo.quotaAnnua/100).toFixed(2).replace('.',',')}"></label>
+const cardParametri = () => `  <div class="card"><h3>Nome del gruppo</h3>
     <label class="f"><span>Nome gruppo</span><input class="in" id="ad-nome" value="${esc(st.gruppo.nome||'')}" maxlength="40"></label>
     <button class="btn amber block" data-act="salva-gruppo">Salva</button>
-    ${infoBtn(`Il prezzo del caffè e il listino si gestiscono da Saletta → Inventario. Regole punti, soci, backup e chiusura sono nel menu ☰, sezione Amministrazione.`, 'Come funziona')}
+    ${infoBtn(`Prezzo del caffè e listino: Saletta → Inventario. Quota annuale: ☰ → Quote annuali. Regole punti, soci, PIN, backup e chiusura sono nel menu ☰, sezione Gestione.`, 'Come funziona')}
   </div>
 `;
 const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['rp-on-bf', 'ptBfOn', '👏 Punti «Ben fatto»']];
@@ -2635,7 +2627,6 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
   </div>
-  ${cardCompiti()}
   <div class="card" id="rp-c"><h3>C · Podio del mese</h3>
     <label class="check"><input type="checkbox" id="rp-podio-on" ${podioOn() || (st.gruppo && st.gruppo.podioOn === true) ? 'checked' : ''}><b style="flex:1;font-size:14px">🏅 Bonus ai primi tre del mese solare</b></label>
     <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
@@ -2654,18 +2645,6 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
   </div>
   <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti" style="margin-bottom:12px">Salva le regole</button>
 `;
-const cardAdmins = () => `
-  <div class="card"><h3>Amministratori</h3>
-    <div class="list">${st.admins.map(a => `<div class="li"><div class="av">${ic('shield','s')}</div><div class="grow"><div class="t">${esc(uidNome(a.id) || a.nome || 'telefono')}${protettoUid(a.id) ? ' <span class="pill amber">creatore</span>' : ''}</div><div class="d">${a.id === st.uid ? 'questo telefono' : 'dal ' + (a.ts && a.ts.toMillis ? dataOra(a.ts.toMillis()).slice(0,10) : '')}</div></div>
-      ${a.id !== st.uid && !protettoUid(a.id) ? `<button class="btn sm ghost" data-act="revoca" data-id="${a.id}">Rimuovi</button>` : ''}</div>`).join('')}</div>
-    ${infoBtn(`Per nominare un nuovo amministratore apri il collega dalla pagina <button class="btn link" style="padding:0" data-act="go" data-p="membri">Colleghi</button>, oppure approva la sua richiesta dalle Notifiche. Il creatore del gruppo non può essere rimosso.`, 'Come funziona')}
-    <div class="grid2" style="margin-top:10px">
-      <button class="btn sm" data-act="cambia-pin">${ic('lock','s')} Cambia PIN</button>
-      <button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia ruolo</button>
-    </div>
-  </div>
-`;
-
 function pRegole(){
   return `<h2>${ic('sparkles')} ⚙️ Regole punti &amp; premi ${infoBtn(`Tutto in un posto: consumi e spese, obiettivi e collaborazione, podio del mese e riscatto della Tessera Fedeltà`)}</h2>${cardRegolePunti()}`;
 }
@@ -2675,19 +2654,33 @@ function pBackup(d){
     <p class="tx2" style="font-size:13px;margin:0 0 10px">Copia completa di saldi, cassa, movimenti e periodi chiusi. Conservala fuori dall'app (Drive, email, WhatsApp a te stesso).${LS.get('backup_'+st.gid) ? ' Ultimo backup: ' + dataOra(LS.get('backup_'+st.gid)) + '.' : ' Non hai ancora fatto un backup.'}</p>
     <button class="btn block" data-act="backup">${ic('download','s')} Scarica backup (JSON)</button>
     <div class="grid2" style="margin-top:8px"><button class="btn" data-act="backup-invia">${ic('share','s')} Invia / salva</button><button class="btn" data-act="backup-csv">Excel (CSV)</button></div>
-    <button class="btn block ghost" style="margin-top:8px" data-act="ripristina-backup">Ripristina da file…</button>
-    <input type="file" id="bk-file" accept=".json,application/json" hidden>
+    ${sonoCreatore() ? `<button class="btn block ghost" style="margin-top:8px" data-act="ripristina-backup">Ripristina da file…</button>
+    <input type="file" id="bk-file" accept=".json,application/json" hidden>` : '<p class="hint" style="margin:8px 0 0">Il ripristino da file lo può fare solo il Creatore.</p>'}
   </div>`;
+}
+/* Chiusure ravvicinate: tutto dai documenti `chiusure` e dai movimenti già in memoria (nessuna lettura in più) */
+const trascorso = ms => { const h = Math.floor(ms / 36e5); return h < 1 ? 'meno di un\'ora' : h < 24 ? (h === 1 ? '1 ora' : h + ' ore') : (Math.floor(h / 24) === 1 ? '1 giorno' : Math.floor(h / 24) + ' giorni'); };
+function infoChiusura(d){
+  const last = ultimaChiusura();
+  const nuovi = d.movs.filter(m => !m._pending && m.tipo !== 'storno' && !['annullata', 'rifiutata', 'assegnato'].includes(m.stato)).length;
+  if(!last) return {last: null, nuovi, recente: false, pochi: false};
+  const t = tms(last.ts) || last.fino.toMillis(), ms = Math.max(0, Date.now() - t);
+  return {last, t, ms, nuovi, autore: last.autore || 'un Supervisor', n: last.n || 0, recente: ms < CHIUSURA_RECENTE_GG * 864e5, pochi: nuovi < CHIUSURA_MIN_NUOVI};
 }
 function pChiusura(d){
   const vecchi = d.movs.filter(m => m.t < Date.now() - CHIUSURA_MARGINE && !m._pending).length;
-  const last = ultimaChiusura();
+  const k = infoChiusura(d), last = k.last, avvisa = !!last && (k.recente || k.pochi);
+  const box = last ? `<div class="banner sky" id="chiusura-ultima" style="font-size:14.5px;margin-bottom:12px">${ic('archive')}<div class="grow"><b>Ultima chiusura effettuata il ${dataOra(k.t)} da ${esc(k.autore)}</b> (${k.n} ${k.n === 1 ? 'movimento archiviato' : 'movimenti archiviati'})</div></div>`
+    : `<div class="banner" id="chiusura-ultima" style="margin-bottom:12px">${ic('archive')}<div class="grow">Nessuna chiusura ancora effettuata.</div></div>`;
+  const warn = avvisa ? `<div class="banner red" id="chiusura-recente" style="margin-bottom:12px">${ic('alert')}<div class="grow"><b>⚠️ ${k.recente ? `Periodo chiuso di recente da ${esc(k.autore)} solo ${trascorso(k.ms)} fa` : `Pochi movimenti nuovi dall'ultima chiusura (${esc(k.autore)}, ${dataOra(k.t)})`}</b>${k.pochi ? `<br><span style="font-size:12.5px">Dopo quella chiusura i movimenti significativi sono solo ${k.nuovi}.</span>` : ''}<br><span style="font-size:12.5px">Per chiuderlo di nuovo serve una doppia conferma.</span></div></div>` : '';
   return `<h2>${ic('archive')} Chiusura periodo</h2><p class="sub">Consolida e archivia i movimenti.</p>
+  ${box}
   <div class="card"><h3>Chiusura periodo</h3>
     <p class="tx2" style="font-size:13px;margin:0 0 10px">Fissa saldi, cassa e giacenze e archivia i movimenti. Ogni telefono poi scarica solo i movimenti nuovi: tienilo leggero chiudendo una volta al mese.</p>
-    <div class="between" style="font-size:13px;margin-bottom:10px"><span class="mut">Ultima chiusura</span><b>${last ? dataOra(last.fino.toMillis()) : 'mai'}</b></div>
+    <div class="between" style="font-size:13px;margin-bottom:10px"><span class="mut">Ultima chiusura</span><b>${last ? dataOra(k.t) : 'mai'}</b></div>
     <div class="between" style="font-size:13px;margin-bottom:12px"><span class="mut">Movimenti nel periodo aperto</span><b class="mono ${d.movs.length > 800 ? 'red' : ''}">${d.movs.length}</b></div>
-    <button class="btn block" data-act="chiudi-periodo" ${!vecchi || st.busy ? 'disabled' : ''}>${ic('archive','s')} Chiudi il periodo</button>
+    ${warn}
+    <button class="btn block" id="btn-chiudi-periodo" data-act="chiudi-periodo" ${!vecchi || st.busy ? 'disabled' : ''}>${ic('archive','s')} Chiudi il periodo</button>
   </div>`;
 }
 
@@ -2696,17 +2689,12 @@ function pImpostazioni(){
   const link = location.origin + location.pathname + '#g=' + st.gid;
   return `<h2>${ic(st.isAdmin ? 'settings' : 'user')} ${st.isAdmin ? 'Impostazioni' : 'Profilo'}</h2><p class="sub">${esc(st.gruppo.nome || '')}</p>
   <div class="card"><h3>Tu</h3>
-    <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${st.isAdmin ? 'Amministratore' : 'Collega'}</div></div>
+    <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${ruolo()}</div></div>
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
   ${st.mid ? `<div class="card"><div class="between"><div><b>PIN personale</b><div class="mut" style="font-size:12px">Serve a ritrovare il profilo se cambi telefono</div></div><button class="btn sm" data-act="pin-cambia">${ic('lock','s')} Cambia</button></div></div>` : ''}
-  ${st.isAdmin ? cardParametri() + cardAdmins() : ''}
+  ${sonoCreatore() ? cardParametri() : ''}
+  ${st.isAdmin && !sonoCreatore() ? `<div class="card"><div class="between"><div><b>Ruolo di Supervisor</b><div class="mut" style="font-size:12px">${badgePerm(permDi(st.uid)) || 'nessun permesso'}</div></div><button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia</button></div></div>` : ''}
   <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e compiti</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
-  ${!st.isAdmin ? `<div class="card"><h3>${ic('shield','s')} Amministratore</h3>
-    ${st.reqAdmin && st.reqAdmin.stato === 'attesa' ? `<p class="tx2" style="font-size:13px;margin:0 0 10px">Richiesta inviata: un amministratore deve approvarla.</p><button class="btn block ghost" data-act="ritira-richiesta-admin">Ritira la richiesta</button>`
-      : `${st.reqAdmin && st.reqAdmin.stato === 'rifiutata' ? `<div class="banner red">${ic('alert')}<div>La tua ultima richiesta non è stata accettata.</div></div>` : ''}<p class="tx2" style="font-size:13px;margin:0 0 10px">Vuoi aiutare a gestire la saletta? Chiedi di diventare amministratore: lo decide chi lo è già.</p><button class="btn amber block" data-act="richiedi-admin" ${st.busy?'disabled':''}>Richiedi accesso come amministratore</button>`}
-    <details style="margin-top:12px"><summary class="mut" style="cursor:pointer;font-size:12.5px">Ho il PIN amministratore</summary>
-      <label class="f" style="margin-top:8px"><span>PIN amministratore</span><input class="in mono" id="a-pin" type="password" autocomplete="current-password" placeholder="PIN"></label>
-      <button class="btn block" data-act="diventa-admin" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Accedi con il PIN'}</button></details></div>` : ''}
   ${st.isAdmin ? `<div class="card"><h3>Invita i colleghi</h3>
     <div class="code mono" style="margin-bottom:10px">${esc(st.gid)}</div>
     <div class="grid2"><button class="btn sm" data-act="copia" data-v="${esc(st.gid)}">${ic('copy','s')} Copia codice</button>
@@ -2717,7 +2705,7 @@ function pImpostazioni(){
     <div class="between" style="font-size:13px;margin-top:6px"><span class="mut">Versione</span><span>v${VERSION}</span></div></div>
   <button class="btn block ghost" data-act="esci-gruppo" style="color:var(--red)">${ic('logout','s')} Esci dal gruppo su questo telefono</button>
   ${isCreatore(st.mid) || (st.gruppo && st.gruppo.creatoDa === st.uid) ? `<div class="card" style="border-color:rgba(248,113,113,.45);margin-top:14px"><h3 style="color:var(--red)">Zona pericolosa</h3>
-    <p class="mut" style="font-size:13px;margin:0 0 10px">Solo tu, che hai creato il gruppo, puoi eliminarlo. Vengono cancellati per sempre registro, saldi, cassa, inventario e colleghi. Prima scarica un backup dalle Impostazioni.</p>
+    <p class="mut" style="font-size:13px;margin:0 0 10px">Solo tu, che hai creato il gruppo, puoi eliminarlo. Vengono cancellati per sempre registro, saldi, cassa, inventario e colleghi. Prima scarica un backup da ☰ → Backup & Ripristino.</p>
     <button class="btn block" id="btn-elimina-gruppo" data-act="elimina-gruppo" style="background:var(--red);border-color:var(--red);color:#fff">${ic('trash','s')} Elimina il gruppo</button></div>` : ''}`;
 }
 
@@ -2735,10 +2723,10 @@ A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render
 A['drawer'] = () => { $('drawer').classList.add('on'); $('drawer-ov').classList.add('on'); };
 A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
   <p class="sub">Armieri 5.0 v${VERSION} · ${esc(st.gruppo.nome || '')}</p>
-  <div class="card" style="margin:0 0 10px"><div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Il tuo ruolo</span><b>${st.isAdmin ? 'Amministratore' : 'Collega'}</b></div>
+  <div class="card" style="margin:0 0 10px"><div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Il tuo ruolo</span><b>${ruolo()}</b></div>
     <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Prezzo caffè</span><b class="mono">${eur(st.gruppo.prezzoCaffe || 0)}</b></div>
     <div class="between" style="font-size:13px"><span class="tx2">Quota fondo annuale</span><b class="mono">${eur(st.gruppo.quotaAnnua || 0)}</b></div></div>
-  ${infoBtn(`Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un amministratore. Ricariche e pagamenti li conferma un amministratore. Saldi e movimenti degli altri sono visibili solo agli amministratori.`, 'Come funziona')}
+  ${infoBtn(`Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un Supervisor. Ricariche e pagamenti li conferma un Supervisor. Saldi e movimenti degli altri sono visibili solo ail Creatore e i Supervisor.`, 'Come funziona')}
   <button class="btn block" data-act="sheet-close">Chiudi</button>`); };
 /* forza l'aggiornamento: svuota cache e service worker, rilegge i file dalla rete e ricarica (dati e accesso restano) */
 A['aggiorna'] = async () => {
@@ -2794,49 +2782,20 @@ A['join'] = async () => {
 };
 
 A['join-collega'] = () => { const code = st.joinCode; if(!code) return; st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null; st.joinCode = null; connect(code); render(); };
-A['join-creatore'] = async () => {
-  const code = st.joinCode || st.recCode, pin = val('jc-pin');
-  if(!code) return;
-  if(!pin) return toast('Inserisci il PIN amministratore', 'err');
-  if(!navigator.onLine) return toast('Serve la connessione', 'err');
-  st.busy = true; render();
-  try {
-    const g = db.collection('saletta').doc(code);
-    const gd = await g.get({source:'server'}), cm = gd.exists && gd.data().creatoreMid;
-    if(!cm){ toast('Questo gruppo non ha un creatore registrato: entra come nuovo collega', 'err'); return; }
-    // se questo telefono è già amministratore e già collegato non c'è nulla da scrivere
-    const ad = await g.collection('admin').doc(st.uid).get({source:'server'});
-    if(!ad.exists){
-      try { await g.collection('admin').doc(st.uid).set({pin, nome: gd.data().nome || 'Creatore', ts: TS()}); }   // le regole verificano il PIN
-      catch(e){ throw Object.assign(e, {fase: 'pin'}); }
-    }
-    const ut = await g.collection('utenti').doc(st.uid).get({source:'server'});
-    if(!ut.exists){
-      const md = await g.collection('membri').doc(cm).get({source:'server'});
-      await g.collection('utenti').doc(st.uid).set({mid: cm, nome: md.exists ? md.data().nome : 'Creatore', ts: TS()});
-    }
-    const mid = ut.exists ? ut.data().mid : cm;
-    st.gid = code; LS.set('gid', code); LS.set('mid', mid); LS.del('invito'); st.entry = null; st.joinCode = null;
-    connect(code); toast(ad.exists ? 'Bentornato 🛡️ Questo telefono era già amministratore' : 'Bentornato, creatore del gruppo 🛡️');
-  } catch(e){ toast(e && e.fase === 'pin' ? errIngresso(e, 'PIN amministratore errato') : errIngresso(e), 'err'); }
-  finally { st.busy = false; render(); }
-};
 A['crea'] = async () => {
-  const nome = val('c-nome'), io = val('c-io'), nick = val('c-nick'), pin = val('c-pin');
+  const nome = val('c-nome'), io = val('c-io'), nick = val('c-nick');
   const pc = parseEuro(val('c-caffe')), qa = parseEuro(val('c-quota'));
   const ct = val('c-contanti') ? parseEuro(val('c-contanti')) : 0, rv = val('c-revolut') ? parseEuro(val('c-revolut')) : 0;
   if(!nome || !validaNome(io)) return toast('Scrivi il nome del gruppo e il tuo nome', 'err');
   if(!validaNick(nick)) return toast('Nickname troppo lungo', 'err');
   if(!(pc >= 0) || !(qa >= 0) || !(ct >= 0) || !(rv >= 0)) return toast('Controlla gli importi', 'err');
-  if(pin.length < 6) return toast('Il PIN deve avere almeno 6 caratteri', 'err');
   if(!navigator.onLine) return toast('Serve la connessione per creare il gruppo', 'err');
   st.busy = true; render();
   try {
     const gid = newCode(), g = db.collection('saletta').doc(gid);
     const me = g.collection('membri').doc();
     await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1, scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: 1, ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20});
-    await g.collection('segreti').doc('pin').set({pin});
-    await g.collection('admin').doc(st.uid).set({pin, nome: io, ts: TS()});
+    await g.collection('admin').doc(st.uid).set({nome: io, ts: TS()});
     const b = db.batch();
     b.set(me, clean({nome: io, nick: nick || undefined, uid: st.uid, attivo: true, creato: TS()}));
     b.set(g.collection('utenti').doc(st.uid), {mid: me.id, nome: io, ts: TS()});
@@ -2864,7 +2823,7 @@ A['richiesta-modifica'] = () => { st.richiesta = {...st.richiesta, stato: 'modif
 A['richiesta-ritira'] = () => { if(!confirm('Ritirare la richiesta di accesso?')) return; C('richieste').doc(st.uid).delete().catch(e => toast(errMsg(e), 'err')); };
 A['nick'] = () => {
   const m = membro(st.mid);
-  openSheet(`<h3>${ic('user')} Il tuo nickname</h3><p class="sub">Il nome <b>${esc(m.nome)}</b> è stato registrato dall'amministratore e non si può cambiare.</p>
+  openSheet(`<h3>${ic('user')} Il tuo nickname</h3><p class="sub">Il nome <b>${esc(m.nome)}</b> è stato registrato dal Supervisor e non si può cambiare.</p>
     <label class="f"><span>Nickname</span><input class="in" id="nk" maxlength="20" value="${esc(m.nick || '')}" placeholder="facoltativo" autofocus></label>
     <button class="btn amber block big" data-act="salva-nick">Salva</button>`);
 };
@@ -2984,7 +2943,7 @@ A['conferma-elimina-gruppo'] = async () => {
 A['esci-gruppo'] = force => {
   if(force !== true && st.isAdmin && st.gid){
     const unico = st.admins.length <= 1;
-    const msg = (unico ? 'ATTENZIONE: sei l\'unico amministratore. ' : '') + 'Per rientrare servono il codice del gruppo (e il PIN per tornare amministratore).\n\nCodice: ' + st.gid + '\n\nPremi OK per copiare il codice e uscire, Annulla per restare.';
+    const msg = (sonoCreatore() ? 'ATTENZIONE: sei il Creatore del gruppo. ' : '') + 'Per rientrare servono il codice del gruppo e il tuo PIN personale.\n\nCodice: ' + st.gid + '\n\nPremi OK per copiare il codice e uscire, Annulla per restare.';
     if(!confirm(msg)) return;
     try { navigator.clipboard && navigator.clipboard.writeText(st.gid); } catch(e){}
   } else if(force !== true && !confirm('Uscire dal gruppo su questo telefono? Potrai rientrare con il codice.')) return;
@@ -3038,7 +2997,7 @@ A['prendi-snack'] = ds => {
   toast(`${p.nome} (−${eur(p.prezzo)})${st.isAdmin && rest <= SOGLIA_SCORTA ? ' · scorte basse!' : ''}`, '', {label:'Annulla', fn: () => annullaConsumo(id)});
 };
 
-/* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un amministratore --- */
+/* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un Supervisor --- */
 A['ricarica-nuova'] = () => openSheet(`<h3>${ic('wallet')} Cosa vuoi fare?</h3>
   <p class="sub">Scegli se caricare il tuo saldo o farti rimborsare una spesa anticipata per il gruppo.</p>
   <button class="btn amber block big" id="scelta-ricarica" data-act="ricarica-saldo">💶 Ricarica saldo</button>
@@ -3047,7 +3006,7 @@ A['ricarica-nuova'] = () => openSheet(`<h3>${ic('wallet')} Cosa vuoi fare?</h3>
 A['ricarica-saldo'] = () => {
   const deb = debitoLibero(), base = deb > 0 ? deb : 1000;
   openSheet(`<h3>${ic('wallet')} Ricarica crediti</h3>
-    <p class="sub">${deb > 0 ? `Hai un debito di <b class="mono red">${eur(deb)}</b>. ` : ''}Versi i soldi al Fondo Gruppo; quando un amministratore conferma l'incasso ricevi i crediti (1 credito = 1 €).</p>
+    <p class="sub">${deb > 0 ? `Hai un debito di <b class="mono red">${eur(deb)}</b>. ` : ''}Versi i soldi al Fondo Gruppo; quando un Supervisor conferma l'incasso ricevi i crediti (1 credito = 1 €).</p>
     <div class="chips" id="rc-tagli">${[500, 1000, 2000, 5000].map(v => `<button type="button" data-act="rc-taglio" data-v="${v}">${eur(v)}</button>`).join('')}</div>
     <label class="f"><span>Importo €</span><input class="in mono" id="r-imp" inputmode="decimal" value="${(base / 100).toFixed(2).replace('.', ',')}"></label>
     <label class="f"><span>Come versi i soldi?</span>${segOpts('r-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], 'contanti', revOff())}</label>
@@ -3057,14 +3016,15 @@ A['rc-taglio'] = ds => { const i = $('r-imp'); if(i) i.value = (Number(ds.v) / 1
 A['conferma-ricarica'] = () => {
   const imp = parseEuro(val('r-imp')), met = revolutOn() ? (radio('r-met') || 'contanti') : 'contanti';
   if(!(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
-  addMov({tipo:'ricarica', mid: st.mid, importo: imp, metodo: met, stato: st.isAdmin ? 'confermata' : 'attesa', ...(st.isAdmin ? {esitoDa: myName()} : {})});
+  const subito = can('soci') || can('inbox');
+  addMov({tipo:'ricarica', mid: st.mid, importo: imp, metodo: met, stato: subito ? 'confermata' : 'attesa', ...(subito ? {esitoDa: myName()} : {})});
   closeSheet();
-  toast(st.isAdmin ? `Ricarica di ${eur(imp)} registrata` : `Richiesta inviata: ${eur(imp)} in attesa di conferma`);
+  toast(subito ? `Ricarica di ${eur(imp)} registrata` : `Richiesta inviata: ${eur(imp)} in attesa di conferma`);
 };
 A['riscatta-nuovo'] = () => {
   const cr = creditoLibero(); if(cr <= 0) return toast('Non hai crediti da riscattare', 'err');
   openSheet(`<h3>${ic('banknote')} Riscatta crediti</h3>
-    <p class="sub">Hai <b class="mono green">${eur(cr)}</b> di crediti liberi. Chiedi al Fondo Gruppo di restituirti il denaro (1 credito = 1 €): l'importo resta riservato e il saldo scende solo quando un amministratore ti paga. Se in cassa non c'è liquidità la richiesta può essere rifiutata: potrai rifarla per un importo minore.</p>
+    <p class="sub">Hai <b class="mono green">${eur(cr)}</b> di crediti liberi. Chiedi al Fondo Gruppo di restituirti il denaro (1 credito = 1 €): l'importo resta riservato e il saldo scende solo quando un Supervisor ti paga. Se in cassa non c'è liquidità la richiesta può essere rifiutata: potrai rifarla per un importo minore.</p>
     <label class="f"><span>Quanto riscatti €</span><input class="in mono" id="vf-imp" inputmode="decimal" value="${(Math.min(cr, 50000) / 100).toFixed(2).replace('.', ',')}"></label>
     <label class="f"><span>Come vuoi ricevere i soldi?</span>${segOpts('vf-met', [['contanti', '💶 Contanti'], ['revolut', '📱 Revolut']], 'contanti', revOff())}</label>
     <button class="btn amber block big" id="btn-riscatto-conferma" data-act="conferma-riscatto">Invia la richiesta</button>`);
@@ -3100,7 +3060,7 @@ A['conferma-riscatto-paga'] = ds => {
 /* rimborso spesa: qualsiasi spesa anticipata per il gruppo (saletta o spese straordinarie). Punti proporzionali all'importo alla convalida */
 A['rimborso-nuovo'] = () => {
   openSheet(`<h3>${ic('receipt')} Rimborso spesa</h3>
-    <p class="sub">Hai anticipato una spesa per il gruppo? Un amministratore la convalida guardando lo scontrino o la ricevuta.</p>
+    <p class="sub">Hai anticipato una spesa per il gruppo? Un Supervisor la convalida guardando lo scontrino o la ricevuta.</p>
     <label class="f"><span>Motivo del rimborso</span><input class="in" id="s-desc" maxlength="80" placeholder="es. Caffè in grani e bicchieri · Telegramma condoglianze" autofocus></label>
     <label class="f"><span>Importo speso €</span><input class="in mono" id="s-imp" inputmode="decimal" placeholder="12,50"></label>
     <div data-chg="rb-upd"><label class="f"><span>Come vuoi essere rimborsato?</span>${segOpts('s-rimb', [['crediti','🪙 Tutto in crediti'],['denaro','💶 Tutto in denaro reale'],['misto','⚖️ Misto (crediti + denaro)']], 'crediti')}</label></div>
@@ -3108,7 +3068,7 @@ A['rimborso-nuovo'] = () => {
       <label class="f" style="margin:0"><span>Quota in denaro reale €</span><input class="in mono" id="s-qd" inputmode="decimal" placeholder="0,00"></label>
       <label class="f" style="margin:0"><span>Quota in crediti €</span><input class="in mono" id="s-qc" inputmode="decimal" placeholder="0,00"></label></div>
       <p class="hint" id="rb-msg" style="margin:6px 0 0;font-size:12px"></p></div>
-    ${infoBtn(`Tutto in crediti: l'importo diventa un credito per te. Tutto in denaro reale: un amministratore ti paga dalla cassa e il tuo saldo non cambia. Misto: parte in denaro e parte in crediti; le due quote devono dare esattamente il totale. I punti spesa si calcolano sul totale, in ogni caso.`, 'Come funziona')}
+    ${infoBtn(`Tutto in crediti: l'importo diventa un credito per te. Tutto in denaro reale: un Supervisor ti paga dalla cassa e il tuo saldo non cambia. Misto: parte in denaro e parte in crediti; le due quote devono dare esattamente il totale. I punti spesa si calcolano sul totale, in ogni caso.`, 'Come funziona')}
     <button class="btn green block big" data-act="conferma-spesa">Invia la richiesta</button>`);
 };
 /* rimborso misto: tengo le due quote sincronizzate col totale (quella modificata per ultima comanda) */
@@ -3193,7 +3153,7 @@ function cpFoglio(){
   if(e.fase === 'setup'){
     const nPool = e.sel.length, nEs = membriAttivi().filter(m => c.esenti.includes(m.id)).length, max = Math.max(1, Math.min(cpModo(c) === 'squadra' ? cpMaxP(c) : CP_K_MAX, nPool));
     openSheet(`${testa}
-      ${nEs ? `<p class="hint" style="margin:0 0 8px">${nEs} ${nEs === 1 ? 'collega escluso' : 'colleghi esclusi'} in modo permanente dagli admin per questo compito.</p>` : ''}
+      ${nEs ? `<p class="hint" style="margin:0 0 8px">${nEs} ${nEs === 1 ? 'collega escluso' : 'colleghi esclusi'} in modo permanente dai Supervisor per questo compito.</p>` : ''}
       ${cpModo(c) === 'squadra' ? `<p class="hint" id="cp-squadra" style="margin:0 0 8px">👥 Monte di squadra: <b>${c.pt} pt</b> diviso tra i presenti. Con ${e.k} ${e.k === 1 ? 'persona' : 'persone'} ognuna riceve <b>${cpPtPers(c, e.k)} pt</b>.</p>` : ''}
       <div class="f"><span>Quante persone devono svolgerlo?</span><div class="row" id="cp-k" data-k="${e.k}" style="justify-content:center;gap:10px;margin-top:6px">${Array.from({length: max}, (_, i) => i + 1).map(n => `<button class="btn ${n === e.k ? 'amber' : 'ghost'}" id="cp-k-${n}" data-act="cp-k" data-v="${n}" style="min-width:52px;font-size:18px">${n}</button>`).join('')}</div></div>
       <button class="btn amber block big" id="cp-estrai" data-act="cp-estrai" style="margin-top:14px">🎲 Avvia sorteggio</button>`);
@@ -3226,10 +3186,10 @@ function cpAnim(){
 A['cp-apri'] = ds => {
   if(!st.mid) return;
   const c = cpLista().find(x => x.id === ds.id); if(!c || c.on === false) return toast('Compito non più disponibile', 'err');
-  if(!ptMaster()) return toast('🚫 Sistema punti disattivato dall\'amministratore', 'err');
+  if(!ptMaster()) return toast('🚫 Sistema punti disattivato dal Supervisor', 'err');
   if(cpAperti().some(m => m.cp === c.id)) return toast('Compito già assegnato: attendi che venga concluso', 'err');
   const pool = membriAttivi().filter(m => !c.esenti.includes(m.id)).map(m => m.id);
-  if(!pool.length) return toast('Nessun collega disponibile: tutti esclusi dagli admin', 'err');
+  if(!pool.length) return toast('Nessun collega disponibile: tutti esclusi dai Supervisor', 'err');
   const cd = cpCool(c);
   if(cd){   // frequenza: giorni minimi tra due assegnazioni dello stesso compito (calcolo in memoria sui movimenti caricati)
     const ult = tuttiMov().filter(m => m.tipo === 'compito' && m.cp === c.id && m.giorno && m.stato !== 'annullata' && m.stato !== 'rifiutata').map(m => m.giorno).sort().pop();
@@ -3273,77 +3233,126 @@ A['cp-fatto'] = ds => {
   const m = tuttiMov().find(x => x.id === ds.id);
   if(!m || m.tipo !== 'compito' || m.mid !== st.mid || m.stato !== 'assegnato' || m._pending) return toast('Questo incarico non è più da svolgere', 'err');
   C('movimenti').doc(m.id).update({stato: 'attesa', fattoTs: Date.now()})
-    .then(() => toast('Fatto! In attesa di convalida di un admin ✓')).catch(e => toast(errMsg(e), 'err'));
+    .then(() => toast('Fatto! In attesa di convalida di un Supervisor ✓')).catch(e => toast(errMsg(e), 'err'));
 };
 A['cp-annulla'] = ds => {
   const m = tuttiMov().find(x => x.id === ds.id);
-  if(!st.isAdmin || !m || m.tipo !== 'compito' || m.stato !== 'assegnato') return;
+  if(!can('compiti') || !m || m.tipo !== 'compito' || m.stato !== 'assegnato') return;
   if(!confirm('Annullare questo incarico?\n\nNessun punto: il compito torna sorteggiabile.')) return;
   C('movimenti').doc(m.id).update({stato: 'annullata', esitoDa: myName(), esitoTs: TS()}).then(() => toast('Incarico annullato')).catch(e => toast(errMsg(e), 'err'));
 };
 A['cp-sc'] = ds => { if(cpAperte.has(ds.id)) cpAperte.delete(ds.id); else cpAperte.add(ds.id); render(); };
 
-/* --- Supervisor: colleghi delegati dagli admin (lista «supervisori» nel gruppo, senza scadenza) a convalidare i compiti e crearne di nuovi --- */
+/* --- Ruoli (v1.40.0): Creatore e Supervisor ---
+   Il Creatore ha tutti i poteri e solo lui nomina i Supervisor e ne sceglie i permessi.
+   Un Supervisor vede le stesse schermate dei colleghi: compaiono solo i comandi dei permessi che ha. */
+const PERMESSI = [
+  ['inbox', '✅', 'Approva richieste', 'Conferma spese, ricariche, riscatti e nuovi iscritti (Notifiche)'],
+  ['cassa', '💶', 'Cassa e Storni', 'Entrate, giroconti, correzione saldo cassa, storni'],
+  ['inventario', '📦', 'Inventario e Scorte', 'Prezzi e articoli, giacenze, scorta caffè, Esaurito'],
+  ['soci', '👥', 'Quote e Saldi Soci', 'Quote annuali, saldi e punti, PIN, archivia / espelli'],
+  ['compiti', '🎯', 'Compiti e Regole', 'Compiti nel Briefing, parametri di punteggio e premi'],
+  ['sistema', '🛠️', 'Strumenti di Sistema', 'Avvisi e sondaggi in Home, backup, chiusura periodo']];
+const PERM_IDS = PERMESSI.map(x => x[0]);
+function sonoCreatore(){ return !!st.gruppo && (st.gruppo.creatoDa === st.uid || (!!st.mid && st.gruppo.creatoreMid === st.mid)); }
+/* permessi di un telefono Supervisor (uid): voce assente = tutti (così i vecchi amministratori restano operativi finché il Creatore non li ritocca) */
+function permDi(uid){ const pm = st.gruppo && st.gruppo.permSup, v = pm && pm[uid]; return Array.isArray(v) ? v.filter(x => PERM_IDS.includes(x)) : PERM_IDS.slice(); }
+function can(p){ return sonoCreatore() || (!!st.admDoc && permDi(st.uid).includes(p)) || (p === 'compiti' && isSup()); }
+const canAccessi = () => can('inbox') || can('soci');
+function ruolo(){ return sonoCreatore() ? 'Creatore' : st.isAdmin ? 'Supervisor' : 'Collega'; }
+const midDiUid = uid => { const u = st.utenti.find(x => x.id === uid); return u ? u.mid : null; };
+/* vecchi «supervisori dei compiti» (lista sul gruppo): continuano a funzionare con il solo permesso Compiti e Regole */
 const supervisoriIds = () => { const v = st.gruppo && st.gruppo.supervisori; return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; };
-const supervisori = () => membriAttivi().filter(m => supervisoriIds().includes(m.id));
 const isSup = () => !!st.mid && supervisoriIds().includes(st.mid);
-const cpSoloAdmin = () => st.isAdmin && supervisoriIds().length === 0 && (st.admins || []).length <= 1;   // unico admin e nessun Supervisor: può chiudere anche un compito proprio
-const cpPuoConv = m => m.stato === 'attesa' && !m._pending && !m._local && (m.mid !== st.mid ? (st.isAdmin || isSup()) : cpSoloAdmin());
-const nCpConv = () => (isSup() && ptMaster()) ? cpAperti().filter(m => m.stato === 'attesa' && m.mid !== st.mid).length : 0;
-const bannerSup = () => { const L = supervisori(); return L.length ? `<div class="banner" id="cp-sup" style="margin-bottom:10px"><div class="grow">🛡️ <b>Supervisor attivi:</b> ${L.map(m => esc(m.nick || m.nome)).join(', ')}<br><span style="font-size:12px" class="mut">Possono convalidare i compiti in assenza degli admin.</span></div></div>` : ''; };
+/* mid -> [uid dei telefoni con documento admin], escluso il Creatore (lo leggono solo Creatore e Supervisor) */
+const supervisorMids = () => {
+  const out = {};
+  st.admins.forEach(a => { const m = midDiUid(a.id); if(m && !protettoUid(a.id) && !isCreatore(m)) (out[m] = out[m] || []).push(a.id); });
+  return out;
+};
+const svPermessiMid = mid => { const uids = supervisorMids()[mid]; return uids && uids.length ? permDi(uids[0]) : (supervisoriIds().includes(mid) ? ['compiti'] : []); };
+const badgePerm = ids => PERMESSI.filter(x => ids.includes(x[0])).map(x => `<span class="pill violet" title="${x[2]}">${x[1]}</span>`).join(' ');
+const cpSoloAdmin = () => sonoCreatore() && supervisoriIds().length === 0 && !st.admins.some(a => permDi(a.id).includes('compiti') && midDiUid(a.id) !== st.mid);   // il Creatore è l'unico a poter convalidare: può chiudere anche un compito proprio
+const cpPuoConv = m => m.stato === 'attesa' && !m._pending && !m._local && can('compiti') && (m.mid !== st.mid || cpSoloAdmin());
+const nCpConv = () => (can('compiti') && ptMaster()) ? cpAperti().filter(cpPuoConv).length : 0;
+const supPubblici = () => Array.from(new Set((Array.isArray(st.gruppo.supMids) ? st.gruppo.supMids : []).concat(supervisoriIds())));
+const bannerSup = () => { const ids = supPubblici(), L = membriAttivi().filter(m => ids.includes(m.id)); return L.length ? `<div class="banner" id="cp-sup" style="margin-bottom:10px"><div class="grow">🛡️ <b>Supervisor:</b> ${L.map(m => esc(m.nick || m.nome)).join(', ')}<br><span style="font-size:12px" class="mut">Insieme al Creatore gestiscono richieste, cassa e compiti, ciascuno per le proprie competenze.</span></div></div>` : ''; };
 function cpConvCard(){
-  if(!isSup()) return '';
-  const l = cpAperti().filter(m => m.stato === 'attesa' && m.mid !== st.mid); if(!l.length) return '';
+  if(!can('compiti') || !ptMaster()) return '';
+  const l = cpAperti().filter(cpPuoConv); if(!l.length) return '';
   return `<div class="card" id="cp-conv"><h3>🛡️ Compiti da convalidare <span class="pill red">${l.length}</span></h3><div class="list">${l.map(m => cpRiga(m, st.mid)).join('')}</div></div>`;
 }
 let soloSent = '';
-function sincronizzaSolo(){   // l'admin tiene aggiornato il flag che le regole usano per l'eccezione «unico admin»
-  if(!st.isAdmin || st.sync !== 'ok' || modeKey !== 'admin' || !st.gruppo || !Array.isArray(st.admins) || !st.admins.length) return;
-  const solo = st.admins.length <= 1;
-  if((st.gruppo.soloAdmin === true) === solo || soloSent === String(solo)) return;
-  soloSent = String(solo); G().update({soloAdmin: solo}).catch(() => { soloSent = ''; });
+function sincronizzaSolo(){   // il Creatore tiene aggiornati il flag «unico che può convalidare» (lo usano le regole) e l'elenco pubblico dei Supervisor
+  if(!sonoCreatore() || st.sync !== 'ok' || modeKey !== 'admin' || !st.gruppo || !Array.isArray(st.admins) || !st.admins.length) return;
+  const solo = cpSoloAdmin(), mids = Object.keys(supervisorMids()).sort(), att = (Array.isArray(st.gruppo.supMids) ? st.gruppo.supMids : []).slice().sort();
+  const up = {};
+  if((st.gruppo.soloAdmin === true) !== solo) up.soloAdmin = solo;
+  if(mids.join() !== att.join()) up.supMids = mids;
+  const k = JSON.stringify(up); if(k === '{}' || soloSent === k) return;
+  soloSent = k; G().update(up).catch(() => { soloSent = ''; });
 }
-A['cp-sup-edit'] = () => {
-  if(!st.isAdmin) return;
-  const att = supervisoriIds();
-  openSheet(`<h3>🛡️ Supervisor</h3><p class="hint" style="margin:0 0 8px">Possono convalidare o rifiutare i compiti e creare nuovi compiti. Nessun accesso a cassa o impostazioni. Restano attivi finché non li togli (massimo 10).</p>
-    <div id="cp-sv-lista" style="max-height:40vh;overflow:auto">${membriAttivi().map(m => `<label class="check"><input type="checkbox" class="cp-sv" value="${m.id}" ${att.includes(m.id) ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(m.nick || m.nome)}</b></label>`).join('')}</div>
-    <div class="grid2"><button class="btn" data-act="sheet-close">Annulla</button><button class="btn amber" id="btn-cp-sup-salva" data-act="cp-sup-salva">Salva</button></div>`);
+/* --- Gestione Supervisor (solo Creatore) --- */
+function pSupervisor(d){
+  if(!sonoCreatore()) return `<h2>${ic('shield')} Gestione Supervisor</h2><div class="card"><div class="empty">Solo il Creatore del gruppo può nominare i Supervisor.</div></div>`;
+  const per = supervisorMids(), legacy = supervisoriIds().filter(id => !per[id]);
+  const att = membriAttivi().filter(m => per[m.id] || legacy.includes(m.id));
+  const cand = membriAttivi().filter(m => !per[m.id] && !legacy.includes(m.id) && !isCreatore(m.id) && st.utenti.some(u => u.mid === m.id));
+  return `<h2>${ic('shield')} Gestione Supervisor ${infoBtn(`Il Supervisor è un collega di fiducia con gli stessi schermi degli altri: vede solo i comandi dei permessi che gli concedi. Solo tu puoi nominarlo, cambiarne i permessi o revocarlo. I vecchi amministratori sono stati trasformati in Supervisor con tutti i permessi: puoi ridurli da qui.`)}</h2>
+  <div class="card" id="sv-attivi"><h3><span>Supervisor attivi</span>${att.length ? `<span class="pill violet">${att.length}</span>` : ''}</h3>
+    ${att.length ? `<div class="list">${att.map(m => `<div class="li" id="sv-${m.id}" style="flex-wrap:wrap;gap:8px"><div class="av">${esc(m.nome.slice(0,1))}</div>
+      <div class="grow"><div class="t">${esc(nomeM(m.id))}${per[m.id] ? '' : ' <span class="pill">vecchio</span>'}</div><div class="d">${badgePerm(svPermessiMid(m.id)) || 'nessun permesso'}</div></div>
+      <div class="row" style="gap:6px"><button class="btn sm" data-act="sv-permessi" data-id="${m.id}">Permessi</button><button class="btn sm ghost" data-act="sv-revoca" data-id="${m.id}">Revoca</button></div></div>`).join('')}</div>`
+      : '<div class="empty" id="sv-vuoto">Nessun Supervisor: gestisci tutto tu.</div>'}
+  </div>
+  <div class="card" id="sv-nomina"><h3>Nomina un Supervisor</h3>
+    ${cand.length ? `${cercaBox('sv-lista')}<div class="list" id="sv-lista">${cand.map(m => `<button class="li" data-q="${qMem(m)}" style="width:100%;text-align:left" data-act="sv-nomina" data-id="${m.id}"><div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div></div><span class="pill amber">Nomina</span></button>`).join('')}</div>${cercaVuoto('sv-lista')}`
+      : '<div class="empty">Nessun collega con un telefono collegato da nominare.</div>'}
+  </div>
+  <div class="card"><h3>I sei permessi</h3><div class="list">${PERMESSI.map(x => `<div class="li"><div class="av">${x[1]}</div><div class="grow"><div class="t">${x[2]}</div><div class="d">${x[3]}</div></div></div>`).join('')}</div></div>`;
+}
+function svSheet(mid, esiste){
+  const m = membro(mid); if(!m || !sonoCreatore()) return;
+  const att = esiste ? svPermessiMid(mid) : [];
+  openSheet(`<h3>🛡️ ${esc(m.nome)}</h3><p class="sub">${esiste ? 'Cambia cosa può fare come Supervisor.' : 'Scegli cosa potrà fare come Supervisor. Potrai cambiarlo o revocarlo quando vuoi.'}</p>
+    <div id="sv-perm">${PERMESSI.map(([k, em, nome, desc]) => `<label class="check"><input type="checkbox" class="sv-p" id="svp-${k}" value="${k}" ${att.includes(k) ? 'checked' : ''}><span style="flex:1"><b style="font-size:14px">${em} ${nome}</b><span class="hint" style="display:block;margin:2px 0 0;font-size:12px">${desc}</span></span></label>`).join('')}</div>
+    <button class="btn amber block big" id="btn-sv-salva" data-act="sv-salva" data-id="${mid}" style="margin-top:8px">${esiste ? 'Salva permessi' : 'Nomina Supervisor'}</button>`);
+}
+A['sv-nomina'] = ds => svSheet(ds.id, false);
+A['sv-permessi'] = ds => svSheet(ds.id, true);
+A['sv-salva'] = ds => {
+  if(!sonoCreatore()) return;
+  const m = membro(ds.id); if(!m) return;
+  const perm = Array.from(document.querySelectorAll('#sheet input.sv-p')).filter(b => b.checked).map(b => b.value);
+  if(!perm.length) return toast('Scegli almeno un permesso', 'err');
+  const uids = st.utenti.filter(u => u.mid === ds.id).map(u => u.id);
+  if(!uids.length) return toast('Questo collega non ha un telefono collegato', 'err');
+  const b = db.batch(), up = {};
+  uids.forEach(uid => { if(!st.admins.some(a => a.id === uid)) b.set(C('admin').doc(uid), {nome: m.nome, nominatoDa: myName(), ts: TS()}); up['permSup.' + uid] = perm; });
+  up.supMids = Array.from(new Set(Object.keys(supervisorMids()).concat([ds.id])));
+  if(supervisoriIds().includes(ds.id)) up.supervisori = supervisoriIds().filter(x => x !== ds.id);   // il vecchio ruolo «solo compiti» è assorbito
+  b.update(G(), up);
+  b.commit().then(() => { closeSheet(); toast(`${m.nome}: permessi salvati`); }).catch(e => toast(errMsg(e), 'err'));
 };
-A['cp-sup-salva'] = () => {
-  if(!st.isAdmin) return;
-  const mostrati = membriAttivi().map(m => m.id), nuovi = Array.from(document.querySelectorAll('#sheet input.cp-sv')).filter(b => b.checked).map(b => b.value);
-  const ids = supervisoriIds().filter(x => !mostrati.includes(x)).concat(nuovi);
-  if(ids.length > 10) return toast('Massimo 10 Supervisor', 'err');
-  G().update({supervisori: ids}).then(() => { closeSheet(); toast('Supervisor aggiornati'); }).catch(e => toast(errMsg(e), 'err'));
-};
-A['cp-nuovo'] = () => {
-  if(!(st.isAdmin || isSup()) || !ptMaster()) return;
-  openSheet(`<h3>🎯 Nuovo compito</h3>
-    <label class="f"><span>Descrizione</span><input class="in" id="cn-nome" maxlength="40" autofocus></label>
-    <label class="f"><span>Punteggio</span><input class="in mono" id="cn-pt" inputmode="numeric" value="10"></label>
-    <div class="grid2"><button class="btn" data-act="sheet-close">Annulla</button><button class="btn amber" id="btn-cn-salva" data-act="cp-nuovo-salva">Crea</button></div>`);
-};
-A['cp-nuovo-salva'] = () => {
-  if(!(st.isAdmin || isSup())) return;
-  const nome = val('cn-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('cn-pt'))), M = cpMap();
-  if(nome.length < 2) return toast('Scrivi la descrizione', 'err');
-  if(!Number.isInteger(pt) || pt < 0 || pt > 500) return toast('Punteggio non valido (0–500)', 'err');
-  if(Object.keys(M).length >= CP_MAX) return toast('Massimo ' + CP_MAX + ' compiti', 'err');
-  let slot = null; for(let i = 0; i < 20 && !slot; i++) if(!(('sv' + i) in M)) slot = 'sv' + i;
-  if(!slot) return toast('Nessuno spazio libero: chiedi a un admin', 'err');
-  const ord = Math.max(0, ...Object.keys(M).map(k => Number.isInteger(M[k].ord) ? M[k].ord : 0)) + 1;
-  G().update({['compiti.' + slot]: {nome, pt, on: true, ord, esenti: []}}).then(() => { closeSheet(); toast('Compito creato'); }).catch(e => toast(errMsg(e), 'err'));
+A['sv-revoca'] = ds => {
+  if(!sonoCreatore()) return;
+  const m = membro(ds.id); if(!m) return;
+  if(!confirm(`Togliere il ruolo di Supervisor a ${m.nome}? Tornerà un collega come gli altri.`)) return;
+  const uids = st.utenti.filter(u => u.mid === ds.id).map(u => u.id), b = db.batch(), up = {};
+  uids.forEach(uid => { if(st.admins.some(a => a.id === uid) && !protettoUid(uid)) b.delete(C('admin').doc(uid)); up['permSup.' + uid] = firebase.firestore.FieldValue.delete(); });
+  up.supMids = Object.keys(supervisorMids()).filter(x => x !== ds.id);
+  if(supervisoriIds().includes(ds.id)) up.supervisori = supervisoriIds().filter(x => x !== ds.id);
+  b.update(G(), up);
+  b.commit().then(() => { closeSheet(); toast(`${m.nome} non è più Supervisor`); }).catch(e => toast(errMsg(e), 'err'));
 };
 /* --- configurazione compiti (admin) --- */
 const cardCompiti = () => {
   const L = cpLista();
-  return `<div class="card" id="card-compiti"><h3>🎯 Compiti di oggi</h3>
-    <p class="hint" style="margin:0 0 8px">Catalogo libero dei compiti sorteggiabili (pulizie, macchinetta, secchio, spesa…): per ciascuno descrizione, punteggio e colleghi esclusi. I punti arrivano alla tua convalida.</p>
+  return `<div class="card" id="card-compiti"><h3>⚙️ Gestione compiti</h3>
+    <p class="hint" style="margin:0 0 8px">Catalogo libero dei compiti sorteggiabili (pulizie, macchinetta, secchio, spesa…): per ciascuno descrizione, punteggio e colleghi esclusi. I punti arrivano alla convalida di chi gestisce i compiti.</p>
     ${L.length ? `<div class="list">${L.map((c, i) => `<div class="li" id="cp-row-${c.id}" style="flex-wrap:wrap;gap:8px"><div class="grow" style="flex-basis:100%"><div class="t">${esc(c.nome)} ${cpPill(c)}${cpCool(c) ? ` <span class="pill">ogni ${cpCool(c)} gg</span>` : ''}${c.on === false ? ' <span class="pill">spento</span>' : ''}</div><div class="d">${c.esenti.length ? c.esenti.length + (c.esenti.length === 1 ? ' collega escluso' : ' colleghi esclusi') : 'Nessuna esclusione'}</div></div>
       <div class="row" style="gap:6px;width:100%;justify-content:flex-end"><button class="btn sm ghost" data-act="cp-su" data-id="${c.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="cp-giu" data-id="${c.id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button>
       <button class="btn sm ghost" data-act="cp-tgl" data-id="${c.id}">${c.on === false ? 'Accendi' : 'Spegni'}</button><button class="btn sm" data-act="cp-edit" data-id="${c.id}">Modifica</button></div></div>`).join('')}</div>` : '<p class="hint" id="cp-cfg-vuoto">Nessun compito configurato.</p>'}
-    <div class="li" id="cp-sup-row" style="flex-wrap:wrap;gap:8px;margin:10px 0"><div class="grow" style="flex-basis:100%"><div class="t">🛡️ Supervisor</div><div class="d">${supervisori().length ? supervisori().map(m => esc(m.nick || m.nome)).join(', ') : 'Nessun Supervisor: solo gli admin convalidano.'}</div></div><div class="row" style="width:100%;justify-content:flex-end"><button class="btn sm" id="btn-cp-sup" data-act="cp-sup-edit">Gestisci</button></div></div>
     <button class="btn amber block" id="btn-cp-nuovo" data-act="cp-edit" data-id="" ${L.length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>
     ${L.length ? '' : `<button class="btn block" id="btn-cp-sugg" data-act="cp-sugg" style="margin-top:8px">Carica compiti suggeriti</button>`}
   </div>`;
@@ -3351,7 +3360,7 @@ const cardCompiti = () => {
 const cpSalvaMappa = (M, msg) => G().update({compiti: M}).then(() => { closeSheet(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
 const cpCopia = () => JSON.parse(JSON.stringify(cpMap()));
 A['cp-edit'] = ds => {
-  if(!st.isAdmin) return;
+  if(!can('compiti')) return;
   const o = ds.id ? cpLista().find(x => x.id === ds.id) : null; if(ds.id && !o) return;
   const x = o || {nome: '', pt: 10, on: true, esenti: []};
   openSheet(`<h3>🎯 ${o ? 'Modifica compito' : 'Nuovo compito'}</h3>
@@ -3366,7 +3375,7 @@ A['cp-edit'] = ds => {
     <div class="grid2">${o ? `<button class="btn red" id="btn-cp-del" data-act="cp-del" data-id="${ds.id}">Elimina</button>` : '<button class="btn" data-act="sheet-close">Annulla</button>'}<button class="btn amber" id="btn-cp-salva" data-act="cp-salva" data-id="${ds.id}">Salva</button></div>`);
 };
 A['cp-salva'] = ds => {
-  if(!st.isAdmin) return;
+  if(!can('compiti')) return;
   const M = cpCopia(), nome = val('cp-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('cp-pt')));
   if(nome.length < 2) return toast('Scrivi la descrizione', 'err');
   if(!Number.isInteger(pt) || pt < 0 || pt > 500) return toast('Punteggio non valido (0–500)', 'err');
@@ -3382,16 +3391,16 @@ A['cp-salva'] = ds => {
   cpSalvaMappa(M, 'Compito salvato');
 };
 A['cp-del'] = ds => {
-  if(!st.isAdmin || !cpMap()[ds.id]) return;
+  if(!can('compiti') || !cpMap()[ds.id]) return;
   if(!confirm('Eliminare questo compito?\n\nGli incarichi già assegnati e i punti già convalidati restano.')) return;
   const M = cpCopia(); delete M[ds.id]; cpSalvaMappa(M, 'Compito eliminato');
 };
 A['cp-tgl'] = ds => {
-  if(!st.isAdmin || !cpMap()[ds.id]) return;
+  if(!can('compiti') || !cpMap()[ds.id]) return;
   const M = cpCopia(); M[ds.id].on = M[ds.id].on === false; cpSalvaMappa(M, M[ds.id].on ? 'Compito acceso' : 'Compito spento');
 };
 function cpSposta(id, dir){
-  if(!st.isAdmin) return;
+  if(!can('compiti')) return;
   const L = cpLista(), i = L.findIndex(c => c.id === id), j = i + dir; if(i < 0 || j < 0 || j >= L.length) return;
   const M = cpCopia(); L.forEach((c, k) => { M[c.id].ord = k + 1; });
   const t = M[L[i].id].ord; M[L[i].id].ord = M[L[j].id].ord; M[L[j].id].ord = t;
@@ -3400,7 +3409,7 @@ function cpSposta(id, dir){
 A['cp-su'] = ds => cpSposta(ds.id, -1);
 A['cp-giu'] = ds => cpSposta(ds.id, 1);
 A['cp-sugg'] = () => {
-  if(!st.isAdmin || cpLista().length) return;
+  if(!can('compiti') || cpLista().length) return;
   cpSalvaMappa({
     cpmacc: {nome: 'Pulizia macchinetta', pt: 10, on: true, ord: 1, esenti: []},
     cpsecchio: {nome: 'Svuotare il secchio', pt: 5, on: true, ord: 2, esenti: []},
@@ -3483,10 +3492,10 @@ A['rg-invia'] = () => {
   closeSheet(); toast(`🎁 Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
 };
 
-/* --- canale Revolut: l'admin lo sospende / riattiva (campo revolutAttivo nel documento del gruppo) --- */
-/* --- podio del mese: bonus ai primi 3 del mese precedente, assegnati dall'admin con un tocco (ID unico: nessun doppio accredito) --- */
+/* --- canale Revolut: il Supervisor lo sospende / riattiva (campo revolutAttivo nel documento del gruppo) --- */
+/* --- podio del mese: bonus ai primi 3 del mese precedente, assegnati dal Supervisor con un tocco (ID unico: nessun doppio accredito) --- */
 function podioDaAssegnare(){
-  if(!st.isAdmin || !podioOn() || !st.gid) return null;
+  if(!can('compiti') || !podioOn() || !st.gid) return null;
   const o = new Date(), pv = new Date(o.getFullYear(), o.getMonth() - 1, 1), mese = `${pv.getFullYear()}-${pad(pv.getMonth() + 1)}`;
   if(LS.get('podio_' + st.gid + '_' + mese)) return null;
   if(tuttiMov().some(m => m.tipo === 'bonus_podio' && m.mese === mese)) return null;
@@ -3505,12 +3514,12 @@ A['podio-apri'] = () => {
     : `<div class="empty">Nessun punto nel mese: niente da assegnare.</div><button class="btn block" id="btn-podio-chiudi" data-act="podio-assegna">Chiudi senza assegnare</button>`}`);
 };
 A['podio-assegna'] = () => {
-  const pr = st.podioProp, pm = podioDaAssegnare(); if(!st.isAdmin || !pr || !pm || pr.mese !== pm.mese) return closeSheet();
+  const pr = st.podioProp, pm = podioDaAssegnare(); if(!can('compiti') || !pr || !pm || pr.mese !== pm.mese) return closeSheet();
   pr.righe.forEach((x, i) => { const pt = podioPt(i + 1); if(pt > 0) addMov({tipo: 'bonus_podio', mid: x.id, pos: i + 1, mese: pr.mese, punti: pt}, `pod_${pr.mese}_${i + 1}`, true, er => toast('Bonus non assegnato (' + errMsg(er) + ')', 'err')); });
   LS.set('podio_' + st.gid + '_' + pr.mese, '1'); st.podioProp = null; closeSheet(); toast('🏅 Bonus podio assegnati'); render();
 };
 A['revolut-toggle'] = () => {
-  if(!st.isAdmin) return;
+  if(!can('cassa')) return;
   const on = !revolutOn();
   G().update({revolutAttivo: on}).then(() => toast(on ? 'Canale Revolut riattivato' : 'Canale Revolut sospeso')).catch(e => toast(errMsg(e), 'err'));
 };
@@ -3580,7 +3589,7 @@ A['cassa-op'] = ds => {
       : `<label class="f"><span>${t === 'uscita' ? 'Prelevato da' : 'Versato su'}</span>${segOpts('k-fonte', [['contanti','Contanti'],['revolut','Revolut']], 'contanti')}</label>`}
     <button class="btn amber block big" data-act="conferma-cassa" data-v="${t}">Registra</button>`);
 };
-/* correzione del saldo di cassa: l'admin inserisce il saldo reale, l'app calcola la differenza */
+/* correzione del saldo di cassa: il Supervisor inserisce il saldo reale, l'app calcola la differenza */
 const corrInfo = () => {
   const f = $('cc-fonte') ? $('cc-fonte').value : 'contanti', att = (derived().S.cassa[f]) || 0, reale = parseEuro(val('cc-reale'));
   return {f, att, reale, diff: reale - att};
@@ -3618,7 +3627,7 @@ A['conferma-cassa'] = ds => {
 
 /* --- inventario (admin) --- */
 A['inv-sort'] = ds => { if(st.invSort.k === ds.k) st.invSort.asc = !st.invSort.asc; else st.invSort = {k: ds.k, asc: true}; render(); };
-/* scorta buste di caffe': articolo speciale 'caffe' creato dall'admin al primo carico (prezzo 0, categoria fondo: non compare tra gli snack) */
+/* scorta buste di caffe': articolo speciale 'caffe' creato dal Supervisor al primo carico (prezzo 0, categoria fondo: non compare tra gli snack) */
 function caricaBusteCaffe(q){
   const d = derived();
   if(q < 0 && -q > busteDisp(d)) return toast('Non ci sono abbastanza buste da togliere', 'err');
@@ -3678,7 +3687,7 @@ function caricaProdotto(p, q){
   C('prodotti').doc(p.id).set(upd, {merge: true}).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
   addMov({tipo:'carico', pid: p.id, qta: q, nome: p.nome});
 }
-A['carico'] = ds => { const p = prodotto(ds.id); if(p && st.isAdmin) caricaProdotto(p, Number(ds.v)); };
+A['carico'] = ds => { const p = prodotto(ds.id); if(p && can('inventario')) caricaProdotto(p, Number(ds.v)); };
 A['carico-n'] = ds => {
   const p = prodotto(ds.id);
   openSheet(`<h3>${ic('package')} Carico ${esc(p.nome)}</h3><p class="sub">Pezzi aggiunti alla giacenza (negativo per toglierli).${p.esaurito === true ? ' L\'articolo è segnato «Esaurito»: con il carico torna disponibile e i pezzi ancora a sistema (ammanco) vengono tolti.' : ''}</p>
@@ -3687,18 +3696,18 @@ A['carico-n'] = ds => {
 };
 A['conferma-carico'] = ds => {
   const q = parseInt(val('cn-q'), 10); if(!q) return toast('Numero non valido', 'err');
-  const p = prodotto(ds.id); if(!p || !st.isAdmin) return;
+  const p = prodotto(ds.id); if(!p || !can('inventario')) return;
   caricaProdotto(p, q); closeSheet(); toast('Giacenza aggiornata');
 };
 A['esaurito'] = ds => {
-  if(!st.isAdmin) return;
+  if(!can('inventario')) return;
   const p = prodotto(ds.id); if(!p) return;
   const on = p.esaurito !== true;
   C('prodotti').doc(p.id).set({esaurito: on}, {merge: true}).then(() => toast(on ? `${p.nome}: segnato esaurito` : `${p.nome}: di nuovo disponibile`)).catch(e => toast(errMsg(e), 'err'));
 };
 /* scorta caffè in grani (kg): avvia il ciclo, carica altri kg, azzera (consolida il ciclo per il Tasso di Onestà) */
 A['caffe-ciclo'] = ds => {
-  if(!st.isAdmin) return;
+  if(!can('inventario')) return;
   const S = statoCaffe(derived()), m = ds.v;
   if(m === 'azzera'){
     if(!S || !S.attivo) return;
@@ -3710,7 +3719,7 @@ A['caffe-ciclo'] = ds => {
     <button class="btn amber block big" id="btn-caffe-ciclo-ok" data-act="conferma-caffe-ciclo" data-v="${m}">${m === 'avvia' ? 'Avvia' : 'Aggiungi'}</button>`);
 };
 A['conferma-caffe-ciclo'] = ds => {
-  if(!st.isAdmin) return;
+  if(!can('inventario')) return;
   const S = statoCaffe(derived()) || {kg: 0, kgIniz: 0, da: 0, hk: 0, hc: 0, registrati: 0, attivo: false}, m = ds.v;
   let nc;
   if(m === 'azzera'){ if(!S.attivo) return closeSheet(); nc = {kg: 0, kgIniz: 0, da: 0, hk: r3(S.hk + S.kg), hc: S.hc + S.registrati}; }
@@ -3724,6 +3733,12 @@ A['conferma-caffe-ciclo'] = ds => {
 };
 
 /* --- quote (admin) --- */
+A['quota-importo'] = () => {
+  if(!can('soci')) return;
+  const qa = parseEuro(val('q-importo'));
+  if(!(qa >= 0) || qa > 100000) return toast('Importo non valido', 'err');
+  G().update({quotaAnnua: qa}).then(() => toast('Quota annuale aggiornata')).catch(e => toast(errMsg(e), 'err'));
+};
 A['quota-toggle'] = ds => { statoQuota(derived(), ds.id, anno()) === 'pagata' ? A['quota-annulla'](ds) : A['quota'](ds); };
 A['quota'] = ds => {
   const q = st.gruppo.quotaAnnua;
@@ -3769,83 +3784,27 @@ A['conferma-quota-migra'] = () => {
 
 
 /* --- admin --- */
-A['diventa-admin'] = async () => {
-  const pin = val('a-pin');
-  if(!pin) return toast('Inserisci il PIN', 'err');
-  if(!navigator.onLine) return toast('Serve la connessione', 'err');
-  st.busy = true; render();
-  try { await C('admin').doc(st.uid).set({pin, nome: myName(), ts: TS()}); st.isAdmin = true; syncMode(); toast('Ora sei amministratore 🛡️'); }
-  catch(e){ toast(/permission/i.test(e.code || e.message) ? 'PIN errato' : 'Errore (' + errMsg(e) + ')', 'err'); }
-  finally { st.busy = false; render(); }
-};
-A['lascia-admin'] = () => { if(!confirm('Lasciare il ruolo di amministratore su questo telefono?')) return; C('admin').doc(st.uid).delete().then(() => toast('Non sei più amministratore')).catch(e => toast(errMsg(e), 'err')); };
-A['richiedi-admin'] = async () => {
-  if(!st.mid) return;
-  try { await C('richiesteAdmin').doc(st.uid).set({stato: 'attesa', mid: st.mid, nome: myName(), ts: TS()}); toast('Richiesta inviata'); }
-  catch(e){ toast('Richiesta non riuscita (' + errMsg(e) + ')', 'err'); }
-};
-A['ritira-richiesta-admin'] = () => { C('richiesteAdmin').doc(st.uid).delete().then(() => toast('Richiesta ritirata')).catch(e => toast(errMsg(e), 'err')); };
-A['approva-admin'] = ds => {
-  const r = st.richAdmin.find(x => x.id === ds.id); if(!r) return;
-  const b = db.batch();
-  b.set(C('admin').doc(r.id), {nome: r.nome || '', nominatoDa: myName(), ts: TS()});
-  b.delete(C('richiesteAdmin').doc(r.id));
-  b.commit().then(() => toast((r.nome || 'Il collega') + ' è ora amministratore')).catch(e => toast(errMsg(e), 'err'));
-};
-A['rifiuta-admin'] = ds => { C('richiesteAdmin').doc(ds.id).set({stato: 'rifiutata', esitoDa: myName(), esitoTs: TS()}, {merge: true}).then(() => toast('Richiesta rifiutata')).catch(e => toast(errMsg(e), 'err')); };
-A['nomina-admin'] = ds => {
-  const m = membro(ds.id); const us = st.utenti.filter(u => u.mid === ds.id); if(!m || !us.length) return toast('Questo collega non ha un telefono collegato', 'err');
-  if(!confirm(`Nominare ${m.nome} amministratore? Potrà gestire saldi, cassa e altri amministratori.`)) return;
-  const b = db.batch();
-  us.forEach(u => { b.set(C('admin').doc(u.id), {nome: m.nome, nominatoDa: myName(), ts: TS()}); b.delete(C('richiesteAdmin').doc(u.id)); });
-  b.commit().then(() => { closeSheet(); toast(m.nome + ' è ora amministratore'); }).catch(e => toast(errMsg(e), 'err'));
-};
-A['rimuovi-admin'] = ds => {
-  const m = membro(ds.id); if(!m) return;
-  if(isCreatore(m.id)) return toast('Il creatore del gruppo non può essere rimosso', 'err');
-  if(!confirm(`Togliere il ruolo di amministratore a ${m.nome}?`)) return;
-  const b = db.batch(); adminDiMembro(m.id).forEach(u => b.delete(C('admin').doc(u.id)));
-  b.commit().then(() => { closeSheet(); toast(m.nome + ' non è più amministratore'); }).catch(e => toast(errMsg(e), 'err'));
-};
-A['revoca'] = ds => {
-  if(protettoUid(ds.id)) return toast('Il creatore del gruppo non può essere rimosso', 'err');
-  if(!confirm('Togliere il ruolo di amministratore? Se conosce il PIN potrebbe riottenerlo: in quel caso cambia anche il PIN.')) return;
-  C('admin').doc(ds.id).delete().then(() => toast('Amministratore rimosso')).catch(e => toast(errMsg(e), 'err'));
-};
-A['cambia-pin'] = () => openSheet(`<h3>${ic('lock')} Cambia PIN ${infoBtn(`Gli amministratori attuali restano tali. Il nuovo PIN serve per i prossimi.`)}</h3>
-  <label class="f"><span>Nuovo PIN</span><input class="in mono" id="np-1" type="password" autocomplete="new-password" placeholder="almeno 6 caratteri" autofocus></label>
-  <label class="f"><span>Ripeti</span><input class="in mono" id="np-2" type="password" autocomplete="new-password"></label>
-  <button class="btn amber block big" data-act="conferma-pin">Salva PIN</button>`);
-A['conferma-pin'] = () => {
-  const a = val('np-1'), b = val('np-2');
-  if(a.length < 6) return toast('Almeno 6 caratteri', 'err');
-  if(a !== b) return toast('I due PIN non coincidono', 'err');
-  C('segreti').doc('pin').set({pin: a}).then(() => toast('PIN cambiato')).catch(e => toast(errMsg(e), 'err'));
-  closeSheet();
-};
+A['lascia-admin'] = () => { if(sonoCreatore()) return toast('Il Creatore non può lasciare il ruolo', 'err'); if(!confirm('Lasciare il ruolo di Supervisor su questo telefono?')) return; C('admin').doc(st.uid).delete().then(() => toast('Non sei più Supervisor')).catch(e => toast(errMsg(e), 'err')); };
 A['salva-gruppo'] = () => {
-  const pc = $('ad-caffe') ? parseEuro(val('ad-caffe')) : (st.gruppo.prezzoCaffe || 0), qa = parseEuro(val('ad-quota')), nome = val('ad-nome');
-  if(!(pc >= 0) || !(qa >= 0) || !nome) return toast('Controlla i valori', 'err');
-  G().set({prezzoCaffe: pc, quotaAnnua: qa, nome: nome.slice(0,40)}, {merge: true}).then(() => toast('Salvato')).catch(e => toast(errMsg(e), 'err'));
+  if(!sonoCreatore()) return;
+  const nome = val('ad-nome');
+  if(!nome) return toast('Scrivi il nome del gruppo', 'err');
+  G().update({nome: nome.slice(0,40)}).then(() => toast('Salvato')).catch(e => toast(errMsg(e), 'err'));
 };
 A['membro'] = ds => {
   const m = ds.id ? membro(ds.id) : null;
+  const puoRimuovere = m && m.id !== st.mid && !isCreatore(m.id) && (!adminDiMembro(m.id).length || sonoCreatore());
   openSheet(`<h3>${ic('user')} ${m ? esc(m.nome) : 'Nuovo collega'}</h3>
-    ${m ? `<p class="sub">Saldo attuale <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}">${eurS(saldo(m.id))}</b></p>` : '<p class="sub">Per un collega senza telefono. Se poi chiederà l\'accesso, collegalo a questo nome.</p>'}
+    ${m ? `<p class="sub">Saldo attuale <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}">${eurS(saldo(m.id))}</b> · ⭐ ${ptDisp(derived(), m.id)} punti</p>` : '<p class="sub">Per un collega senza telefono. Se poi chiederà l\'accesso, collegalo a questo nome.</p>'}
     <div class="grid2"><label class="f"><span>Nome</span><input class="in" id="m-nome" maxlength="30" value="${esc(m ? m.nome : '')}" ${m ? '' : 'autofocus'}></label>
     <label class="f"><span>Nickname</span><input class="in" id="m-nick" maxlength="20" value="${esc(m && m.nick ? m.nick : '')}"></label></div>
     ${!m && st.gruppo.quotaAnnua > 0 ? `<label class="check"><input type="checkbox" id="m-quota"><b style="flex:1;font-size:14px">Ha già pagato la quota ${anno()}</b></label>` : ''}
     ${m && m.espulso ? `<div class="banner red">${ic('alert')}<div>Espulso${m.espulsoDa ? ' da ' + esc(m.espulsoDa) : ''}. I suoi telefoni non possono più chiedere l'accesso.</div></div>`
       : m && m.attivo === false ? `<div class="banner amber">${ic('archive')}<div>Archiviato: non fa più parte della saletta, ma saldo e storico restano.</div></div>` : ''}
+    ${m && isCreatore(m.id) ? `<div class="banner amber">${ic('shield')}<div>Creatore del gruppo: non può essere archiviato né espulso.</div></div>` : m && adminDiMembro(m.id).length ? `<div class="banner sky">${ic('shield')}<div>Supervisor: ${sonoCreatore() ? 'se lo archivi o lo espelli perde anche il ruolo.' : 'può essere archiviato solo dal Creatore.'}</div></div>` : ''}
     <button class="btn amber block big" data-act="salva-membro" data-id="${m ? m.id : ''}" style="margin-top:6px">Salva</button>
-    ${m && m.attivo !== false ? `<div class="grid3" style="margin-top:10px"><button class="btn sm" data-act="accredito" data-id="${m.id}">${ic('plus','s')} Accredita</button><button class="btn sm" data-act="ricarica-per" data-id="${m.id}">${ic('banknote','s')} Ricarica</button><button class="btn sm" data-act="rettifica" data-id="${m.id}">${ic('edit','s')} Rettifica</button></div>
-    <button class="btn sm block" style="margin-top:8px" data-act="punti-adm" data-id="${m.id}">${ic('sparkles','s')} Modifica punti (pulizie / caffè)</button>
-    <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="pin-reset" data-id="${m.id}">${ic('lock','s')} Reset PIN</button><button class="btn sm ghost" data-act="pin-temp" data-id="${m.id}">${ic('lock','s')} PIN temporaneo</button></div>
-    <button class="btn sm block" style="margin-top:8px" data-act="caffe-fuori" data-id="${m.id}">${ic('coffee','s')} Caffè pagati subito (fuori app)</button>` : ''}
-    ${m && m.attivo !== false && st.utenti.some(u => u.mid === m.id) ? (isCreatore(m.id) ? `<div class="banner amber">${ic('shield')}<div>Creatore del gruppo: è amministratore e non può essere rimosso.</div></div>`
-      : adminDiMembro(m.id).length ? `<button class="btn sm ghost block" style="margin-top:10px" data-act="rimuovi-admin" data-id="${m.id}">${ic('shield','s')} Rimuovi da amministratore</button>`
-      : `<button class="btn sm block" style="margin-top:10px" data-act="nomina-admin" data-id="${m.id}">${ic('shield','s')} Nomina amministratore</button>`) : ''}
-    ${m && m.id !== st.mid && !isCreatore(m.id) ? (m.attivo !== false
+    ${m && m.attivo !== false ? `<button class="btn block" id="btn-saldo-punti" style="margin-top:10px" data-act="saldo-punti" data-id="${m.id}">✏️ Modifica saldo / punti</button>` : ''}
+    ${m && puoRimuovere ? (m.attivo !== false
       ? `<div class="grid2" style="margin-top:10px"><button class="btn sm ghost" data-act="archivia" data-id="${m.id}">${ic('archive','s')} Archivia</button><button class="btn sm ghost" style="color:var(--red)" data-act="espelli" data-id="${m.id}">${ic('logout','s')} Espelli</button></div>`
       : `<button class="btn sm ghost block" style="margin-top:10px" data-act="ripristina" data-id="${m.id}">${ic('undo','s')} Ripristina come collega attivo</button>`) : ''}`);
 };
@@ -3873,6 +3832,7 @@ function scollega(b, mid, statoRichiesta, blocca){
 }
 A['archivia'] = ds => {
   const m = membro(ds.id); if(!m) return;
+  if(adminDiMembro(m.id).length && !sonoCreatore()) return toast('Un Supervisor lo può archiviare solo il Creatore', 'err');
   if(isCreatore(m.id)) return toast('Il creatore del gruppo non può essere archiviato', 'err');
   if(!confirm(`Archiviare ${m.nome}? Non farà più parte della saletta e il suo telefono perde l'accesso. Saldo e storico restano; potrai ripristinarlo.`)) return;
   const b = db.batch();
@@ -3883,6 +3843,7 @@ A['archivia'] = ds => {
 };
 A['espelli'] = ds => {
   const m = membro(ds.id); if(!m) return;
+  if(adminDiMembro(m.id).length && !sonoCreatore()) return toast('Un Supervisor lo può espellere solo il Creatore', 'err');
   if(isCreatore(m.id)) return toast('Il creatore del gruppo non può essere espulso', 'err');
   if(!confirm(`Espellere ${m.nome}? Perde subito l'accesso e dal suo telefono non potrà più chiedere di rientrare.`)) return;
   const b = db.batch();
@@ -3896,17 +3857,6 @@ A['ripristina'] = ds => {
   C('membri').doc(m.id).set({attivo: true, espulso: false}, {merge: true}).then(() => toast(`${m.nome} di nuovo attivo. Per usare l'app dovrà chiedere l'accesso: collegalo a questo nome.`)).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
 };
-A['accredito'] = ds => openSheet(`<h3>${ic('plus')} Accredita crediti ${infoBtn(`Aggiunge credito al saldo del collega senza toccare la cassa (es. omaggio, premio, rimborso già dato).`)}</h3>
-  <label class="f"><span>Collega</span>${selMembro('ac-m', ds.id)}</label>
-  <label class="f"><span>Importo €</span><input class="in mono" id="ac-imp" inputmode="decimal" placeholder="5,00"></label>
-  <label class="f"><span>Motivo</span><input class="in" id="ac-caus" maxlength="80" placeholder="es. caffè offerti per il compleanno"></label>
-  <button class="btn green block big" data-act="conferma-accredito">Accredita</button>`);
-A['conferma-accredito'] = () => {
-  const mid = val('ac-m'), imp = parseEuro(val('ac-imp'));
-  if(!mid || !(imp > 0) || imp > 50000) return toast('Importo non valido', 'err');
-  addMov({tipo:'accredito', mid, importo: imp, causale: val('ac-caus').slice(0,80)});
-  closeSheet(); toast(`${eur(imp)} accreditati a ${nomeM(mid)}`);
-};
 function selMembro(id, sel){ return `${cercaBox(id)}<select class="in" id="${id}">${membriAttivi().map(m => `<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(nomeM(m.id))}</option>`).join('')}</select>${cercaVuoto(id)}`; }
 A['ricarica-per'] = ds => openSheet(`<h3>${ic('banknote')} Ricarica per un collega</h3><p class="sub">Hai ricevuto tu i soldi: vale subito.</p>
   <label class="f"><span>Collega</span>${selMembro('rp-m', ds.id)}</label>
@@ -3919,22 +3869,10 @@ A['conferma-ricarica-per'] = () => {
   addMov({tipo:'ricarica', mid, importo: imp, metodo: radio('rp-met'), stato:'confermata', esitoDa: myName()});
   closeSheet(); toast(`Ricarica di ${eur(imp)} per ${nomeM(mid)}`);
 };
-A['caffe-fuori'] = ds => openSheet(`<h3>${ic('coffee')} Caffè pagati subito ${infoBtn(`Caffè pagati direttamente, senza usare l'app: contano nelle statistiche ma non toccano il saldo del collega.`)}</h3>
-  <label class="f"><span>Collega</span>${selMembro('cf-m', ds.id)}</label>
-  <label class="f"><span>Numero di caffè</span><input class="in mono" id="cf-q" inputmode="numeric" value="1"></label>
-  <label class="f"><span>Dove sono finiti i soldi</span>${segOpts('cf-met', [['contanti','💶 Contanti'],['revolut','📱 Revolut'],['esterno','Già contati']], 'contanti')}</label>
-  ${infoBtn(`«Già contati»: nessun movimento di cassa (i soldi sono già stati registrati altrove).`, 'Come funziona')}
-  <button class="btn amber block big" data-act="conferma-caffe-fuori">Registra</button>`);
-A['conferma-caffe-fuori'] = () => {
-  const mid = val('cf-m'), q = parseInt(val('cf-q'), 10), pc = st.gruppo.prezzoCaffe || 0;
-  if(!mid || !(q >= 1 && q <= 30)) return toast('Numero di caffè non valido (1-30)', 'err');
-  addMov({tipo:'caffe_pagato', mid, qta: q, importo: pc * q, metodo: radio('cf-met')});
-  closeSheet(); toast(`${q} caffè registrati per ${nomeM(mid)}`);
-};
 /* --- punti caffè, punti (admin), spesa admin, prezzo caffè --- */
 /* --- Punti Collega Modello: punti di tutte le categorie, riscatto a soglia --- */
 A['tessera'] = () => {
-  if(!ptMaster()) return toast('Sistema punti disattivato dall\'amministratore', 'err');
+  if(!ptMaster()) return toast('Sistema punti disattivato dal Supervisor', 'err');
   const d = derived(), r = sogliaPunti(), cr = creditiSoglia(), pt = ptDisp(d, st.mid), ok = pt >= r, me = st.mid;
   const usati = ptUsati(d, me);
   openSheet(`<h3>⭐ Punti Collega Modello</h3>
@@ -3949,7 +3887,7 @@ A['tessera'] = () => {
       <p class="tx2" style="font-size:14px;line-height:1.5;margin:10px 0 0">Riscattare i punti non cambia la tua posizione in classifica.</p></div>`);
 };
 A['riscatta-punti'] = () => {
-  if(!ptMaster()) return toast('Sistema punti disattivato dall\'amministratore', 'err');
+  if(!ptMaster()) return toast('Sistema punti disattivato dal Supervisor', 'err');
   const d = derived(), r = sogliaPunti(), cr = creditiSoglia();
   if(ptDisp(d, st.mid) < r) return toast(`Servono ${r} punti`, 'err');
   addMov({tipo:'riscatto_punti', mid: st.mid, importo: cr * 100, punti: r});
@@ -4007,10 +3945,10 @@ A['salva-punti'] = () => {
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
   G().set({...v, ...sw, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
-/* valori consigliati: una sola scrittura, solo su richiesta dell'admin; nulla viene sovrascritto in automatico */
+/* valori consigliati: una sola scrittura, solo su richiesta del Supervisor; nulla viene sovrascritto in automatico */
 const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptBenFatto: 20, sogliaPunti: 500, creditiSoglia: 5, podioOn: true, podio1: 50, podio2: 30, podio3: 20};
 A['rp-consigliati'] = () => {
-  if(!st.isAdmin) return;
+  if(!can('compiti')) return;
   if(!confirm('Applicare i valori consigliati?\n\nCaffè 10 punti · snack 10 punti per 1,00 € · rimborsi 10 punti per € (tetto 500) · «Ben fatto» 20 · podio 50/30/20 · riscatto 500 punti = 5,00 €.\nVale per gli eventi futuri: quelli passati non cambiano.')) return;
   const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptBenFatto: 'rp-bf', sogliaPunti: 'rp-soglia', creditiSoglia: 'rp-crediti', podio1: 'rp-pod1', podio2: 'rp-pod2', podio3: 'rp-pod3'}, prima = {};
   Object.keys(ids).forEach(k => { const e = $(ids[k]); if(e){ prima[ids[k]] = e.value; e.value = nDec(RP_CONSIGLIATI[k]); } });
@@ -4019,7 +3957,7 @@ A['rp-consigliati'] = () => {
 };
 /* passaggio alla scala punti ×10: una sola scrittura sul documento del gruppo (scalaDa + valori espliciti); i movimenti vecchi si rivalutano in memoria */
 A['scala10'] = () => {
-  if(!st.isAdmin || scalaDa()) return;
+  if(!can('compiti') || scalaDa()) return;
   if(!confirm('Passare alla scala punti ×10?\n\nValori: soglia 300 punti = 1 credito · caffè 10 · snack 10 · «Ben fatto» 20 · macchinetta 10.\nI punti già maturati vengono moltiplicati per 10 (i vecchi turni di pulizia valgono 50). L\'operazione non si annulla.')) return;
   // i campi della pagina conservano il testo digitato tra un render e l'altro: li aggiorno subito, altrimenti «Salva le regole» riscriverebbe i valori vecchi
   const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-bf': 20}, prima = {};
@@ -4055,11 +3993,11 @@ A['recupera'] = async () => {
     await u.set({mid, nome: m ? m.nome : '', recuperato: true, pinHash: h, ts: TS()});
     LS.set('offriAdmin_' + code, mid);
     entra(mid, 'Profilo recuperato ✓');
-  } catch(e){ toast(errIngresso(e, 'PIN errato, oppure nessun PIN impostato per questo profilo (chiedi un PIN temporaneo a un amministratore)'), 'err'); }
+  } catch(e){ toast(errIngresso(e, 'PIN errato, oppure nessun PIN impostato per questo profilo (chiedi un PIN temporaneo a un Supervisor)'), 'err'); }
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v13';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v14';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
@@ -4070,19 +4008,6 @@ A['reg-avviso'] = () => {
 };
 A['reg-ok'] = () => { const mai = $('reg-mai') && $('reg-mai').checked; if(mai) LS.set(REG_KEY, 1); closeSheet(); if(mai) render(); };
 A['reg-leggi'] = () => { closeSheet(); A['go']({p: 'regolamento'}); };
-A['offri-admin'] = () => openSheet(`<h3>${ic('shield')} Eri amministratore?</h3><p class="sub">Su questo telefono il ruolo non è attivo. Se eri amministratore, inserisci il PIN amministratore per riattivarlo.</p>
-  <label class="f"><span>PIN amministratore</span><input class="in" id="oa-pin" type="password" autocomplete="off" autocapitalize="off" autofocus></label>
-  <button class="btn amber block big" data-act="offri-admin-ok">Riattiva il ruolo</button>
-  <button class="btn block ghost" style="margin-top:8px" data-act="sheet-close">Non sono amministratore / più tardi</button>`);
-A['offri-admin-ok'] = async () => {
-  const pin = val('oa-pin');
-  if(!pin) return toast('Inserisci il PIN amministratore', 'err');
-  if(!navigator.onLine) return toast('Serve la connessione', 'err');
-  try {
-    await C('admin').doc(st.uid).set({pin, nome: myName(), ts: TS()});   // le regole verificano il PIN
-    st.isAdmin = true; syncMode(); closeSheet(); toast('Ruolo di amministratore riattivato 🛡️');
-  } catch(e){ toast(errIngresso(e, 'PIN amministratore errato'), 'err'); }
-};
 A['pin-salva'] = async () => {
   const a = val('pg-1'), b = val('pg-2');
   if(!pinOk(a)) return toast('Il PIN ha esattamente 6 cifre', 'err');
@@ -4093,7 +4018,7 @@ A['pin-salva'] = async () => {
     const h = await hashPin(a, st.gid, st.mid);
     await C('segretiMembri').doc(st.mid).set({pinHash: h, temporaneo: false, ts: TS()});
     st.pinDoc = {temporaneo: false}; toast('PIN salvato ✓');
-  } catch(e){ toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'Non riesco a salvare il PIN: chiedi all\'amministratore di aggiornare le regole del database' : pinErr(e), 'err'); }
+  } catch(e){ toast(/permission/i.test((e && (e.code || e.message)) || '') ? 'Non riesco a salvare il PIN: chiedi al Supervisor di aggiornare le regole del database' : pinErr(e), 'err'); }
   finally { st.busy = false; render(); }
 };
 A['pin-cambia'] = () => openSheet(`<h3>${ic('lock')} Cambia il tuo PIN</h3><p class="sub">Serve il PIN attuale. Il nuovo ha 6 cifre.</p>
@@ -4144,17 +4069,30 @@ A['rec-scollega'] = ds => {
   const b = db.batch(); b.delete(C('utenti').doc(u.id)); if(st.admins.some(a => a.id === u.id)) b.delete(C('admin').doc(u.id)); b.delete(C('segretiMembri').doc(u.mid));
   b.commit().then(() => { LS.set('recVisti_' + st.gid, recVisti().concat(u.id)); toast('Telefono scollegato e PIN azzerato'); }).catch(e => toast(errMsg(e), 'err'));
 };
-A['punti-adm'] = ds => openSheet(`<h3>${ic('sparkles')} Modifica punti ${infoBtn(`Aggiunge o toglie punti a un collega (es. correzioni, premi). Usa il meno per togliere.`)}</h3>
-  <label class="f"><span>Collega</span>${selMembro('pa-m', ds.id)}</label>
-  <label class="f"><span>Punti da modificare</span>${segOpts('pa-k', [['pulizia','🎯 Compiti'],['caffe','☕🍫 Consumi']], 'pulizia')}</label>
-  <label class="f"><span>Variazione (+ / −)</span><input class="in mono" id="pa-n" inputmode="numeric" placeholder="es. 3 oppure -2"></label>
-  <label class="f"><span>Motivo</span><input class="in" id="pa-caus" maxlength="60" placeholder="facoltativo"></label>
-  <button class="btn amber block big" data-act="conferma-punti-adm">Registra</button>`);
-A['conferma-punti-adm'] = () => {
-  const mid = val('pa-m'), n = parseInt(String(val('pa-n')).replace('−', '-'), 10);
-  if(!mid || !n || Math.abs(n) > 1000) return toast('Variazione non valida', 'err');
-  addMov({tipo:'punti_adj', mid, kind: radio('pa-k') === 'caffe' ? 'caffe' : 'pulizia', punti: n, causale: val('pa-caus').slice(0,60)});
-  closeSheet(); toast('Punti aggiornati');
+/* Modifica saldo / punti: un'unica finestra (Euro € oppure Punti pt) al posto di Accredita, Rettifica e Modifica punti */
+A['saldo-punti'] = ds => {
+  const m = membro(ds.id); if(!m || !can('soci')) return;
+  openSheet(`<h3>${ic('edit')} Modifica saldo / punti ${infoBtn(`Corregge il saldo (€) o i punti (pt) di un collega senza toccare la cassa: omaggi, premi, errori, saldo iniziale. Usa il meno per togliere.`)}</h3>
+    <p class="sub"><b>${esc(nomeM(m.id))}</b> · saldo <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}">${eurS(saldo(m.id))}</b> · ⭐ ${ptDisp(derived(), m.id)} pt</p>
+    <label class="f"><span>Cosa modifichi</span>${segOpts('sp-k', [['euro','€ Euro'],['pt','⭐ Punti']], 'euro')}</label>
+    <label class="f"><span>Tipo di punti (solo se Punti)</span>${segOpts('sp-t', [['pulizia','🎯 Compiti'],['caffe','☕🍫 Consumi']], 'pulizia')}</label>
+    <label class="f"><span>Importo (+ aggiunge, − toglie)</span><input class="in mono" id="sp-imp" inputmode="decimal" placeholder="es. 5,00 oppure -2" autofocus></label>
+    <label class="f"><span>Causale</span><input class="in" id="sp-caus" maxlength="80" placeholder="es. omaggio, correzione, saldo dal vecchio quaderno"></label>
+    <button class="btn amber block big" id="btn-sp-ok" data-act="conferma-saldo-punti" data-id="${m.id}">Registra</button>`);
+};
+A['conferma-saldo-punti'] = ds => {
+  if(!can('soci') || !membro(ds.id)) return;
+  const mid = ds.id, caus = val('sp-caus').slice(0, 80);
+  if(radio('sp-k') === 'pt'){
+    const n = parseInt(String(val('sp-imp')).replace('−', '-'), 10);
+    if(!n || Math.abs(n) > 1000) return toast('Variazione non valida', 'err');
+    addMov({tipo:'punti_adj', mid, kind: radio('sp-t') === 'caffe' ? 'caffe' : 'pulizia', punti: n, causale: caus.slice(0, 60)});
+    closeSheet(); return toast('Punti aggiornati');
+  }
+  const imp = parseEuro(val('sp-imp'));
+  if(!imp || Math.abs(imp) > 500000) return toast('Importo non valido', 'err');
+  addMov({tipo:'rettifica', mid, importo: imp, causale: caus});
+  closeSheet(); toast('Saldo aggiornato');
 };
 A['spesa-admin'] = () => {
   const c = derived().S.cassa;
@@ -4175,17 +4113,6 @@ A['salva-prezzo-caffe'] = () => {
   if(!(pc >= 0)) return toast('Prezzo non valido', 'err');
   G().set({prezzoCaffe: pc}, {merge: true}).then(() => toast('Prezzo caffè aggiornato')).catch(e => toast(errMsg(e), 'err'));
 };
-A['rettifica'] = ds => openSheet(`<h3>${ic('edit')} Rettifica saldo ${infoBtn(`Corregge il saldo di un collega senza toccare la cassa (es. saldo iniziale, errori). Usa il meno per addebitare.`)}</h3>
-  <label class="f"><span>Collega</span>${selMembro('rt-m', ds.id)}</label>
-  <label class="f"><span>Importo € (+ accredita, − addebita)</span><input class="in mono" id="rt-imp" inputmode="decimal" placeholder="-2,50"></label>
-  <label class="f"><span>Motivo</span><input class="in" id="rt-caus" maxlength="80" placeholder="es. saldo dal vecchio quaderno"></label>
-  <button class="btn amber block big" data-act="conferma-rettifica">Registra</button>`);
-A['conferma-rettifica'] = () => {
-  const mid = val('rt-m'), imp = parseEuro(val('rt-imp'));
-  if(!mid || !imp) return toast('Dati non validi', 'err');
-  addMov({tipo:'rettifica', mid, importo: imp, causale: val('rt-caus').slice(0,80)});
-  closeSheet(); toast('Rettifica registrata');
-};
 
 A['chiudi-periodo'] = async () => {
   const d = derived();
@@ -4198,7 +4125,12 @@ A['chiudi-periodo'] = async () => {
 
   const nCpA = incl.filter(m => m.tipo === 'compito' && m.stato === 'assegnato' && !d.stornati.has(m.id)).length;
   if(nCpA && !confirm(`Ci sono ${nCpA} ${nCpA === 1 ? 'incarico ancora da svolgere' : 'incarichi ancora da svolgere'} (Compiti di oggi).\n\nChiudendo il periodo ${nCpA === 1 ? 'verrà archiviato' : 'verranno archiviati'} e non sarà più possibile confermarlo.\n\nProseguire comunque?`)) return;
-  if(!confirm(`Chiudere il periodo con ${incl.length} movimenti?`)) return;
+  const k = infoChiusura(d);
+  if(k.last && (k.recente || k.pochi)){   // doppia conferma esplicita contro le chiusure ravvicinate
+    const perche = k.recente ? `Il periodo è stato chiuso di recente da ${k.autore}, solo ${trascorso(k.ms)} fa (il ${dataOra(k.t)}).` : `Dopo l'ultima chiusura (${k.autore}, ${dataOra(k.t)}) ci sono solo ${k.nuovi} movimenti significativi.`;
+    if(!confirm(`⚠️ ATTENZIONE\n\n${perche}\n\nVuoi davvero chiudere di nuovo il periodo?`)) return;
+    if(!confirm(`Seconda conferma: chiudere ora il periodo con ${incl.length} movimenti?\n\nL'operazione non si annulla.`)) return;
+  } else if(!confirm(`Chiudere il periodo con ${incl.length} movimenti?`)) return;
   st.busy = true; render();
   try {
     const prev = ultimaChiusura();
@@ -4219,7 +4151,7 @@ A['chiudi-periodo'] = async () => {
     incl.filter(m => m.tipo === 'ben_fatto' && !stor.has(m.id)).forEach(m => { (bf[m.mid] = bf[m.mid] || []).push(m.t); });
     Object.keys(bf).forEach(k => { bf[k] = bf[k].filter(t => t >= lim).slice(-10); if(!bf[k].length) delete bf[k]; });   // ultimi invii di "Ben fatto": servono al gettone a cavallo di una chiusura
     const mp = {pcaf: S.pcaf, pcafConv: S.pcafConv, punti: S.punti, puntiConv: S.puntiConv, turni: S.turni, ultimo: S.ultimo, pspesa: S.pspesa, pbf: S.pbf, pRisc: S.pRisc, bf};
-    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, bf, ...scF, n: incl.length, uid: st.uid, autore: myName(), ts: TS()});
+    b.set(C('chiusure').doc(id), {fino, da: prev ? prev.fino : firebase.firestore.Timestamp.fromMillis(0), stato: S, stats: T, riep, bf, ...scF, n: incl.length, uid: st.uid, daMid: st.mid || '', autore: myName(), ts: TS()});
     const arr = incl.map(compactMov);
     st.membri.forEach(m => {
       const q = {}, dv = {};
@@ -4305,7 +4237,7 @@ A['backup-csv'] = async () => {
     toast('Esporto saldi e movimenti (2 file CSV)');
   } catch(e){ toast('Esportazione non riuscita (' + errMsg(e) + ')', 'err'); }
 };
-A['ripristina-backup'] = () => { const f = $('bk-file'); if(f){ f.value = ''; f.click(); } };
+A['ripristina-backup'] = () => { if(!sonoCreatore()) return toast('Il ripristino è riservato al Creatore', 'err'); const f = $('bk-file'); if(f){ f.value = ''; f.click(); } };
 async function leggiBackup(file){
   let bk;
   try { bk = JSON.parse(await file.text()); } catch(e){ return toast('Il file non è un backup valido', 'err'); }
@@ -4420,7 +4352,7 @@ function testoRendiconto(o){
   if(o.saldi && D.saldi.length){ L.push('', '*Saldi dei colleghi*'); D.saldi.forEach(x => L.push(`${x.nome}: ${eurS(x.s)}`)); }
   return L.join('\n');
 }
-/* ---------- Archivio (solo admin): report dei periodi chiusi, dai documenti `chiusure` gia' in memoria (nessuna lettura in piu') ---------- */
+/* ---------- Archivio (solo chi gestisce): report dei periodi chiusi, dai documenti `chiusure` gia' in memoria (nessuna lettura in piu') ---------- */
 const ARC_MAX = 30;
 const sommaV = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
 function datiArchivio(c){
@@ -4688,7 +4620,7 @@ function avvisiHome(){
   if(av && typeof av.testo === 'string' && av.testo && scadVivo(av)){
     const [em, lab, col] = AVV_TIPI[av.tipo] || AVV_TIPI.avviso, t = tms(av.ts);
     h += `<div class="avv ${col}" id="avviso-admin" role="status"><div class="avv-t">${em} ${lab}${av.autore ? ' · ' + esc(av.autore) : ''}${t ? ' · ' + quando(t) : ''}</div><div class="avv-m">${esc(av.testo)}</div>
-      ${st.isAdmin ? `<button class="iconbtn" id="avviso-rimuovi" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>`;
+      ${can('sistema') ? `<button class="iconbtn" id="avviso-rimuovi" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>`;
   }
   if(so){
     const v = sondVoted(so.id);
@@ -4700,14 +4632,14 @@ function avvisiHome(){
   const pm = podioDaAssegnare();   // admin: a inizio mese, bonus podio del mese precedente da assegnare con un tocco
   if(pm) h += `<button class="avv amber" id="avviso-podio" data-act="podio-apri"><div class="avv-t">🏅 Podio del mese</div><div class="avv-m"><b>Assegna i bonus di ${esc(pm.nome)}</b><br><span style="font-size:12.5px">Prima convalida le ultime richieste e i compiti di fine mese.</span></div></button>`;
   const mc = cpMiei();   // promemoria: compiti assegnati a me e ancora da svolgere
-  if(mc.length) h += `<button class="avv amber" id="avviso-compiti" data-act="go" data-p="compiti"><div class="avv-t">🎯 ${mc.length === 1 ? 'Hai un compito da svolgere' : 'Hai ' + mc.length + ' compiti da svolgere'}</div><div class="avv-m">${mc.map(m => esc(m.nome || 'Compito')).join('<br>')}<br><b>Quando hai finito premi «Ho fatto!» →</b></div></button>`;
+  if(mc.length) h += `<button class="avv amber" id="avviso-compiti" data-act="go" data-p="briefing"><div class="avv-t">🎯 ${mc.length === 1 ? 'Hai un compito da svolgere' : 'Hai ' + mc.length + ' compiti da svolgere'}</div><div class="avv-m">${mc.map(m => esc(m.nome || 'Compito')).join('<br>')}<br><b>Quando hai finito premi «Ho fatto!» →</b></div></button>`;
   return h;
 }
 const scadPill = o => !o.scad ? '<span class="pill green">attivo</span>' : o.scad < Date.now() ? '<span class="pill red">Scaduto</span>' : `<span class="pill green">attivo fino al ${dataOra(o.scad)}</span>`;
 const strumentiAdmin = () => bannerBackup() + avvisoAdminBtn();
 const avvisoAdminBtn = () => {
   const av = st.gruppo.avviso, so = st.gruppo.sondaggio, tr = (t, n) => esc(t.length > n ? t.slice(0, n - 1) + '…' : t);
-  return `<div class="card" id="com-admin"><h3>🛡️ Strumenti admin</h3><div class="list">
+  return `<div class="card" id="com-admin"><h3>🛠️ Strumenti di sistema</h3><div class="list">
     <div class="li"><div class="grow"><div class="t">Avviso</div><div class="d">${av && av.testo ? tr(av.testo, 46) + ' ' + scadPill(av) : 'Nessun avviso'}</div></div>
       <button class="btn sm" id="btn-avviso-nuovo" data-act="avviso-nuovo">${av ? 'Sostituisci' : 'Nuovo'}</button>${av ? `<button class="iconbtn" style="width:32px;height:32px" data-act="avviso-rimuovi" aria-label="Rimuovi avviso">${ic('trash','s')}</button>` : ''}</div>
     <div class="li"><div class="grow"><div class="t">Sondaggio / domanda</div><div class="d">${so && so.domanda ? tr(so.domanda, 46) + ' ' + scadPill(so) : 'Nessun sondaggio'}</div></div>
@@ -4715,7 +4647,7 @@ const avvisoAdminBtn = () => {
   </div></div>`;
 };
 A['avviso-nuovo'] = () => {
-  if(!st.isAdmin) return;
+  if(!can('sistema')) return;
   const cur = st.gruppo.avviso || {}, tp = AVV_TIPI[cur.tipo] ? cur.tipo : 'avviso';
   st.avvTipo = tp;
   openSheet(`<h3>📢 Comunicazione in Home ${infoBtn(`Visibile a tutti i colleghi finché non la rimuovi o la sostituisci. Ne resta una sola attiva.`)}</h3>
@@ -4727,7 +4659,7 @@ A['avviso-nuovo'] = () => {
 };
 A['avviso-tipo'] = ds => { if(!AVV_TIPI[ds.v]) return; st.avvTipo = ds.v; document.querySelectorAll('#av-tipi button').forEach(b => b.classList.toggle('on', b.dataset.v === ds.v)); };
 A['avviso-pubblica'] = () => {
-  if(!st.isAdmin) return;
+  if(!can('sistema')) return;
   const testo = val('av-testo'), tipo = AVV_TIPI[st.avvTipo] ? st.avvTipo : 'avviso';
   if(testo.length < 3) return toast('Scrivi il testo della comunicazione', 'err');
   const autore = (nomeBreve(st.mid) || 'Amministratore').slice(0, 40), scad = scadInput('av-scad');
@@ -4736,7 +4668,7 @@ A['avviso-pubblica'] = () => {
   closeSheet();
 };
 A['avviso-rimuovi'] = () => {
-  if(!st.isAdmin) return;
+  if(!can('sistema')) return;
   G().update({avviso: firebase.firestore.FieldValue.delete()}).then(() => toast('Comunicazione rimossa')).catch(e => toast(errMsg(e), 'err'));
   closeSheet();
 };
@@ -4806,7 +4738,7 @@ A['sond-aggiorna'] = async () => {
 };
 /* --- admin --- */
 A['sond-nuovo'] = () => {
-  if(!st.isAdmin) return;
+  if(!can('sistema')) return;
   st.sondTipo = 'scelta';
   openSheet(`<h3>🗳️ Nuovo sondaggio o domanda</h3>
     <div class="chips" id="sn-tipi"><button id="sn-t-scelta" class="on" data-act="sond-tipo" data-v="scelta">☑️ Scelta multipla</button><button id="sn-t-aperta" data-act="sond-tipo" data-v="aperta">✍️ Risposta libera</button></div>
@@ -4819,7 +4751,7 @@ A['sond-nuovo'] = () => {
 A['sond-tipo'] = ds => { st.sondTipo = ds.v === 'aperta' ? 'aperta' : 'scelta'; document.querySelectorAll('#sn-tipi button').forEach(b => b.classList.toggle('on', b.dataset.v === st.sondTipo)); const o = $('sn-opz'); if(o) o.hidden = st.sondTipo === 'aperta'; };
 A['sond-piu'] = () => { for(let i = 2; i < 6; i++){ const l = $('sn-ol-' + i); if(l && l.hidden){ l.hidden = false; if(i === 5 && $('sn-piu')) $('sn-piu').hidden = true; return; } } };
 A['sond-pubblica'] = async () => {
-  if(!st.isAdmin) return;
+  if(!can('sistema')) return;
   const tipo = st.sondTipo === 'aperta' ? 'aperta' : 'scelta', domanda = val('sn-dom');
   if(domanda.length < 3) return toast('Scrivi la domanda', 'err');
   const opz = tipo === 'scelta' ? [0,1,2,3,4,5].map(i => val('sn-o' + i)).filter(Boolean) : [];
@@ -4841,7 +4773,7 @@ async function sondPulisci(pid){
   const b = db.batch(); st.membri.forEach(m => b.delete(col.collection('voti').doc(m.id))); await b.commit();
 }
 A['sond-admin'] = () => {
-  const s = st.gruppo.sondaggio; if(!st.isAdmin || !s) return;
+  const s = st.gruppo.sondaggio; if(!can('sistema') || !s) return;
   openSheet(`<h3>🗳️ ${s.tipo === 'scelta' ? 'Sondaggio' : 'Domanda'} ${scadPill(s)}</h3>
     <p style="font-size:15px;font-weight:700;margin:0 0 10px;word-break:break-word">${esc(s.domanda)}</p>
     <div id="sond-ris" class="card"><div class="empty">Carico…</div></div>
@@ -4851,7 +4783,7 @@ A['sond-admin'] = () => {
   sondUnsub = sondCol(s.id).collection('risposte').limit(30).onSnapshot(r => { if($('sond-ris')) $('sond-ris').innerHTML = sondRisultati(s, r.docs.map(d => d.data()), true); }, e => { if($('sond-ris')) $('sond-ris').innerHTML = `<div class="banner red">${ic('alert')}<div>${esc(errMsg(e))}</div></div>`; });
 };
 A['sond-elimina'] = async () => {
-  const s = st.gruppo.sondaggio; if(!st.isAdmin || !s) return;
+  const s = st.gruppo.sondaggio; if(!can('sistema') || !s) return;
   if(!confirm('Rimuovere il sondaggio e cancellare tutte le risposte?')) return;
   closeSheet();
   try { await sondPulisci(s.id); await G().update({sondaggio: firebase.firestore.FieldValue.delete()}); toast('Sondaggio rimosso'); } catch(e){ toast(errMsg(e), 'err'); }
