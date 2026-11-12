@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.36.5';
+const VERSION = '1.36.6';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -3410,6 +3410,13 @@ A['rg-invia'] = () => {
   if(ids.length * imp > creditoLibero()) return toast('Saldo insufficiente', 'err');
   ids.forEach(dest => addMov({tipo:'regalo', mid: st.mid, dest, daMid: st.mid, aMid: dest, importo: imp, ...(msg ? {msg} : {})}));
   closeSheet(); toast(`🎁 Inviati ${ids.length * q} ${ids.length * q === 1 ? 'credito' : 'crediti'} a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
+};
+
+/* --- canale Revolut: l'admin lo sospende / riattiva (campo revolutAttivo nel documento del gruppo) --- */
+A['revolut-toggle'] = () => {
+  if(!st.isAdmin) return;
+  const on = !revolutOn();
+  G().update({revolutAttivo: on}).then(() => toast(on ? 'Canale Revolut riattivato' : 'Canale Revolut sospeso')).catch(e => toast(errMsg(e), 'err'));
 };
 
 /* --- eventi --- */
