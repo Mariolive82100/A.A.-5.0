@@ -328,6 +328,43 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 .steps li::before{content:counter(s);flex:none;width:26px;height:26px;border-radius:50%;background:rgba(245,165,36,.14);color:var(--amber);font-weight:800;font-size:13px;display:grid;place-items:center}
 .steps li b{color:var(--tx)}
 @media (min-width:700px){html{font-size:17px}}
+
+/* premi del podio nell'header (compatti su mobile: seconda riga sotto la barra) */
+header.hasprize{padding-bottom:38px}
+.prizepill{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;gap:2px;font-size:11.5px;font-weight:800;color:#fde68a;white-space:nowrap;cursor:pointer}
+.pz-s{opacity:.5;white-space:pre}
+.rp-grid{display:block}
+/* ---------- desktop / tablet orizzontale: sidebar fissa e contenuti a piu' colonne (il mobile resta invariato) ---------- */
+@media (min-width:1000px){
+  body:has(nav.dock:not(.hidden)){padding-left:232px}
+  nav.dock{left:0;right:auto;top:0;bottom:0;width:232px;border-top:0;border-right:1px solid var(--line);padding:20px 12px;overflow-y:auto}
+  nav.dock .dk{flex-direction:column;gap:6px}
+  nav.dock .dk button{flex:none;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;padding:13px 14px;font-size:14px;text-align:left;border-radius:14px}
+  nav.dock .dk button:first-child{border:1px solid rgba(245,165,36,.45);background:linear-gradient(135deg,rgba(245,165,36,.22),rgba(124,58,237,.16));color:var(--tx);font-weight:800;margin-bottom:6px}
+  nav.dock .dk button.on{background:var(--card2);color:var(--amber)}
+  nav.dock .dk button:hover{background:var(--card2)}
+  body:has(nav.dock:not(.hidden)) .sheet{left:232px}
+  body:has(nav.dock:not(.hidden)) #fab-menu{left:calc(50% + 116px)}
+  header{padding-left:22px;padding-right:26px;gap:14px}
+  header.hasprize{padding-bottom:10px}
+  .prizepill{position:static;flex:none;padding:5px 12px;border:1px solid rgba(251,191,36,.4);border-radius:99px;background:rgba(251,191,36,.10)}
+  main,main.wide{max-width:1260px;padding:22px 30px 48px}
+  main:not([data-p="bar"]),#atab-pannello{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start;grid-auto-flow:row dense}
+  main:not([data-p="bar"])>*,#atab-pannello>*{grid-column:1/-1}
+  main:not([data-p="bar"])>.card:not(:has(table)):not(:has(.list)),#atab-pannello>.card:not(:has(table)):not(:has(.list)){grid-column:auto}
+  .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start}
+  .rp-grid>#card-compiti{grid-column:1/-1}
+  main[data-p="bar"] .home .grid{grid-template-columns:repeat(4,1fr)}
+  main[data-p="bar"] .gbtn{min-height:190px}
+  main[data-p="bar"]>*{max-width:1100px;margin-left:auto;margin-right:auto}
+  table{width:100%}
+  .card{overflow-x:visible}
+}
+@media (min-width:1500px){
+  main:not([data-p="bar"]),#atab-pannello{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  main,main.wide{max-width:1480px}
+}
 </style>
 </head>
 <body>
@@ -340,6 +377,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
     <small><span class="dot" id="syncdot"></span><span id="hdr-sub"></span></small>
   </div>
   <button class="rankpill hidden" id="hdr-rank" data-act="go" data-p="classifiche" aria-label="La tua posizione in classifica nel mese"></button>
+  <button class="prizepill hidden" id="hdr-prize" data-act="go" data-p="classifiche" aria-label="Premi del Podio del Mese"></button>
   <button class="iconbtn" id="hdr-update" style="margin-left:auto" data-act="aggiorna" aria-label="Aggiorna all'ultima versione" title="Aggiorna all'ultima versione"><svg class="i"><use href="#i-repeat"/></svg></button>
   <button class="sbadge pos hidden" id="hdr-sb" style="margin-left:6px" data-act="go" data-p="registro" aria-label="Saldo"></button>
 </header>
@@ -409,7 +447,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.37.0';
+const VERSION = '1.37.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -984,7 +1022,7 @@ function doRender(){
   renderDrawer();
 
   const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, compiti:pCompiti, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, eventi:pEventi, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pAdmin, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
-  main.classList.remove('wide');
+  main.classList.remove('wide'); main.dataset.p = (st.page === 'bar' && !av) ? 'bar' : st.page;
   const sbg = n => n ? `<span class="tb tbi">${n}</span>` : '';
   const sw = st.isAdmin ? `<div class="swbar"><button class="${av ? '' : 'on'}" data-act="vista" data-v="user" id="sw-user">👤 Profilo Utente${av ? sbg(cn.pers) : ''}</button><button class="${av ? 'on adm' : ''}" data-act="vista" data-v="admin" id="sw-admin">🛡️ Amministrazione Fondo${av ? '' : sbg(cn.fondo)}</button></div>` : '';
   main.innerHTML = sw + fn(d);
@@ -2053,6 +2091,9 @@ function aggiornaPillola(d, av){
   const el = $('hdr-rank'), hd = $('hdr'); if(!el || !hd) return;
   let x = null;
   if(!av && st.mid && ptMaster()){ try { x = posMese(d); } catch(e){ x = null; } }
+  /* premi del Podio del Mese, sempre sott'occhio accanto alla posizione (nascosti se il podio e' spento dall'admin) */
+  const pz = $('hdr-prize'), premi = (!av && st.mid && podioOn()) ? [1, 2, 3].filter(i => podioPt(i) > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} +${podioPt(i)} pt`) : [];
+  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio a fine mese'; } }
   hd.classList.toggle('hasrank', !!x); el.classList.toggle('hidden', !x);
   if(!x) return;
   const med = {1: '🥇 ', 2: '🥈 ', 3: '🥉 '}[x.pos] || '';
@@ -2586,7 +2627,9 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
     <p class="hint" style="margin:4px 0 8px">Se spento, nessun accredito di punti e Tessera Fedeltà nascosta. I punti già maturati restano.</p>
     <div id="rp-sw-lista">${RP_SW.map(([id, k, l]) => `<label class="check"><input type="checkbox" id="${id}" ${flagOn(k) ? 'checked' : ''} ${ptMaster() ? '' : 'disabled'}><b style="flex:1;font-size:14px">${l}</b></label>`).join('')}</div>
     <button class="btn sm block ghost" id="btn-rp-consigliati" data-act="rp-consigliati" style="margin:8px 0">✨ Applica valori consigliati</button>
-    <h3 style="margin-top:10px">A · Consumi &amp; spese</h3>
+  </div>
+  <div class="rp-grid">
+  <div class="card" id="rp-a"><h3>A · Consumi &amp; spese</h3>
     <div class="grid2">
       <label class="f"><span>☕ Punti per caffè</span><input class="in mono" id="rp-caffe" inputmode="numeric" value="${ptCaffe()}"></label>
       <label class="f"><span>🍪 Punti per ogni 1,00 € di snack</span><input class="in mono" id="rp-snackeuro" inputmode="decimal" value="${nDec(ptSnackEuro())}"></label>
@@ -2596,7 +2639,8 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Tetto punti per spesa</span><input class="in mono" id="rp-spmax" inputmode="numeric" value="${ptSpesaMax()}"></label>
     </div>
     <p class="hint" style="margin:-4px 0 8px;font-size:12px">Snack e spese: punti = importo × tariffa, arrotondati all'intero (le spese anche limitate dal tetto). Il rimborso resta al 100%.</p>
-    <h3 style="margin-top:10px">B · Obiettivi &amp; collaborazione</h3>
+  </div>
+  <div class="card" id="rp-b"><h3>B · Obiettivi &amp; collaborazione</h3>
     <div class="grid2">
       <label class="f"><span>👏 Punti per «Ben fatto»</span><input class="in mono" id="rp-bf" inputmode="numeric" value="${ptBenFatto()}"></label>
     </div>
@@ -2604,7 +2648,9 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Gettoni «Ben fatto»</span><input class="in mono" id="rp-bfn" inputmode="numeric" value="${bfN()}"></label>
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
-    <h3 style="margin-top:10px">C · Podio del mese</h3>
+  </div>
+  ${cardCompiti()}
+  <div class="card" id="rp-c"><h3>C · Podio del mese</h3>
     <label class="check"><input type="checkbox" id="rp-podio-on" ${podioOn() || (st.gruppo && st.gruppo.podioOn === true) ? 'checked' : ''}><b style="flex:1;font-size:14px">🏅 Bonus ai primi tre del mese solare</b></label>
     <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
       <label class="f"><span>🥇 1°</span><input class="in mono" id="rp-pod1" inputmode="numeric" value="${podioPt(1)}"></label>
@@ -2612,13 +2658,15 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>🥉 3°</span><input class="in mono" id="rp-pod3" inputmode="numeric" value="${podioPt(3)}"></label>
     </div>
     <p class="hint" style="margin:-4px 0 8px;font-size:12px">A inizio mese ti compare un avviso in Home: con un tocco assegni i bonus ai primi tre del mese precedente. Entrano nella Tessera Fedeltà, non nella classifica.</p>
-    <h3 style="margin-top:10px">D · Riscatto Tessera Fedeltà</h3>
+  </div>
+  <div class="card" id="rp-d"><h3>D · Riscatto Tessera Fedeltà</h3>
     <div class="grid2">
       <label class="f"><span>Soglia riscatto (punti)</span><input class="in mono" id="rp-soglia" inputmode="numeric" value="${sogliaPunti()}"></label>
       <label class="f"><span>Premio in crediti (€)</span><input class="in mono" id="rp-crediti" inputmode="numeric" value="${creditiSoglia()}"></label>
     </div>
-    <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti">Salva le regole</button>
   </div>
+  </div>
+  <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti" style="margin-bottom:12px">Salva le regole</button>
 `;
 const cardAdmins = () => `
   <div class="card"><h3>Amministratori</h3>
@@ -2633,7 +2681,7 @@ const cardAdmins = () => `
 `;
 
 function pRegole(){
-  return `<h2>${ic('sparkles')} ⚙️ Regole punti &amp; premi ${infoBtn(`Tutto in un posto: consumi e spese, obiettivi e collaborazione, podio del mese e riscatto della Tessera Fedeltà`)}</h2>${cardRegolePunti().replace('<h3 style="margin-top:10px">C ·', cardCompiti() + '<h3 style="margin-top:10px">C ·')}`;
+  return `<h2>${ic('sparkles')} ⚙️ Regole punti &amp; premi ${infoBtn(`Tutto in un posto: consumi e spese, obiettivi e collaborazione, podio del mese e riscatto della Tessera Fedeltà`)}</h2>${cardRegolePunti()}`;
 }
 function pBackup(d){
   return `<h2>${ic('download')} Backup & Ripristino</h2><p class="sub">Copia dei dati fuori dall'app.</p>
