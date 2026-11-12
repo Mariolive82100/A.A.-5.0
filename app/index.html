@@ -210,6 +210,7 @@ main.wide{max-width:980px}
 .tess-ok{margin-top:8px;font-weight:800;color:var(--green);font-size:13.5px;text-align:center}
 .sala{background:linear-gradient(135deg,rgba(245,165,36,.16),rgba(245,165,36,.05));border:1px solid rgba(245,165,36,.35);border-radius:14px;padding:12px 14px;margin:0 0 12px}
 .sala-l{font-size:13px;font-weight:700;color:var(--tx2)}.sala-v{font-size:34px;font-weight:800;color:var(--amber);line-height:1}
+.cd-wide{grid-column:1/-1}
 .bar{height:8px;border-radius:5px;background:var(--card2);overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),#818cf8);border-radius:5px}
 .cols{display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:6px}
@@ -359,17 +360,19 @@ header.hasprize{padding-bottom:38px}
   main[data-p="spesa"],main[data-p="eventi"],main[data-p="compiti"],main[data-p="gioco"],main[data-p="ruota"],main[data-p="perle"],main[data-p="impostazioni"],main[data-p="regolamento"],main[data-p="notifiche"],main[data-p="crediti"]{max-width:860px}
   main[data-p="saletta"]{max-width:980px}
   main[data-p="saletta"] .grid2{grid-template-columns:repeat(3,1fr)}
-  /* Classifica: filtri a tutta larghezza, sotto due colonne bilanciate (sinistra: scheda, albo, onesta; destra: podio completo) */
-  .cl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto 1fr;gap:0 18px;align-items:start}
-  .cl-grid>.clg-h{grid-column:1;grid-row:1}.cl-grid>.clg-a{grid-column:1;grid-row:2}.cl-grid>.clg-o{grid-column:1;grid-row:3}
-  .cl-grid>.clg-p{grid-column:2;grid-row:1/5}
+  /* Classifica: filtri a tutta larghezza, sotto due colonne bilanciate (sinistra: scheda e albo; destra: podio completo) */
+  .cl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:0 18px;align-items:start}
+  .cl-grid>.clg-h{grid-column:1;grid-row:1}.cl-grid>.clg-a{grid-column:1;grid-row:2}
+  .cl-grid>.clg-p{grid-column:2;grid-row:1/3}
   /* Cassa e registro: cruscotto a tutta larghezza con i 4 indicatori su una riga */
-  #cassa-dash .grid2{grid-template-columns:repeat(4,minmax(0,1fr))}
+  #cassa-dash .grid2{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #cassa-dash .cd-wide{grid-column:auto}
   /* premio podio accanto alla posizione, al centro dell'header */
   #hdr-rank{margin:0 0 0 auto}
   .prizepill{margin:0 auto 0 0}
   #hdr-update{margin-left:0!important}
 }
+@media (min-width:1280px){ #cassa-dash .grid2{grid-template-columns:repeat(5,minmax(0,1fr))} }
 @media (min-width:1500px){ main,main.wide{max-width:1360px} }
 </style>
 </head>
@@ -453,7 +456,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.37.2';
+const VERSION = '1.38.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1059,7 +1062,7 @@ function renderDrawer(){
 const SALETTA_SUB = ['saletta','eventi','inventario','gioco','ruota','perle','spesa'];
 const PAGINE_COLLEGA = ['bar','saletta','classifiche','spesa','gioco','compiti','inventario','eventi','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche','admin'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADMIN = ['regole','bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','inventario','statistiche','cassa','feed','compiti','impostazioni','regolamento'];
+const PAGINE_ADMIN = ['regole','bar','classifiche','spesa','registro','notifiche','admin','backup','chiusura','membri','quote','statistiche','cassa','feed','compiti','impostazioni','regolamento'];
 const adminView = () => st.isAdmin && st.vista === 'admin';
 const pagineConsentite = () => !st.isAdmin ? PAGINE_COLLEGA : adminView() ? PAGINE_ADMIN : PAGINE_UTENTE;
 
@@ -1265,7 +1268,7 @@ function pBar(d){
   const recenti = d.movs.filter(m => m.uid === st.uid && ['caffe','snack'].includes(m.tipo) && !m.stato && !d.stornati.has(m.id) && Date.now() - m.t < ANNULLA_MIN*60000).reverse();
   const sq = statoQuota(d, st.mid, anno());
   const quotaDa = st.gruppo.quotaAnnua > 0 && st.ready.mv && sq !== 'pagata';
-  const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0);
+  const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && p.esaurito !== true && giacenza(d, p) > 0);
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
   const scRic = scambiPerMe(d).length;
   return `
@@ -1394,7 +1397,7 @@ function tesoro(d){
   Object.keys(d.S.saldi).forEach(k => { const v = d.S.saldi[k] || 0; if(v > 0) cred += v; else deb += -v; });
   return {cassa, cont: c.contanti || 0, rev: c.revolut || 0, cred, deb, netto: cassa - cred + deb};
 }
-const ADM_TABS = [['inbox','📥','Inbox'],['cassa','💶','Cassa'],['soci','👥','Soci'],['magazzino','📦','Magazzino']];
+const ADM_TABS = [['inbox','📥','Inbox'],['cassa','💶','Cassa'],['soci','👥','Soci']];
 /* scheda attiva dell'Amministrazione: all'apertura Inbox se ci sono richieste, altrimenti l'ultima usata */
 function admTabCur(d){
   const ok = k => ADM_TABS.some(x => x[0] === k);
@@ -1407,8 +1410,6 @@ function admTabCur(d){
 }
 function pAdminHome(d, forza){
   const t = tesoro(d), tab = forza || admTabCur(d), cn = contatori(d);
-  const prods = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
-  const bd = busteDisp(d), pcf = st.gruppo.prezzoCaffe || 0;
   const soci = membriAttivi().slice().sort((a, b) => a.nome.localeCompare(b.nome));
   const a = anno(), qPag = soci.filter(m => statoQuota(d, m.id, a) === 'pagata').length;
   const tabs = `<div class="atabs" role="tablist">${ADM_TABS.map(([k, e, l]) => `<button role="tab" aria-selected="${tab === k}" class="${tab === k ? 'on' : ''}" id="atab-${k}" data-act="adm-tab" data-v="${k}"><span>${e}</span>${l}${k === 'inbox' && cn.fondo ? `<span class="tb">${cn.fondo}</span>` : ''}</button>`).join('')}</div>`;
@@ -1429,18 +1430,7 @@ function pAdminHome(d, forza){
     <div class="grid2" style="margin-top:8px"><button class="btn sm ghost" data-act="ricarica-per">${ic('banknote','s')} Ricarica per un collega</button><button class="btn sm ghost" data-act="go" data-p="membri">${ic('users','s')} Tutti i colleghi</button></div>
   </div>
   <button class="btn amber block big" id="adm-classifiche" data-act="go" data-p="classifiche" style="margin-top:10px">📊 Classifica e statistiche</button>`;
-  const magaz = `  <div class="card"><h3>${ic('bean','s')} Caffè</h3>
-    <div class="row" style="align-items:flex-end;gap:8px"><label class="f" style="flex:1;margin:0"><span>Prezzo tazzina €</span><input class="in mono" id="mg-caffe" inputmode="decimal" value="${(pcf/100).toFixed(2).replace('.',',')}"></label><button class="btn amber" data-act="salva-prezzo-caffe">Salva</button></div>
-    <div class="between" style="font-size:13px;margin:12px 0 8px"><span class="tx2">Buste disponibili</span><b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b></div>
-    <button class="btn sm block" data-act="carico-caffe-n">${ic('package','s')} Carico buste…</button>
-  </div>
-  <div class="card"><h3><span>Listino snack e bevande</span><button class="btn link" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button></h3>
-    ${prods.length ? `<div class="list">${prods.map(p => { const sk = giacenza(d, p); return `<div class="li"><button class="grow" style="text-align:left" data-act="prodotto" data-id="${p.id}"><div class="t">${esc(p.emoji || '')} ${esc(p.nome)}</div><div class="d mono">${eur(p.prezzo)}</div></button>
-      <span class="stepper"><button data-act="carico" data-id="${p.id}" data-v="-1">−</button><b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b><button data-act="carico" data-id="${p.id}" data-v="1">+</button></span></div>`; }).join('')}</div>`
-      : '<div class="empty">Nessun articolo in listino.</div>'}
-    ${infoBtn(`Palette, zucchero, bicchieri e detersivi non si contano: registrali con «Registra spesa».`, 'Come funziona')}
-  </div>
-`;
+
   return `${bannerBackup()}${avvisiHome()}${avvisoAdminBtn()}
   <div class="card tesoro">
     <div class="between"><small class="mut">Saldo Disponibile del Fondo (Cassa Totale)</small>${d.pendenti.length ? `<button class="pill red" style="border:0" data-act="adm-tab" data-v="inbox">${d.pendenti.length} in attesa</button>` : ''}</div>
@@ -1452,7 +1442,7 @@ function pAdminHome(d, forza){
     <div class="between"><small class="mut">Fondo Netto</small><b class="mono ${t.netto < 0 ? 'red' : 'green'}" id="t-netto" style="font-size:20px">${eurS(t.netto)}</b></div>
     <div class="mut" style="font-size:11.5px;margin-top:4px">cassa ${eur(t.cassa)} − crediti dei colleghi ${eur(t.cred)} + debiti dei colleghi ${eur(t.deb)}</div>
   </div>${tabs}
-  <div role="tabpanel" id="atab-pannello">${tab === 'inbox' ? inbox : tab === 'cassa' ? cassa : tab === 'soci' ? sociT : magaz}</div>`;
+  <div role="tabpanel" id="atab-pannello">${tab === 'inbox' ? inbox : tab === 'cassa' ? cassa : tab === 'soci' ? sociT : cassa}</div>`;
 }
 
 /* ---------- registro movimenti, notifiche ---------- */
@@ -1521,8 +1511,8 @@ function sincronizzaEstratti(){
 function sincronizzaGiacenze(d){
   if(!st.isAdmin || st.sync !== 'ok' || !st.ready.mv || modeKey !== 'admin') return;
   st.prodotti.forEach(p => {
-    const v = d.S.stock[p.id] || 0, k = p.id + ':' + v;
-    if(p.giacenza !== v && !giacSent[k]){ giacSent[k] = 1; C('prodotti').doc(p.id).set({giacenza: v}, {merge: true}).catch(() => { delete giacSent[k]; }); }
+    const v = d.S.stock[p.id] || 0, car = Number(p.caricati) || 0, ven = Math.max(0, car - Math.max(0, v)), k = p.id + ':' + v + ':' + car;
+    if((p.giacenza !== v || (car > 0 && p.venduti !== ven)) && !giacSent[k]){ giacSent[k] = 1; C('prodotti').doc(p.id).set(car > 0 ? {giacenza: v, venduti: ven} : {giacenza: v}, {merge: true}).catch(() => { delete giacSent[k]; }); }
   });
 }
 const giacenza = (d, p) => st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 1);
@@ -1534,6 +1524,30 @@ function busteCaricate(d){
   return st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 0);
 }
 const busteDisp = d => Math.max(0, busteCaricate(d));
+/* ---------- scorta caffe' in grani (kg) e lotti di snack/bibite: base del Tasso di Onesta' ---------- */
+const resaKg = () => { const v = Number(st.gruppo && st.gruppo.resaKg); return v >= 1 && v <= 500 ? v : CAFFE_PER_KG; };
+const cicloCaffe = () => { const c = st.gruppo && st.gruppo.caffeCiclo; return c && typeof c === 'object' ? c : null; };
+const r3 = x => Math.round(x * 1000) / 1000;
+/* ciclo attivo: kg caricati dall'avvio; i caffe' registrati (giri inclusi) sono quelli dei movimenti gia' in memoria dall'avvio del ciclo (nessuna lettura in piu') */
+function statoCaffe(d){
+  const c = cicloCaffe(), resa = resaKg(); if(!c) return null;
+  const n = k => { const v = Number(c[k]); return isFinite(v) && v > 0 ? v : 0; };
+  const kg = n('kg'), da = n('da'), hk = n('hk'), hc = n('hc'), attivo = kg > 0 && da > 0;
+  let reg = 0, parz = 0;
+  if(attivo){ const X = aggConChiusi(d, {da, a: Infinity, label: 'Ciclo caffè'}, 'on'); reg = Math.max(0, Math.round(sumo(X.G.caffe))); parz = X.parziali.length; }
+  const cap = Math.round(kg * resa);
+  return {attivo, kg, kgIniz: n('kgIniz'), da, hk, hc, resa, registrati: reg, capienza: cap, restTz: Math.max(0, cap - reg), restKg: Math.max(0, kg - reg / resa),
+    pct: cap > 0 ? reg / cap * 100 : null, parz, capChiusi: Math.round(hk * resa)};
+}
+/* lotto di un articolo: caricati = pezzi del lotto in corso; lotto.{hc,ha} = pezzi caricati / ammanco dei lotti gia' chiusi.
+   Il lotto in corso si consolida quando la giacenza digitale arriva a 0 oppure l'admin attiva «Esaurito» (ammanco = pezzi ancora a sistema) */
+function statoProd(d, p){
+  const l = p.lotto && typeof p.lotto === 'object' ? p.lotto : {}, hc = Number(l.hc) || 0, ha = Number(l.ha) || 0;
+  const gia = Math.max(0, giacenza(d, p)), car = Number(p.caricati) || 0, es = p.esaurito === true, chiuso = car > 0 && (es || gia <= 0);
+  const cT = hc + (chiuso ? car : 0), aT = Math.min(cT, ha + (chiuso && es ? gia : 0));
+  return {car, gia, es, chiuso, cT, aT, reg: Math.max(0, car - gia), ammanco: es ? gia : 0, pct: cT > 0 ? Math.max(0, Math.min(100, (cT - aT) / cT * 100)) : null};
+}
+const prodListino = () => st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false);
 /* ---------- descrizione movimenti ---------- */
 function descMov(m){
   const n = esc(nomeM(m.mid));
@@ -1683,7 +1697,8 @@ function pFeed(d){
       <div class="stat"><small>💰 Giacenza cassa (adesso)</small><b class="mono amber" id="r-fondo-tot" style="font-size:28px;line-height:1.2">${eur(tot)}</b><small>Contanti ${eur(c.contanti || 0)} · Revolut ${eur(c.revolut || 0)}</small></div>
       <div class="stat"><small>🏦 Fondo netto (adesso)</small><b class="mono ${t.netto < 0 ? 'red' : 'green'}" id="cd-netto" style="font-size:28px;line-height:1.2">${eur(t.netto)}</b><small>cassa − crediti + debiti</small></div>
       <div class="stat"><small>📥 Entrate del periodo</small><b class="mono green" id="cd-in">${eur(C.inC + C.inR)}</b><small>Contanti ${eur(C.inC)} · Revolut ${eur(C.inR)}</small></div>
-      <div class="stat"><small>📤 Uscite del periodo</small><b class="mono red" id="cd-out">${eur(uscTot)}</b><small>Spese ${eur(C.spese)} · Uscite ${eur(C.uscite)} · Riscatti ${eur(C.risc)}</small></div></div>
+      <div class="stat"><small>📤 Uscite del periodo</small><b class="mono red" id="cd-out">${eur(uscTot)}</b><small>Spese ${eur(C.spese)} · Uscite ${eur(C.uscite)} · Riscatti ${eur(C.risc)}</small></div>
+      <div class="stat cd-wide"><small>🧾 Totale pagato</small><b class="mono amber" id="cd-pagato">${eur(consumiRange(r).tot)}</b><small>Caffè e snack pagati dai colleghi nel periodo</small></div></div>
     ${hintArc(r)}
     ${infoBtn(`Entrate: ricariche convalidate, quote versate, entrate di cassa e caffè pagati subito. Uscite: spese convalidate (anche quelle anticipate e rimborsate), uscite di cassa e riscatti pagati. I giroconti tra contanti e Revolut non contano. Giacenza e fondo netto sono sempre lo stato di adesso. Gli storni correggono i totali.`, 'Come funziona')}
     <button class="btn block ghost" style="margin-top:8px" data-act="rendiconto">${ic('share','s')} Condividi rendiconto di cassa (immagine)</button></div>`;
@@ -1721,7 +1736,7 @@ function pRegolamento(){
   ${sez('☕ Caffè e snack', [
     `Prezzo da listino (caffè ${eur(g.prezzoCaffe || 0)}), addebitato subito sul saldo.`,
     `Ti sei sbagliato? <b>Annulla entro ${ANNULLA_MIN} minuti.</b>`,
-    'Ogni prelievo riduce la scorta in inventario.'])}
+    'Ogni prelievo riduce la scorta in inventario. Se un articolo è segnato <b>⚠️ Esaurito</b> non si può acquistare finché non viene ricaricato.'])}
   ${sez('🛒 Spesa e rimborsi', [
     'La <b>Lista della spesa</b> è solo un <b>promemoria</b>: chiunque aggiunge ciò che manca e chi lo compra lo spunta per toglierlo dall\'elenco. Non genera rimborsi.',
     'Hai anticipato dei soldi per il gruppo (acquisti per la saletta o spese straordinarie come un telegramma o un omaggio autorizzato)? Da Home tocca <b>➕ Ricarica o rimborso → 🧾 Rimborso spesa</b>: indica motivo, importo e se vuoi il rimborso <b>in crediti</b> o in <b>denaro reale</b>.',
@@ -1746,10 +1761,11 @@ function pRegolamento(){
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti di oggi, settimana o mese. La pillola in alto mostra la tua posizione del mese.',
     '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
-    `<b>Tasso di Onestà:</b> caffè registrati ÷ (kg acquistati × ${CAFFE_PER_KG}). Verde da 85%, rosso sotto 70%.`])}
+    '<b>Statistiche · Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati) e un indice per ogni articolo.',
+    `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
   ${sez('🔑 Ruoli', [
     '<b>Collega:</b> registra consumi, spese, ricariche e regali; svolge i compiti assegnati; riceve notifiche personali.',
-    '<b>Amministratore:</b> conferma ricariche, spese e riscatti; gestisce inventario, listino, cassa, regole punti, storni e chiusure.',
+    '<b>Amministratore:</b> conferma ricariche, spese e riscatti; gestisce inventario (dalla pagina Inventario), listino, cassa, regole punti, storni e chiusure.',
     '<b>Creatore:</b> non può essere revocato. Il gruppo tiene almeno due admin.',
     'Solo gli admin cambiano regole e parametri.'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
@@ -1992,14 +2008,14 @@ function aggMov(G, m, sg){
   }
 }
 function aggrega(list){ const G = nuovoAgg(); list.forEach(m => aggMov(G, m)); return G; }
-let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''}, _aggHd = {d: null, k: ''};
+let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''}, _aggHd = {d: null, k: ''}, _aggOn = {d: null, k: ''};
 function aggRange(d, r, slot){
   const k = [r.da, r.a, st.arcMov ? st.arcMov.length : -1, new Date().toDateString()].join('|');
-  const c = slot === 'cl' ? _aggCl : slot === 'hd' ? _aggHd : _aggC;
+  const c = slot === 'cl' ? _aggCl : slot === 'hd' ? _aggHd : slot === 'on' ? _aggOn : _aggC;
   if(c.d === d && c.k === k) return c;
   const tutti = (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
   const n = {d, k, r, tutti, G: aggrega(tutti)};
-  if(slot === 'cl') _aggCl = n; else if(slot === 'hd') _aggHd = n; else _aggC = n;
+  if(slot === 'cl') _aggCl = n; else if(slot === 'hd') _aggHd = n; else if(slot === 'on') _aggOn = n; else _aggC = n;
   return n;
 }
 function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
@@ -2149,45 +2165,40 @@ function clHero(righe, pos, T, r){
     ${miei.length ? `<div class="hero-tit">${miei.map(t => `<span class="pill amber">${t.e} ${esc(t.nome)}</span>`).join(' ')}</div>` : ''}
   </div>`;
 }
-/* ---------- Tasso di Onestà automatico: caffè registrati nel periodo ÷ (kg di caffè in grani acquistati nel periodo × 130) ---------- */
-function kgCaffeSpesa(m){
-  const parti = (m.articoliNomi && m.articoliNomi.length) ? m.articoliNomi : String(m.descr || '').split(/[,;+]/);
-  let kg = 0;
-  parti.forEach(p => {
-    const t = String(p).toLowerCase();
-    if(!/caff[eèé]/.test(t) || /macchina|filtr|ciald|capsul|solubil|decalcif|zuccher|tazz|bicchier|palett|orzo|ginseng/.test(t)) return;
-    let k = 0;
-    const mk = t.match(/(\d+(?:[.,]\d+)?)\s*kg/);
-    if(mk) k = parseFloat(mk[1].replace(',', '.'));
-    else { const mg = t.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grammi)\b/); if(mg) k = parseFloat(mg[1].replace(',', '.')) / 1000; }
-    kg += (k > 0 && k <= 50) ? k : 1;
-  });
-  return kg;
-}
-function kgGrani(list){
-  let kg = 0, n = 0;
-  list.forEach(m => {
-    let src = m, sg = 1;
-    if(m.tipo === 'storno'){ if(!m.orig) return; src = m.orig; sg = -1; }
-    if(src.tipo !== 'spesa' || src.stato !== 'confermata') return;
-    const k = kgCaffeSpesa(src); if(k){ kg += sg * k; n += sg; }
-  });
-  return {kg: Math.max(0, Math.round(kg * 1000) / 1000), n: Math.max(0, n)};
-}
-function tassoOnesta(c){
-  const B = aggrega(c.tutti), caffe = Math.max(0, sumo(B.caffe)), P = kgGrani(c.tutti), attesi = Math.round(P.kg * CAFFE_PER_KG);
-  return {caffe, kg: P.kg, n: P.n, attesi, pct: attesi > 0 ? Math.round(caffe / attesi * 1000) / 10 : null};
-}
+/* ---------- Tasso di Onestà: caffè in grani (kg × resa) + singoli snack/bibite (pezzi caricati nel lotto), nella scheda Statistiche ---------- */
 const kgTxt = kg => String(Math.round(kg * 100) / 100).replace('.', ',');
-function cardOnesta(c, r){
-  const t = tassoOnesta(c);
-  const info = infoBtn(`Calcolo automatico, senza aprire o chiudere buste: caffè registrati dai colleghi nel periodo ÷ (kg di caffè in grani acquistati nello stesso periodo × ${CAFFE_PER_KG}). Gli acquisti sono le spese convalidate il cui articolo o descrizione contiene «caffè» (se indichi i kg, es. «Caffè in grani 2 kg», il conto è preciso; altrimenti si assume 1 kg). Verde da 85%, rosso sotto il 70%. Con periodi brevi o senza acquisti il dato non è significativo: il caffè comprato prima del periodo non viene contato.`, 'Come funziona');
-  if(t.pct == null) return `<div class="card" id="cl-onesta"><h3><span>🛡️ Tasso di Onestà</span><b class="mono mut">n/d</b></h3>
-    <p class="hint" style="margin:0">Nessun acquisto di caffè in grani convalidato in questo periodo (${esc(r.label.toLowerCase())}): confronto non disponibile. Caffè registrati: <b>${t.caffe}</b>.</p>${info}</div>`;
-  const cls = t.pct >= 85 ? 'green' : t.pct < 70 ? 'red' : 'amber';
-  return `<div class="card" id="cl-onesta"><h3><span>🛡️ Tasso di Onestà</span><b class="mono ${cls}" id="cl-onesta-pct">${String(t.pct).replace('.', ',')}%</b></h3>
-    <div class="bar"><i style="width:${Math.min(100, t.pct)}%"></i></div>
-    <p class="hint" style="margin:6px 0 0"><b>${t.caffe}</b> caffè registrati su <b>${t.attesi}</b> attesi · ${kgTxt(t.kg)} kg acquistati in ${t.n} ${t.n === 1 ? 'spesa convalidata' : 'spese convalidate'} (${esc(r.label.toLowerCase())}).</p>${info}</div>`;
+const onCls = pct => pct >= 85 ? 'green' : pct < 70 ? 'red' : 'amber';
+const onCol = pct => pct >= 85 ? 'var(--green)' : pct < 70 ? 'var(--red)' : 'var(--amber)';
+const pctTxt = pct => String(Math.round(pct * 10) / 10).replace('.', ',') + '%';
+function cardOnesta(d){
+  const S = statoCaffe(d), resa = resaKg(), righe = [];
+  let num = 0, den = 0;
+  // ☕ caffè in grani: cicli chiusi (consolidati) + ciclo in corso (indicativo finché i chicchi non finiscono)
+  const pcCh = S && S.capChiusi > 0 ? Math.min(100, S.hc / S.capChiusi * 100) : null;
+  if(pcCh != null){ num += Math.min(S.hc, S.capChiusi); den += S.capChiusi; }
+  let det = '';
+  if(S && S.attivo) det = `Ciclo in corso: <b>${S.registrati}</b> caffè registrati su <b>${S.capienza}</b> teorici (${kgTxt(S.kg)} kg × ${resa}) · ${pctTxt(Math.min(100, S.pct))} · ${kgTxt(S.restKg)} kg rimasti. Il voto si consolida quando l'admin azzera il ciclo.`;
+  else det = S && S.hk > 0 ? 'Nessun ciclo in corso: l\'admin ne avvia uno dall\'Inventario.' : 'Nessun ciclo di caffè avviato: l\'admin lo imposta dall\'Inventario.';
+  if(S && S.attivo && S.parz) det += ' Il ciclo attraversa una chiusura di periodo: i caffè del periodo chiuso a metà non sono inclusi.';
+  if(pcCh != null) det = `Cicli conclusi: <b>${S.hc}</b> caffè su <b>${S.capChiusi}</b> teorici (${kgTxt(S.hk)} kg). ` + det;
+  righe.push(`<div class="onr" id="on-caffe" style="font-size:14px"><div class="between"><span>☕ <b>Caffè in grani</b></span><b class="mono ${pcCh == null ? 'mut' : onCls(pcCh)}">${pcCh == null ? 'n/d' : pctTxt(pcCh)}</b></div>
+    ${pcCh == null ? '' : `<div class="bar"><i style="width:${pcCh}%;background:${onCol(pcCh)}"></i></div>`}<p class="hint" style="margin:4px 0 0">${det}</p></div>`);
+  // 🍫 / 🥤 singoli articoli
+  prodListino().slice().sort((a, b) => (a.nome || '').localeCompare(b.nome || '')).forEach(p => {
+    const t = statoProd(d, p); if(t.pct != null){ num += t.cT - t.aT; den += t.cT; }
+    let dt;
+    if(t.cT > 0) dt = `<b>${t.cT - t.aT}</b> pezzi registrati su <b>${t.cT}</b> caricati${t.es ? ` · ⚠️ esaurito con ${t.ammanco} ${t.ammanco === 1 ? 'pezzo' : 'pezzi'} a sistema` : ''}`;
+    else if(t.car > 0) dt = `Lotto in corso: ${t.reg} su ${t.car} pezzi registrati. L'indice si consolida a giacenza 0 o con «Esaurito».`;
+    else dt = 'In attesa del primo carico dopo l\'avvio del nuovo conteggio.';
+    righe.push(`<div class="onr" style="font-size:14px"><div class="between"><span>${esc(p.emoji || '🍫')} <b>${esc(p.nome)}</b></span><b class="mono ${t.pct == null ? 'mut' : onCls(t.pct)}">${t.pct == null ? 'n/d' : pctTxt(t.pct)}</b></div>
+      ${t.pct == null ? '' : `<div class="bar"><i style="width:${t.pct}%;background:${onCol(t.pct)}"></i></div>`}<p class="hint" style="margin:4px 0 0">${dt}</p></div>`);
+  });
+  const g = den > 0 ? num / den * 100 : null;
+  const info = infoBtn(`Indice globale: media ponderata tra caffè in grani e prodotti confezionati (peso = caffè teorici e pezzi caricati nei cicli/lotti conclusi). Caffè: caffè registrati (giri offerti inclusi) ÷ (kg caricati × ${resa} caffè/kg), valutato quando l'admin azzera il ciclo. Snack e bibite: pezzi registrati ÷ pezzi caricati, valutato quando la giacenza arriva a 0 o l'admin segna «Esaurito» (i pezzi ancora a sistema sono l'ammanco). Verde da 85%, giallo 70–84%, rosso sotto 70%. Nessuna lettura aggiuntiva.`, 'Come funziona');
+  return `<div class="card" id="cl-onesta"><h3><span>🛡️ Tasso di Onestà</span><b class="mono ${g == null ? 'mut' : onCls(g)}" id="cl-onesta-pct">${g == null ? 'n/d' : pctTxt(g)}</b></h3>
+    <p class="hint" style="margin:0 0 8px">${g == null ? 'Indice globale della saletta: disponibile appena un ciclo di caffè o un lotto di snack si conclude.' : 'Indice globale della saletta (caffè + snack e bibite)'}</p>
+    ${g == null ? '' : `<div class="bar" style="margin:0 0 10px"><i style="width:${g}%;background:${onCol(g)}"></i></div>`}
+    ${righe.join('<div style="height:10px"></div>')}${info}</div>`;
 }
 /* totali aggregati della sala per il tipo di punti scelto */
 function clSala(righe, key, G){
@@ -2253,7 +2264,7 @@ function clClassifica(d, R, T, c){
     ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
-  return {podio: podioCard, onesta: cardOnesta(c, r), albo};
+  return {podio: podioCard, albo};
 }
 function pClassifiche(d){
   const mod = st.clMod === 'stat' ? 'stat' : (st.clMod === 'arc' && st.isAdmin) ? 'arc' : 'classifica';
@@ -2286,7 +2297,7 @@ function pStatConsumi(d){
     <div class="grid2" style="margin-bottom:8px">
       <div class="stat"><small>☕ Caffè</small><b class="mono amber" id="sc-caffe">${R.caffe}</b><small>${eur(R.caffeE)}</small></div>
       <div class="stat"><small>🍫 Snack e bibite</small><b class="mono" id="sc-snack">${R.snack}</b><small>${eur(R.snackE)}</small></div></div>
-    <div class="stat"><small>Totale pagato</small><b class="mono green" id="sc-tot" style="font-size:26px">${eur(R.tot)}</b></div>
+    ${io ? `<div class="stat"><small>Totale pagato</small><b class="mono green" id="sc-tot" style="font-size:26px">${eur(R.tot)}</b></div>` : ''}
     ${!io && st.isAdmin ? `<button class="btn amber block big" style="margin-top:10px" id="btn-st-img" data-act="st-img">📸 Condividi Resoconto Consumi (Immagine)</button>` : ''}</div>`;
   if(io){
     const pos = Rs.righe.findIndex(x => x.mid === st.mid), MAXL = 30, lista = R.mov.slice().sort((a, b) => b.t - a.t);
@@ -2296,7 +2307,7 @@ function pStatConsumi(d){
         ${lista.length > MAXL ? `<p class="hint" style="margin:6px 0 0">…e altri ${lista.length - MAXL} movimenti nel periodo.</p>` : ''}`
         : '<div class="empty">Nessun pagamento nel periodo scelto.</div>'}</div>`;
   }
-  return filtri + tot + `<div class="card" id="sc-classifica"><h3><span>🏅 Classifica pagamenti</span></h3>
+  return filtri + tot + cardOnesta(d) + `<div class="card" id="sc-classifica"><h3><span>🏅 Classifica pagamenti</span></h3>
     ${R.righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">☕</th><th class="c">🍫</th><th class="c">Pagato</th></tr></thead><tbody>
       ${R.righe.map((x, i) => `<tr><td class="mono">${['🥇', '🥈', '🥉'][i] || i + 1}</td><td><b>${esc(x.nome)}</b>${x.mid === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.s}</td><td class="c mono"><b>${eur(x.e)}</b></td></tr>`).join('')}
       </tbody></table>` : '<div class="empty">Nessun pagamento nel periodo scelto.</div>'}
@@ -2317,7 +2328,7 @@ function pClassificaPunti(d){
   if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
   ${clIo(R.righe, c)}`;
   const Z = clClassifica(d, R, T, c);
-  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div><div class="clg-o">${Z.onesta}</div><div class="clg-a">${Z.albo}</div></div>`;
+  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div><div class="clg-a">${Z.albo}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
 A['cl-per'] = ds => { st.clP = ['oggi', 'settimana', 'mese', 'sempre'].includes(ds.v) ? ds.v : 'oggi'; st.scSel = null; render(); };
@@ -2468,33 +2479,50 @@ function pCassa(d){
 }
 
 /* ---------- INVENTARIO ---------- */
+function cardCaffeScorta(d, ad){
+  const pcf = (st.gruppo && st.gruppo.prezzoCaffe) || 0, S = statoCaffe(d), resa = resaKg();
+  const prezzo = ad ? `<div class="row" style="align-items:flex-end;gap:8px"><label class="f" style="flex:1;margin:0"><span>Prezzo tazzina €</span><input class="in mono" id="mg-caffe" inputmode="decimal" value="${(pcf / 100).toFixed(2).replace('.', ',')}"></label><button class="btn sm amber" id="btn-prezzo-caffe" data-act="salva-prezzo-caffe">Salva</button></div>`
+    : `<div class="between"><span class="tx2">Prezzo a tazzina</span><b class="mono amber">${eur(pcf)}</b></div>`;
+  let corpo;
+  if(S && S.attivo){
+    const low = S.restKg <= 1, rest = Math.max(0, Math.min(100, S.restKg / S.kg * 100));
+    corpo = `<div class="between" style="margin-top:12px;font-size:14px"><span class="tx2">Rimanenza stimata</span><b class="mono ${low ? 'red' : ''}" id="caffe-rest">${kgTxt(S.restKg)} kg · ~${S.restTz} tazzine</b></div>
+      <div class="bar"><i style="width:${rest}%;background:${low ? 'var(--red)' : 'var(--teal)'}"></i></div>
+      <p class="hint" style="margin:6px 0 0">${kgTxt(S.kg)} kg caricati dal ${dBr(S.da)} · ${S.registrati} caffè registrati su ${S.capienza} (${resa} per kg, giri offerti inclusi)${S.parz ? ' · il ciclo attraversa una chiusura di periodo: i caffè del periodo chiuso a metà non sono inclusi' : ''}.</p>
+      ${ad ? `<div class="grid2" style="margin-top:8px"><button class="btn sm" id="btn-caffe-carica" data-act="caffe-ciclo" data-v="carica">${ic('plus', 's')} Carica kg</button><button class="btn sm ghost" id="btn-caffe-azzera" data-act="caffe-ciclo" data-v="azzera">Azzera ciclo</button></div>` : ''}`;
+  } else {
+    corpo = `<p class="hint" style="margin:12px 0 0">Nessun ciclo di caffè in grani in corso.${ad ? '' : ' La scorta la imposta un amministratore.'}</p>
+      ${ad ? `<button class="btn sm amber block" id="btn-caffe-avvia" style="margin-top:8px" data-act="caffe-ciclo" data-v="avvia">${ic('bean', 's')} Avvia ciclo (kg iniziali)</button>` : ''}`;
+  }
+  return `<div class="card" id="inv-caffe"><h3><span>${ic('bean', 's')} Caffè in grani</span></h3>${prezzo}${corpo}</div>`;
+}
 function pInventario(d){
+  const ad = st.isAdmin;
   const k = st.invSort.k, asc = st.invSort.asc ? 1 : -1;
   const v = p => k === 'stock' ? giacenza(d, p) : k === 'prezzo' ? p.prezzo : k === 'categoria' ? p.categoria : (p.nome||'').toLowerCase();
-  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && (adminView() || p.attivo !== false)).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
+  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && (ad || p.attivo !== false)).sort((a,b) => (a.attivo === false) - (b.attivo === false) || (v(a) > v(b) ? asc : v(a) < v(b) ? -asc : 0));
   const th = (key, l, cls='') => `<th class="s ${cls}" data-act="inv-sort" data-k="${key}">${l}${k === key ? (st.invSort.asc ? ' ↑' : ' ↓') : ''}</th>`;
-  const bd = busteDisp(d), pcf = (st.gruppo && st.gruppo.prezzoCaffe) || 0;
-  const rigaCaffe = `<tr>
-      <td><div><b>${ic('bean','s')} Caffè</b></div><div class="mut" style="font-size:11px">Prezzo a tazzina · scorta in buste</div></td>
-      <td class="r mono amber"><b>${eur(pcf)}</b></td>
-      <td class="c">${adminView() ? `<span class="stepper"><button data-act="carico-caffe" data-v="-1">−</button><b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b><button data-act="carico-caffe" data-v="1">+</button></span>
-        <div class="mut" style="font-size:11px">buste disponibili</div>
-        <div><button class="btn link" style="font-size:11px;padding:2px" data-act="carico-caffe-n">carico…</button></div>`
-        : `<b class="mono ${bd <= SOGLIA_SCORTA ? 'red' : ''}" id="buste-disp">${bd}</b><div class="mut" style="font-size:11px">buste disponibili</div>`}</td></tr>`;
-  return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e buste del caffè</p></div>
-    ${adminView() ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
+  const S = statoCaffe(d);
+  const ric = prodListino().filter(p => p.esaurito === true || giacenza(d, p) <= SOGLIA_SCORTA).map(p => `${esc(p.emoji || '')} ${esc(p.nome)}${p.esaurito === true ? ' <span class="pill red">esaurito</span>' : ''}`);
+  if(S && S.attivo && S.restKg <= 1) ric.unshift(`☕ Caffè in grani <span class="pill red">${kgTxt(S.restKg)} kg</span>`);
+  return `${backSaletta()}<div class="between" style="margin-bottom:14px"><div><h2>${ic('package')} Inventario & listino</h2><p class="sub" style="margin:0">Prezzi, giacenze e scorta del caffè</p></div>
+    ${ad ? `<button class="btn sm" style="background:#0d9488;border:0;color:#fff" data-act="prodotto" data-id="">${ic('plus','s')} Nuovo</button>` : ''}</div>
   <div class="banner sky">${ic('info')}<div>Materiali di consumo (palette, zucchero, bicchieri, detersivi…) non si contano: sono spese generali, aggiungili alla <b>Lista della spesa</b> come promemoria e, se li anticipi, chiedi il <b>Rimborso spesa</b> dalla Home.</div></div>
-  ${!adminView() ? `<div class="banner sky">${ic('lock')}<div>Prezzi e giacenze li modificano solo gli amministratori.</div></div>` : ''}
+  ${!ad ? `<div class="banner sky">${ic('lock')}<div>Prezzi, giacenze e scorte li modificano solo gli amministratori.</div></div>` : ''}
+  ${ric.length ? `<div class="card" id="inv-ricomprare"><h3><span>🛒 Da ricomprare</span></h3><div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px">${ric.map(x => `<span>${x}</span>`).join('')}</div></div>` : ''}
+  ${cardCaffeScorta(d, ad)}
   <div class="card" style="padding:6px 8px;overflow-x:auto">
   <table><thead><tr>${th('nome','Articolo')}${th('prezzo','Prezzo','r')}${th('stock','Giacenza','c')}</tr></thead><tbody>
-    ${rigaCaffe}
-    ${list.map(p => { const sk = giacenza(d, p); return `<tr class="${p.attivo === false ? 'strike' : ''}">
-      <td>${adminView() ? `<button style="text-align:left" data-act="prodotto" data-id="${p.id}">` : '<div>'}<b>${esc(p.emoji||'')} ${esc(p.nome)}</b><div class="mut" style="font-size:11px">${p.categoria === 'fondo' ? 'Dotazione fondo' : 'A consumo'}${p.attivo === false ? ' · non attivo' : ''}${adminView() ? ' · ' + ic('edit','s').replace('class="i s"','class="i s" style="width:11px;height:11px;vertical-align:-1px"') : ''}</div>${adminView() ? '</button>' : '</div>'}</td>
+    ${list.map(p => { const sk = giacenza(d, p), es = p.esaurito === true, T = statoProd(d, p); return `<tr class="${p.attivo === false ? 'strike' : ''}">
+      <td>${ad ? `<button style="text-align:left" data-act="prodotto" data-id="${p.id}">` : '<div>'}<b>${esc(p.emoji||'')} ${esc(p.nome)}</b><div class="mut" style="font-size:11px">${p.categoria === 'fondo' ? 'Dotazione fondo' : 'A consumo'}${p.attivo === false ? ' · non attivo' : ''}${ad ? ' · ' + ic('edit','s').replace('class="i s"','class="i s" style="width:11px;height:11px;vertical-align:-1px"') : ''}</div>${ad ? '</button>' : '</div>'}
+        ${es ? `<div style="margin-top:4px"><span class="pill red inv-esaurito">⚠️ Esaurito in dispensa</span>${T.ammanco > 0 ? `<div class="red" style="font-size:11.5px;margin-top:3px">Ammanco: ${T.ammanco} ${T.ammanco === 1 ? 'pezzo non registrato' : 'pezzi non registrati'}</div>` : ''}</div>` : ''}
+        ${ad && p.categoria !== 'fondo' ? `<div><button class="btn sm ${es ? 'red' : 'ghost'}" style="margin-top:6px;padding:4px 10px;font-size:12px" data-act="esaurito" data-id="${p.id}">${es ? 'Torna disponibile' : '⚠️ Segna esaurito'}</button></div>` : ''}</td>
       <td class="r mono amber"><b>${p.categoria === 'fondo' ? '—' : eur(p.prezzo)}</b></td>
-      <td class="c">${adminView() ? `<span class="stepper"><button data-act="carico" data-id="${p.id}" data-v="-1">−</button><b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b><button data-act="carico" data-id="${p.id}" data-v="1">+</button></span>
-        <div><button class="btn link" style="font-size:11px;padding:2px" data-act="carico-n" data-id="${p.id}">carico…</button></div>` : `<b class="mono ${sk <= SOGLIA_SCORTA ? 'red' : ''}">${sk}</b>`}</td></tr>`; }).join('')}
+      <td class="c">${ad ? `<span class="stepper"><button data-act="carico" data-id="${p.id}" data-v="-1">−</button><b class="mono ${sk <= SOGLIA_SCORTA || es ? 'red' : ''}">${sk}</b><button data-act="carico" data-id="${p.id}" data-v="1">+</button></span>
+        <div><button class="btn link" style="font-size:11px;padding:2px" data-act="carico-n" data-id="${p.id}">carico…</button></div>` : `<b class="mono ${sk <= SOGLIA_SCORTA || es ? 'red' : ''}">${es ? 'Esaurito' : sk}</b>`}</td></tr>`; }).join('')}
   </tbody></table>
-  ${list.length ? '' : `<div class="empty">Nessun altro articolo. ${adminView() ? 'Aggiungi il primo con “Nuovo”.' : ''}</div>`}
+  ${list.length ? '' : `<div class="empty">Nessun altro articolo. ${ad ? 'Aggiungi il primo con “Nuovo”.' : ''}</div>`}
+  ${infoBtn(`«Esaurito» (solo admin) toglie l'articolo da «Acquista snack» anche se a sistema risultano ancora pezzi: quei pezzi sono l'ammanco. Un nuovo carico, o «Torna disponibile», lo rimette in vendita. La scorta del caffè scala 1 ÷ ${resaKg()} kg per ogni caffè registrato (giri offerti inclusi).`, 'Come funziona')}
   </div>`;
 }
 
@@ -2647,6 +2675,8 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Tetto punti per spesa</span><input class="in mono" id="rp-spmax" inputmode="numeric" value="${ptSpesaMax()}"></label>
     </div>
     <p class="hint" style="margin:-4px 0 8px;font-size:12px">Snack e spese: punti = importo × tariffa, arrotondati all'intero (le spese anche limitate dal tetto). Il rimborso resta al 100%.</p>
+    <label class="f"><span>☕ Resa stimata per 1 kg di caffè (tazzine)</span><input class="in mono" id="rp-resa" inputmode="numeric" value="${resaKg()}"></label>
+    <p class="hint" style="margin:-4px 0 8px;font-size:12px">Scorta in grani e Tasso di Onestà: ogni caffè registrato scala 1 ÷ resa kg (predefinito ${CAFFE_PER_KG}).</p>
   </div>
   <div class="card" id="rp-b"><h3>B · Obiettivi &amp; collaborazione</h3>
     <div class="grid2">
@@ -3045,7 +3075,7 @@ A['annulla-richiesta'] = ds => {
 
 A['snack'] = () => {
   const d = derived(), sd = saldo(st.mid) - riservato(st.mid);
-  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
+  const list = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && p.esaurito !== true && giacenza(d, p) > 0).sort((a,b) => a.nome.localeCompare(b.nome));
   openSheet(`<h3>${ic('cookie')} Acquista snack</h3><p class="sub">Tocca l'articolo che hai preso. Credito disponibile: <b class="mono ${sd < 0 ? 'red' : 'green'}">${eurS(sd)}</b>${list.some(p => p.prezzo > sd) ? ' · gli articoli oltre il tuo credito sono disabilitati: <b>' + MSG_CREDITO.toLowerCase() + '</b>' : ''}.</p>
     ${list.length ? `<div class="list">${list.map(p => { const sk = d.S.stock[p.id] || 0, fin = (st.isAdmin && sk <= 0) || p.prezzo > sd; return `<button class="li" style="width:100%;text-align:left;${fin ? 'opacity:.45' : ''}" data-act="prendi-snack" data-id="${p.id}" ${fin ? 'disabled' : ''}>
       <div class="av" style="font-size:22px">${esc(p.emoji || '🍫')}</div><div class="grow"><div class="t">${esc(p.nome)}</div>${p.prezzo > sd ? '<div class="d red">Credito insufficiente</div>' : st.isAdmin ? `<div class="d">${sk <= 0 ? 'Esaurito' : 'Giacenza ' + sk + ' pz'}</div>` : ''}</div><b class="mono amber">${eur(p.prezzo)}</b></button>`; }).join('')}</div>`
@@ -3053,6 +3083,7 @@ A['snack'] = () => {
 };
 A['prendi-snack'] = ds => {
   const p = prodotto(ds.id); if(!p) return;
+  if(p.esaurito === true){ closeSheet(); return toast(p.nome + ' è esaurito in dispensa', 'err'); }
   if(!puoPagare(p.prezzo)){ closeSheet(); return toast(MSG_CREDITO, 'err'); }
   const id = addMov({tipo:'snack', mid: st.mid, pid: p.id, qta: 1, importo: p.prezzo, nome: p.nome, emoji: p.emoji || '', pt: ptSnackP(p.prezzo)});
   closeSheet();
@@ -3680,22 +3711,69 @@ A['salva-prodotto'] = ds => {
     C('prodotti').doc(ds.id).set(data, {merge: true}).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
   } else {
     const ref = C('prodotti').doc(); data.attivo = true;
-    ref.set(data).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
     const sk = parseInt(val('p-stock'), 10) || 0;
+    if(sk > 0) data.caricati = sk;
+    ref.set(data).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
     if(sk) addMov({tipo:'carico', pid: ref.id, qta: sk, nome: data.nome});
   }
   closeSheet(); toast('Articolo salvato');
 };
-A['carico'] = ds => { const p = prodotto(ds.id); addMov({tipo:'carico', pid: ds.id, qta: Number(ds.v), nome: p ? p.nome : ''}); };
+/* carico/rettifica di un articolo: aggiorna la giacenza (movimento) e il lotto (pezzi caricati). Dopo «Esaurito» o a giacenza 0 il nuovo carico apre un nuovo lotto:
+   il vecchio si consolida (ammanco = pezzi ancora a sistema) e l'ammanco viene tolto dalla giacenza */
+function caricaProdotto(p, q){
+  const d = derived(), gia = d.S.stock[p.id] || 0, car = Number(p.caricati) || 0, l = p.lotto && typeof p.lotto === 'object' ? p.lotto : {}, es = p.esaurito === true, upd = {};
+  if(q > 0){
+    const chiuso = car > 0 && (es || gia <= 0);
+    if(chiuso) upd.lotto = {hc: (Number(l.hc) || 0) + car, ha: (Number(l.ha) || 0) + (es ? Math.max(0, gia) : 0), ts: Date.now()};
+    upd.caricati = chiuso || car <= 0 ? q : car + q;
+    if(es){ upd.esaurito = false; if(gia > 0) addMov({tipo:'carico', pid: p.id, qta: -gia, nome: p.nome + ' (ammanco)'}); }
+  } else upd.caricati = Math.max(0, car + q);
+  C('prodotti').doc(p.id).set(upd, {merge: true}).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
+  addMov({tipo:'carico', pid: p.id, qta: q, nome: p.nome});
+}
+A['carico'] = ds => { const p = prodotto(ds.id); if(p && st.isAdmin) caricaProdotto(p, Number(ds.v)); };
 A['carico-n'] = ds => {
   const p = prodotto(ds.id);
-  openSheet(`<h3>${ic('package')} Carico ${esc(p.nome)}</h3><p class="sub">Pezzi aggiunti alla giacenza (negativo per toglierli).</p>
+  openSheet(`<h3>${ic('package')} Carico ${esc(p.nome)}</h3><p class="sub">Pezzi aggiunti alla giacenza (negativo per toglierli).${p.esaurito === true ? ' L\'articolo è segnato «Esaurito»: con il carico torna disponibile e i pezzi ancora a sistema (ammanco) vengono tolti.' : ''}</p>
     <label class="f"><span>Pezzi</span><input class="in mono" id="cn-q" inputmode="numeric" value="10" autofocus></label>
     <button class="btn amber block big" data-act="conferma-carico" data-id="${p.id}">Registra</button>`);
 };
 A['conferma-carico'] = ds => {
   const q = parseInt(val('cn-q'), 10); if(!q) return toast('Numero non valido', 'err');
-  const p = prodotto(ds.id); addMov({tipo:'carico', pid: ds.id, qta: q, nome: p ? p.nome : ''}); closeSheet(); toast('Giacenza aggiornata');
+  const p = prodotto(ds.id); if(!p || !st.isAdmin) return;
+  caricaProdotto(p, q); closeSheet(); toast('Giacenza aggiornata');
+};
+A['esaurito'] = ds => {
+  if(!st.isAdmin) return;
+  const p = prodotto(ds.id); if(!p) return;
+  const on = p.esaurito !== true;
+  C('prodotti').doc(p.id).set({esaurito: on}, {merge: true}).then(() => toast(on ? `${p.nome}: segnato esaurito` : `${p.nome}: di nuovo disponibile`)).catch(e => toast(errMsg(e), 'err'));
+};
+/* scorta caffè in grani (kg): avvia il ciclo, carica altri kg, azzera (consolida il ciclo per il Tasso di Onestà) */
+A['caffe-ciclo'] = ds => {
+  if(!st.isAdmin) return;
+  const S = statoCaffe(derived()), m = ds.v;
+  if(m === 'azzera'){
+    if(!S || !S.attivo) return;
+    return openSheet(`<h3>${ic('bean')} Azzerare il ciclo?</h3><p class="sub">Il ciclo si conclude: ${S.registrati} caffè registrati su ${S.capienza} teorici (${kgTxt(S.kg)} kg) entrano nel Tasso di Onestà. Poi potrai avviare un nuovo ciclo con i kg iniziali.</p>
+      <div class="grid2"><button class="btn" data-act="sheet-close">Indietro</button><button class="btn red" id="btn-caffe-azzera-ok" data-act="conferma-caffe-ciclo" data-v="azzera">Azzera</button></div>`);
+  }
+  openSheet(`<h3>${ic('bean')} ${m === 'avvia' ? 'Avvia ciclo caffè' : 'Carica caffè in grani'}</h3><p class="sub">${m === 'avvia' ? 'Kg di caffè in grani caricati. Da ora l\'app scala 1 ÷ ' + resaKg() + ' kg per ogni caffè registrato.' : 'Kg aggiunti alla scorta del ciclo in corso.'}</p>
+    <label class="f"><span>Kg</span><input class="in mono" id="cc-kg" inputmode="decimal" value="${m === 'avvia' ? '5' : '1'}" autofocus></label>
+    <button class="btn amber block big" id="btn-caffe-ciclo-ok" data-act="conferma-caffe-ciclo" data-v="${m}">${m === 'avvia' ? 'Avvia' : 'Aggiungi'}</button>`);
+};
+A['conferma-caffe-ciclo'] = ds => {
+  if(!st.isAdmin) return;
+  const S = statoCaffe(derived()) || {kg: 0, kgIniz: 0, da: 0, hk: 0, hc: 0, registrati: 0, attivo: false}, m = ds.v;
+  let nc;
+  if(m === 'azzera'){ if(!S.attivo) return closeSheet(); nc = {kg: 0, kgIniz: 0, da: 0, hk: r3(S.hk + S.kg), hc: S.hc + S.registrati}; }
+  else {
+    const kg = Number(String(val('cc-kg')).replace(',', '.'));
+    if(!(kg > 0 && kg <= 200)) return toast('Kg non validi (0–200)', 'err');
+    if(m === 'avvia') nc = {kg: r3(kg), kgIniz: r3(kg), da: Date.now(), hk: S.hk, hc: S.hc};
+    else { if(!S.attivo) return; if(S.kg + kg > 500) return toast('Scorta troppo alta', 'err'); nc = {kg: r3(S.kg + kg), kgIniz: S.kgIniz, da: S.da, hk: S.hk, hc: S.hc}; }
+  }
+  G().set({caffeCiclo: nc}, {merge: true}).then(() => { closeSheet(); toast(m === 'azzera' ? 'Ciclo azzerato' : m === 'avvia' ? 'Ciclo avviato' : 'Caffè caricato'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
 /* --- quote (admin) --- */
@@ -3974,9 +4052,9 @@ A['bf-invia'] = () => {
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), d = id => Math.round(Number(val(id).replace(',', '.')) * 100) / 100;
   const v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptBenFatto: n('rp-bf'), ptSpesaMax: n('rp-spmax'), bfN: n('rp-bfn'),
-    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), podio1: n('rp-pod1'), podio2: n('rp-pod2'), podio3: n('rp-pod3')};
+    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), podio1: n('rp-pod1'), podio2: n('rp-pod2'), podio3: n('rp-pod3'), resaKg: n('rp-resa')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi, inD = x => isFinite(x) && x >= 0 && x <= 100;
-  const ok = inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inR(v.bfN, 1, 20) && inR(v.podio1, 0, 1000) && inR(v.podio2, 0, 1000) && inR(v.podio3, 0, 1000);
+  const ok = inR(v.resaKg, 1, 500) && inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inR(v.bfN, 1, 20) && inR(v.podio1, 0, 1000) && inR(v.podio2, 0, 1000) && inR(v.podio3, 0, 1000);
   if(!ok) return toast('Valori non validi', 'err');
   const sw = {ptOn: !!($('rp-on') && $('rp-on').checked), podioOn: !!($('rp-podio-on') && $('rp-podio-on').checked)};
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
