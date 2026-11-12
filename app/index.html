@@ -409,7 +409,7 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.35.0';
+const VERSION = '1.35.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -3074,19 +3074,16 @@ let cpE = null;   // sessione di estrazione in memoria: {id, k, sel, scarti, con
 function cpStop(){ if(cpE && cpE.tmr){ clearTimeout(cpE.tmr); cpE.tmr = null; } }
 const cpNome = m => esc(nomeBreve(m) || nomeM(m));
 const cpDisp = e => e.sel.filter(m => !e.scarti.includes(m) && !e.conf.includes(m));
-function cpLeggiSel(){ const e = cpE; if(!e || e.fase !== 'setup') return; const box = document.querySelectorAll('#sheet input.cp-c'); if(box.length) e.sel = Array.from(box).filter(b => b.checked).map(b => b.value); }
 function cpFoglio(){
   const e = cpE, c = e && cpLista().find(x => x.id === e.id); if(!c) return closeSheet();
   const testa = `<h3>🎯 ${esc(c.nome)} <span class="pill violet">+${c.pt} pt</span></h3>`;
   const conf = e.conf.length ? `<p class="hint" id="cp-conf" style="margin:8px 0">✅ Confermati: <b>${e.conf.map(cpNome).join(', ')}</b> (${e.conf.length}/${e.k})</p>` : '';
   if(e.fase === 'setup'){
-    const pool = membriAttivi().filter(m => !c.esenti.includes(m.id)), nEs = membriAttivi().filter(m => c.esenti.includes(m.id)).length;
+    const nPool = e.sel.length, nEs = membriAttivi().filter(m => c.esenti.includes(m.id)).length, max = Math.max(1, Math.min(CP_K_MAX, nPool));
     openSheet(`${testa}
       ${nEs ? `<p class="hint" style="margin:0 0 8px">${nEs} ${nEs === 1 ? 'collega escluso' : 'colleghi esclusi'} in modo permanente dagli admin per questo compito.</p>` : ''}
-      <div class="f"><span>Quante persone?</span><div class="row" style="justify-content:center;gap:16px;margin-top:4px"><button class="btn sm" data-act="cp-k" data-v="-1" aria-label="Meno">−</button><b class="mono" id="cp-k" style="font-size:24px;min-width:28px;text-align:center">${e.k}</b><button class="btn sm" data-act="cp-k" data-v="1" aria-label="Più">＋</button></div></div>
-      <p class="hint" style="margin:8px 0 4px">Togli la spunta a chi sai già che oggi è assente:</p>
-      <div id="cp-pool" style="max-height:34vh;overflow:auto">${pool.map(m => `<label class="check"><input type="checkbox" class="cp-c" value="${m.id}" ${e.sel.includes(m.id) ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(m.nick || m.nome)}</b></label>`).join('')}</div>
-      <button class="btn amber block big" id="cp-estrai" data-act="cp-estrai" style="margin-top:10px">🎲 Estrai</button>`);
+      <div class="f"><span>Quante persone devono svolgerlo?</span><div class="row" id="cp-k" data-k="${e.k}" style="justify-content:center;gap:10px;margin-top:6px">${Array.from({length: max}, (_, i) => i + 1).map(n => `<button class="btn ${n === e.k ? 'amber' : 'ghost'}" id="cp-k-${n}" data-act="cp-k" data-v="${n}" style="min-width:52px;font-size:18px">${n}</button>`).join('')}</div></div>
+      <button class="btn amber block big" id="cp-estrai" data-act="cp-estrai" style="margin-top:14px">🎲 Avvia sorteggio</button>`);
   } else if(e.fase === 'anim'){
     openSheet(`${testa}${conf}<div style="text-align:center;padding:26px 0"><div class="mut" style="font-size:12.5px;margin-bottom:8px">Sorteggio in corso…</div><div id="cp-slot" class="mono" style="font-size:30px;font-weight:800;min-height:40px">🎲</div></div>`);
   } else if(e.fase === 'verifica'){
@@ -3125,16 +3122,12 @@ A['cp-apri'] = ds => {
 };
 A['cp-k'] = ds => {
   const e = cpE; if(!e || e.fase !== 'setup') return;
-  cpLeggiSel();
-  const c = cpLista().find(x => x.id === e.id); if(!c) return;
-  const max = Math.max(1, Math.min(CP_K_MAX, membriAttivi().filter(m => !c.esenti.includes(m.id)).length));
-  e.k = Math.min(max, Math.max(1, e.k + (Number(ds.v) || 0))); cpFoglio();
+  e.k = Math.min(CP_K_MAX, Math.max(1, Number(ds.v) || 1)); cpFoglio();
 };
 A['cp-estrai'] = () => {
   const e = cpE; if(!e || e.fase !== 'setup') return;
-  cpLeggiSel();
-  if(e.sel.length < e.k) return toast(`Servono almeno ${e.k} ${e.k === 1 ? 'collega selezionato' : 'colleghi selezionati'}`, 'err');
-  e.scarti = []; e.conf = []; cpAnim();
+  if(e.sel.length < e.k) return toast(`Servono almeno ${e.k} ${e.k === 1 ? 'collega disponibile' : 'colleghi disponibili'}`, 'err');
+  e.scarti = []; e.conf = []; cpAnim();   // bacino = tutti tranne gli esenti; gli assenti si scartano dopo l'uscita
 };
 A['cp-assente'] = () => {
   const e = cpE; if(!e || e.fase !== 'verifica' || !e.cur) return;
