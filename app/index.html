@@ -478,7 +478,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.48.0';
+const VERSION = '1.49.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1184,7 +1184,7 @@ function renderEntry(){
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
   if(st.entry === 'recupero') return entryRecupero();
-  if(!st.gid) return st.entry === 'crea' ? entryCrea() : st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
+  if(!st.gid) return st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
   return entryRichiesta();
@@ -1231,8 +1231,7 @@ function entryInstall(){
 
 function entryWelcome(){
   return `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1><p>Caffè, snack, cassa e turni della saletta,<br>condivisi con i colleghi.</p></div>
-  <button class="tile" data-act="entry" data-v="join" style="margin-bottom:12px"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Me l'ha mandato un collega o il Supervisor</span></button>
-  <button class="tile" data-act="entry" data-v="crea"><div class="ic violet">${ic('shield')}</div><b>Crea un nuovo gruppo</b><span>Diventi amministratore e inviti i colleghi</span></button>`;
+  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Me l'ha mandato un collega o il Supervisor</span></button>`;
 }
 
 function entryJoin(){
@@ -1256,28 +1255,6 @@ function entryCreatore(){
   <button class="btn link" data-act="entry" data-v="join">← Cambia codice</button>`;
 }
 
-
-function entryCrea(){
-  return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('shield','l')}</div><h1>Nuovo gruppo</h1><p>Sarai il Creatore del gruppo</p></div>
-  <div class="card">
-    <label class="f"><span>Nome del gruppo</span><input class="in" id="c-nome" placeholder="es. Saletta 3° piano" maxlength="40"></label>
-    <div class="grid2">
-      <label class="f"><span>Nome e cognome</span><input class="in" id="c-io" placeholder="es. Mario Rossi" maxlength="30"></label>
-      <label class="f"><span>Nickname (facoltativo)</span><input class="in" id="c-nick" placeholder="es. Super Mario" maxlength="20"></label>
-    </div>
-    <div class="grid2">
-      <label class="f"><span>Prezzo caffè €</span><input class="in mono" id="c-caffe" inputmode="decimal" value="0,50"></label>
-      <label class="f"><span>Quota annua €</span><input class="in mono" id="c-quota" inputmode="decimal" value="20,00"></label>
-    </div>
-    <div class="grid2">
-      <label class="f"><span>Contanti in cassa €</span><input class="in mono" id="c-contanti" inputmode="decimal" placeholder="0,00"></label>
-      <label class="f"><span>Saldo Revolut €</span><input class="in mono" id="c-revolut" inputmode="decimal" placeholder="0,00"></label>
-    </div>
-    <p class="hint">Sarai il <b>Creatore</b> del gruppo: potrai nominare dei Supervisor e scegliere cosa possono fare.</p>
-    <button class="btn amber block big" data-act="crea" ${st.busy?'disabled':''}>${st.busy ? 'Creo il gruppo…' : 'Crea gruppo'}</button>
-  </div>
-  <button class="btn link" data-act="entry" data-v="">← Indietro</button>`;
-}
 
 function entryRichiesta(){
   const r = st.richiesta, g = st.gruppo ? esc(st.gruppo.nome) : '';
@@ -2879,34 +2856,6 @@ A['join'] = async () => {
 };
 
 A['join-collega'] = () => { const code = st.joinCode; if(!code) return; st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null; st.joinCode = null; connect(code); render(); };
-A['crea'] = async () => {
-  const nome = val('c-nome'), io = val('c-io'), nick = val('c-nick');
-  const pc = parseEuro(val('c-caffe')), qa = parseEuro(val('c-quota'));
-  const ct = val('c-contanti') ? parseEuro(val('c-contanti')) : 0, rv = val('c-revolut') ? parseEuro(val('c-revolut')) : 0;
-  if(!nome || !validaNome(io)) return toast('Scrivi il nome del gruppo e il tuo nome', 'err');
-  if(!validaNick(nick)) return toast('Nickname troppo lungo', 'err');
-  if(!(pc >= 0) || !(qa >= 0) || !(ct >= 0) || !(rv >= 0)) return toast('Controlla gli importi', 'err');
-  if(!navigator.onLine) return toast('Serve la connessione per creare il gruppo', 'err');
-  st.busy = true; render();
-  try {
-    const gid = newCode(), g = db.collection('saletta').doc(gid);
-    const me = g.collection('membri').doc();
-    await g.set({nome, prezzoCaffe: pc, quotaAnnua: qa, creatoDa: st.uid, creatoreMid: me.id, creatoIl: TS(), v: 1, scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: 1, ptCaffe: 10, ptSnack: 10, ptSpesa: 20, ptBenFatto: 20});
-    await g.collection('admin').doc(st.uid).set({nome: io, ts: TS()});
-    const b = db.batch();
-    b.set(me, clean({nome: io, nick: nick || undefined, uid: st.uid, attivo: true, creato: TS()}));
-    b.set(g.collection('utenti').doc(st.uid), {mid: me.id, nome: io, ts: TS()});
-    await b.commit();
-    st.gid = gid; st.mid = me.id; LS.set('gid', gid); LS.set('mid', me.id); st.entry = null; st.page = 'impostazioni'; LS.set('page','impostazioni');
-    connect(gid);
-    st.membri = [{id: me.id, nome: io, nick, attivo: true}];
-    if(ct > 0) addMov({tipo:'entrata', fonte:'contanti', importo: ct, causale:'Saldo iniziale cassa'});
-    if(rv > 0) addMov({tipo:'entrata', fonte:'revolut', importo: rv, causale:'Saldo iniziale cassa'});
-    toast('Gruppo creato! Ora invita i colleghi con il codice.');
-  } catch(e){ toast('Creazione non riuscita (' + errMsg(e) + ')', 'err'); }
-  finally { st.busy = false; render(); }
-};
-
 A['invia-richiesta'] = async () => {
   const nome = val('r-nome').replace(/\s+/g, ' '), nick = val('r-nick');
   if(!validaNome(nome)) return toast('Scrivi nome e cognome (almeno 2 caratteri)', 'err');
