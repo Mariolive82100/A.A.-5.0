@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.54.0';
+const VERSION = '1.54.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1566,9 +1566,12 @@ function statoCaffe(d){
 function calcolaCaffe(d, resa){
   const reg = regCaffe(); if(!reg.length) return null;
   const righe = [], stor = []; let base = null, acq = 0, hk = 0, hc = 0, ult = null;
+  /* acquisti prima di qualsiasi rilevazione: giacenza di partenza ipotizzata a 0 kg subito prima del primo acquisto */
+  if(reg[0].tp === 'a') base = {kg: 0, t: reg[0].t, zero: true};
   reg.forEach(e => {
     if(e.tp === 'a'){
-      if(base){ acq += e.kg; stor.push({t: e.t, tp: 'acq', k: e.kg}); righe.push({...e}); } else righe.push({...e, orfano: true});
+      const zero = !!(base && base.zero && e === reg[0]);
+      acq += e.kg; stor.push({t: e.t, tp: 'acq', k: e.kg}); righe.push({...e, zero});
       return;
     }
     if(!base){ base = {kg: e.kg, t: e.t}; acq = 0; righe.push({...e, iniz: true}); return; }
@@ -1813,7 +1816,7 @@ function pRegolamento(){
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti di oggi, settimana o mese. La pillola in alto mostra la tua posizione del mese.',
     '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
-    '<b>Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati), un indice per il caffè e uno per snack e bibite. <b>Caffè:</b> il Registro caffè (Inventario → «📒 Registro caffè») è un vero registro cronologico di <b>acquisti</b> (kg aggiunti) e <b>rilevazioni</b> (kg pesati), fino a ' + REG_MAX + ' righe: oltre, le più vecchie vengono assorbite. Il Creatore e i Supervisor con permesso Inventario possono aggiungere, correggere ed eliminare righe, indicando anche data e ora passate (mai future). Il Tasso di Onestà si calcola tra rilevazioni consecutive: kg consumati davvero (rilevazione precedente + acquisti in mezzo − kg pesati, ×' + resaKg() + ' caffè/kg) contro i caffè pagati nello stesso intervallo. La prima rilevazione avvia soltanto il conteggio. Tra una pesata e l\'altra la rimanenza è stimata (barra nel pulsante «Caffè» in Home). In Home il tasso aggregato sta nel badge 🛡️ accanto ai premi del Podio: toccandolo si apre la pagina con i dettagli. Verde da 85%, giallo 70–85%, rosso sotto 70%.',
+    '<b>Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati), un indice per il caffè e uno per snack e bibite. <b>Caffè:</b> il Registro caffè (Inventario → «📒 Registro caffè») è un vero registro cronologico di <b>acquisti</b> (kg aggiunti) e <b>rilevazioni</b> (kg pesati), fino a ' + REG_MAX + ' righe: oltre, le più vecchie vengono assorbite. Il Creatore e i Supervisor con permesso Inventario possono aggiungere, correggere ed eliminare righe, indicando anche data e ora passate (mai future). Il Tasso di Onestà si calcola tra rilevazioni consecutive: kg consumati davvero (rilevazione precedente + acquisti in mezzo − kg pesati, ×' + resaKg() + ' caffè/kg) contro i caffè pagati nello stesso intervallo. Se ci sono acquisti prima della prima rilevazione, l\'app ipotizza una giacenza di 0 kg subito prima del primo acquisto e calcola già il tasso sulla prima pesata; una rilevazione inserita prima degli acquisti diventa invece il punto di partenza. Senza acquisti, la prima rilevazione avvia soltanto il conteggio. Tra una pesata e l\'altra la rimanenza è stimata (barra nel pulsante «Caffè» in Home). In Home il tasso aggregato sta nel badge 🛡️ accanto ai premi del Podio: toccandolo si apre la pagina con i dettagli. Verde da 85%, giallo 70–85%, rosso sotto 70%.',
     `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
   ${sez('📢 Bacheca, Eventi &amp; Sondaggi', [
     'In Home trovi la <b>Bacheca</b>: avvisi (ℹ️ Info, 📢 Annuncio, 🥐 Novità in sala), sondaggi e gli eventi della saletta (compleanni, nascite, lauree, feste).',
@@ -2243,7 +2246,7 @@ function pCaffeReg(d){
   const S = statoCaffe(d), ad = can('inventario'), righe = S ? S.righe.slice().reverse() : [], mostra = st.regTutte ? righe : righe.slice(0, 30);
   const riga = r => {
     let tit, dx, det;
-    if(r.tp === 'a'){ tit = '🛒 Acquisto'; dx = `<b class="mono">+${kgTxt(r.kg)} kg</b>`; det = r.orfano ? 'Precedente alla prima rilevazione: non usato nei calcoli' : 'Kg aggiunti alla scorta'; }
+    if(r.tp === 'a'){ tit = '🛒 Acquisto'; dx = `<b class="mono">+${kgTxt(r.kg)} kg</b>`; det = r.zero ? 'Primo acquisto: giacenza di partenza ipotizzata a 0 kg' : 'Kg aggiunti alla scorta'; }
     else if(r.iniz){ tit = '⚖️ Rilevazione iniziale'; dx = `<b class="mono">${kgTxt(r.kg)} kg</b>`; det = 'Punto di partenza: il tasso nasce dalla rilevazione successiva'; }
     else { tit = '⚖️ Rilevazione'; dx = `<b class="mono">${kgTxt(r.kg)} kg</b>`;
       det = r.neg ? 'Scorta pesata superiore all\'attesa: tasso non calcolato (controlla gli acquisti)' : `Consumati ${kgTxt(r.cons)} kg · ${r.reg} caffè pagati su ${r.att} attesi${r.p == null ? '' : ` · tasso <b class="${onCls(r.p)}">${pctTxt(r.p)}</b>`}`; }
@@ -4193,7 +4196,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v20';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v21';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
