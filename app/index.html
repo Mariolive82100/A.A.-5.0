@@ -129,6 +129,7 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .gbtn.adm{border-color:rgba(167,139,250,.38);background:linear-gradient(135deg,rgba(245,165,36,.13),rgba(124,58,237,.16))}
 .tbw{position:relative;display:inline-flex}
 .tb{position:absolute;top:-5px;right:-9px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
+.tdot{position:absolute;top:-3px;left:-7px;width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 2px var(--bg,#0b1020)}
 .tb.tbi{position:static;display:inline-flex;margin-left:6px;vertical-align:middle}
 .sbadge{padding:6px 11px;border-radius:99px;font-weight:800;font-size:13px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap;border:1px solid transparent}
 .sbadge.pos{background:rgba(16,185,129,.14);color:var(--green);border-color:rgba(16,185,129,.35)}
@@ -476,7 +477,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.42.0';
+const VERSION = '1.42.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1036,8 +1037,8 @@ function doRender(){
   $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden'); $('hdr-search').classList.toggle('hidden', !st.isAdmin);
   const tabs = [['bar','Home','coffee'],['briefing','Briefing','clipboard'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
-  const nb = cn.tot;
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  const nb = cn.tot, cs = cpSegnali();
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'briefing' && cs.dot ? '<span class="tdot" id="dot-briefing" aria-label="Compiti da svolgere"></span>' : ''}${p === 'briefing' && cs.conv ? `<span class="tb" id="tb-briefing">${cs.conv}</span>` : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
@@ -3203,6 +3204,21 @@ const cpIncarichi = () => { const s = derived().stornati; return tuttiMov().filt
 const cpAperti = () => cpIncarichi().filter(cpAperto);
 const nCpAperti = () => ptMaster() ? cpAperti().length : 0;   // badge: incarichi estratti e ancora da svolgere o da convalidare
 const badgeCompiti = () => { const n = nCpAperti(); return n ? `<span class="tb" id="badge-compiti" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${n}</span>` : ''; };
+/* frequenza: giorni che mancano prima di poter riassegnare il compito (0 = subito). Calcolo in memoria sui movimenti caricati */
+const cpGiorniCool = c => {
+  const cd = cpCool(c); if(!cd) return 0;
+  const ult = tuttiMov().filter(m => m.tipo === 'compito' && m.cp === c.id && m.giorno && m.stato !== 'annullata' && m.stato !== 'rifiutata').map(m => m.giorno).sort().pop();
+  const passati = ult ? -giorniA(ult) : null;
+  return passati !== null && passati < cd ? cd - passati : 0;
+};
+/* compiti che chiunque puo' prendere in carico adesso: attivi, non gia' assegnati o in attesa di convalida, non in pausa per la frequenza, con almeno un collega nel bacino */
+const nCpDisponibili = () => {
+  if(!st.mid || !ptMaster()) return 0;
+  const occ = new Set(cpAperti().map(m => m.cp));
+  return cpAttivi().filter(c => !occ.has(c.id) && cpGiorniCool(c) === 0 && membriAttivi().some(m => !c.esenti.includes(m.id))).length;
+};
+/* segnali sul tab Briefing: pallino se c'e' qualcosa da fare (compito libero o a me assegnato), numero se ci sono compiti da convalidare */
+const cpSegnali = () => ({dot: ptMaster() && (nCpDisponibili() > 0 || cpMiei().length > 0), conv: nCpConv()});
 const cpMiei = () => st.mid ? cpAperti().filter(m => m.mid === st.mid && m.stato === 'assegnato') : [];
 const rnd = () => { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; } catch(e){ return Math.random(); } };
 /* pesi: 1 / (1 + incarichi già convalidati in quel compito nel periodo in memoria) */
@@ -3265,12 +3281,8 @@ A['cp-apri'] = ds => {
   if(cpAperti().some(m => m.cp === c.id)) return toast('Compito già assegnato: attendi che venga concluso', 'err');
   const pool = membriAttivi().filter(m => !c.esenti.includes(m.id)).map(m => m.id);
   if(!pool.length) return toast('Nessun collega disponibile: tutti esclusi dai Supervisor', 'err');
-  const cd = cpCool(c);
-  if(cd){   // frequenza: giorni minimi tra due assegnazioni dello stesso compito (calcolo in memoria sui movimenti caricati)
-    const ult = tuttiMov().filter(m => m.tipo === 'compito' && m.cp === c.id && m.giorno && m.stato !== 'annullata' && m.stato !== 'rifiutata').map(m => m.giorno).sort().pop();
-    const passati = ult ? -giorniA(ult) : null;
-    if(passati !== null && passati < cd) return toast(`Compito svolto da poco: si può riassegnare tra ${cd - passati} ${cd - passati === 1 ? 'giorno' : 'giorni'}`, 'err');
-  }
+  const attesa = cpGiorniCool(c);
+  if(attesa > 0) return toast(`Compito svolto da poco: si può riassegnare tra ${attesa} ${attesa === 1 ? 'giorno' : 'giorni'}`, 'err');
   cpStop(); cpE = {id: c.id, k: 1, sel: pool.slice(), scarti: [], conf: [], cur: null, fase: 'setup', n: null, giorno: null, tmr: null};
   cpFoglio();
 };
@@ -4683,8 +4695,6 @@ function avvisiHome(){
   if(nc) h += `<button class="avv violet" id="avviso-conv" data-act="go" data-p="notifiche"><div class="avv-t">🛡️ ${nc === 1 ? '1 compito da convalidare' : nc + ' compiti da convalidare'}</div><div class="avv-m"><b>Apri le Notifiche →</b></div></button>`;
   const pm = podioDaAssegnare();   // admin: a inizio mese, bonus podio del mese precedente da assegnare con un tocco
   if(pm) h += `<button class="avv amber" id="avviso-podio" data-act="podio-apri"><div class="avv-t">🏅 Podio del mese</div><div class="avv-m"><b>Assegna i bonus di ${esc(pm.nome)}</b><br><span style="font-size:12.5px">Prima convalida le ultime richieste e i compiti di fine mese.</span></div></button>`;
-  const mc = cpMiei();   // promemoria: compiti assegnati a me e ancora da svolgere
-  if(mc.length) h += `<button class="avv amber" id="avviso-compiti" data-act="go" data-p="briefing"><div class="avv-t">🎯 ${mc.length === 1 ? 'Hai un compito da svolgere' : 'Hai ' + mc.length + ' compiti da svolgere'}</div><div class="avv-m">${mc.map(m => esc(m.nome || 'Compito')).join('<br>')}<br><b>Quando hai finito premi «Ho fatto!» →</b></div></button>`;
   return h;
 }
 
