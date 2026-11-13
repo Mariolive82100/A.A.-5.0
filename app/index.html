@@ -477,7 +477,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.45.1';
+const VERSION = '1.46.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2963,16 +2963,8 @@ function giocoChiediRuota(){
 }
 A['gioco-ruota'] = () => giocoChiediRuota();
 A['gioco-ruota-si'] = () => {
-  openSheet(`<h3>🎡 Ruota del Barista</h3><p class="sub">Vuoi mantenere gli stessi partecipanti di questo turno?</p>
-    <div class="grid2"><button class="btn ghost" id="gr-altri" data-act="gioco-ruota-vai" data-v="0">No, scelgo io</button><button class="btn amber" id="gr-stessi" data-act="gioco-ruota-vai" data-v="1">Sì, gli stessi</button></div>`);
-};
-A['gioco-ruota-vai'] = ds => {
-  const g = giocoSt(), stessi = ds.v === '1' && g.ord.length >= 2;
-  closeSheet();
-  const r = ruotaSt(); r.vinc = null;
-  if(stessi){ r.sel = Object.fromEntries(g.ord.filter(id => membro(id)).map(id => [id, true])); r.gira = false; }
-  A['go']({p: 'ruota'});
-  if(stessi) setTimeout(() => { if(st.page === 'ruota' && !ruotaSt().gira) A['ruota-gira'](); }, 500);
+  closeSheet(); ruotaReset(); A['go']({p: 'ruota'});
+  setTimeout(() => { if(st.page === 'ruota' && !ruotaSt().gira) A['ruota-gira'](); }, 500);
 };
 A['gioco-ancora'] = () => { const g = giocoSt(); giocoAvvia(g); render(); };
 A['gioco-prova'] = () => {
@@ -4891,9 +4883,13 @@ function bacPulisciVecchi(){
 /* ---------- Saletta: Ruota del Barista (solo client) e Bacheca delle Perle ---------- */
 function rndInt(n){ const lim = 4294967296 - 4294967296 % n; let x; do { x = crypto.getRandomValues(new Uint32Array(1))[0]; } while(x >= lim); return x % n; }
 function ruotaSt(){
-  if(!st.ruota){ const sv = LS.get('ruotaSel', []); st.ruota = {sel: Object.fromEntries(membriAttivi().filter(m => sv.includes(m.id)).map(m => [m.id, true])), ids: [], ang: 0, from: 0, gira: false, t0: 0, win: null, vinc: null}; }
+  if(!st.ruota) st.ruota = {ids: [], ang: 0, from: 0, gira: false, t0: 0, win: null, vinc: null, conf: null, ass: [], fine: false};
   return st.ruota;
 }
+/* nuovo giro da zero: nessun assente, nessun esito */
+function ruotaReset(){ const r = ruotaSt(); if(r.gira) return r; r.vinc = null; r.conf = null; r.ass = []; r.fine = false; r.win = null; return r; }
+/* bacino: tutti i membri attivi (già in memoria) tranne chi è risultato assente in questo giro */
+const ruotaPool = () => membriAttivi().slice().sort((a, b) => (nomeBreve(a.id) || nomeM(a.id)).localeCompare(nomeBreve(b.id) || nomeM(b.id))).map(m => m.id).filter(id => !ruotaSt().ass.includes(id));
 function ruotaSvg(ids, nome){
   const n = ids.length, A_ = 360 / n, R = 140, C0 = 150, pt = a => [C0 + R * Math.sin(a * Math.PI / 180), C0 - R * Math.cos(a * Math.PI / 180)];
   const fs = n <= 6 ? 15 : n <= 10 ? 12 : 10, mx = n <= 6 ? 12 : n <= 10 ? 9 : 7;
@@ -4904,31 +4900,44 @@ function ruotaSvg(ids, nome){
   }).join('') + `<circle cx="${C0}" cy="${C0}" r="16" fill="var(--card)" stroke="rgba(255,255,255,.6)" stroke-width="2"/><text x="${C0}" y="${C0 + 1}" text-anchor="middle" dominant-baseline="middle" font-size="16">☕</text>`;
 }
 function pRuota(d){
-  const r = ruotaSt(), nome = id => nomeBreve(id) || nomeM(id), att = membriAttivi().slice().sort((a, b) => nome(a.id).localeCompare(nome(b.id)));
-  const sel = att.filter(m => r.sel[m.id]).map(m => m.id), ids = r.gira || r.vinc ? r.ids : sel;
+  const r = ruotaSt(), nome = id => nomeBreve(id) || nomeM(id), pool = ruotaPool();
+  const ids = r.gira || r.vinc || r.conf ? r.ids : pool;
   const anim = r.gira ? `--from:${r.from}deg;--to:${r.ang}deg;animation:ruota-spin 4.2s cubic-bezier(.12,.6,.1,1) ${(-(Date.now() - r.t0) / 1000).toFixed(2)}s forwards` : `transform:rotate(${r.ang}deg)`;
   const ruota = ids.length >= 2 ? `<div class="ruota-box"><div class="ruota-pt"></div><svg viewBox="0 0 300 300" id="ruota-svg" style="${anim}" role="img" aria-label="Ruota con ${ids.length} colleghi">${ruotaSvg(ids, nome)}</svg></div>`
-    : '<div class="empty">Spunta almeno 2 colleghi presenti e gira la ruota.</div>';
-  const esito = r.vinc && !r.gira ? `<div class="card" id="ruota-esito" style="text-align:center;border-color:var(--amber)"><div style="font-size:40px;line-height:1.1">☕</div><div style="font-size:22px;font-weight:800;margin:4px 0">Tocca a ${esc(nome(r.vinc))}!</div><div class="mut" style="font-size:13px">Alla macchinetta a fare i caffè per tutti.</div></div>` : '';
-  return `${backSaletta()}<h2>☕ La Ruota del Barista ${infoBtn(`Chi si mette alla macchinetta? Scegli i presenti e lascia decidere alla sorte.`)}</h2>
-  ${ruota}${esito}
-  <button class="btn amber block big" id="ruota-gira" data-act="ruota-gira" ${sel.length >= 2 && !r.gira ? '' : 'disabled'}>${r.gira ? 'Gira…' : r.vinc ? '🔁 Rigira la ruota' : '🎡 Gira la ruota!'}</button>
-  <div class="card" style="margin-top:12px"><h3><span>Chi c'è</span><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="ruota-tutti" data-v="1" ${r.gira ? 'disabled' : ''}>Tutti</button><button class="btn sm ghost" data-act="ruota-tutti" data-v="0" ${r.gira ? 'disabled' : ''}>Nessuno</button></span></h3>
-    ${cercaBox('ruota-lista')}<div class="list" id="ruota-lista">${att.map(m => `<button class="li" data-q="${qMem(m)}" data-act="ruota-toggle" data-id="${m.id}" ${r.gira ? 'disabled' : ''} style="width:100%;text-align:left;${r.sel[m.id] ? 'border-color:var(--green)' : ''}"><div class="av">${r.sel[m.id] ? '☑' : '☐'}</div><div class="grow"><div class="t" style="font-size:14px">${esc(nome(m.id))}${m.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div></button>`).join('')}</div>
-    ${cercaVuoto('ruota-lista')}${infoBtn(`Estrazione casuale e uniforme: ognuno ha la stessa probabilità. Non viene salvato nulla.`, 'Come funziona')}</div>`;
+    : (r.vinc || r.conf || r.fine ? '' : '<div class="empty">Servono almeno 2 colleghi attivi per girare la ruota.</div>');
+  const verifica = r.vinc && !r.conf && !r.gira ? `<div class="card" id="ruota-verifica" style="text-align:center;border-color:var(--amber)"><div class="mut" style="font-size:12.5px">È uscito</div><div id="ruota-uscito" style="font-size:28px;font-weight:800;margin:6px 0">🎉 ${esc(nome(r.vinc))}</div><p class="tx2" style="font-size:13.5px;margin:0 0 10px">Verifica di persona: tocca a lui solo se è presente.</p>
+    <div class="grid2"><button class="btn red" id="ruota-assente" data-act="ruota-assente">❌ Non è presente / Non disponibile</button><button class="btn green" id="ruota-presente" data-act="ruota-presente">✅ È presente</button></div></div>` : '';
+  const esito = r.conf && !r.gira ? `<div class="card" id="ruota-esito" style="text-align:center;border-color:var(--amber)"><div style="font-size:40px;line-height:1.1">☕</div><div style="font-size:22px;font-weight:800;margin:4px 0">Tocca a ${esc(nome(r.conf))}!</div><div class="mut" style="font-size:13px">Alla macchinetta a fare i caffè per tutti.</div></div>` : '';
+  const fine = r.fine && !r.gira ? `<div class="card" id="ruota-fine"><div class="empty">Nessun altro collega disponibile.</div></div>` : '';
+  const mostraGira = !verifica;
+  return `${backSaletta()}<h2>☕ La Ruota del Barista ${infoBtn(`Chi si mette alla macchinetta? La ruota include tutti i colleghi attivi. Quando esce un nome, conferma se è presente: se non lo è, la ruota gira di nuovo senza di lui.`)}</h2>
+  ${ruota}${verifica}${esito}${fine}
+  ${mostraGira ? `<button class="btn amber block big" id="ruota-gira" data-act="ruota-gira" ${r.gira || (r.fine ? false : pool.length < 2 && !r.conf) ? 'disabled' : ''}>${r.gira ? 'Gira…' : r.conf || r.fine ? '🔁 Nuova estrazione' : '🎡 Gira la ruota!'}</button>` : ''}
+  <p class="hint" style="text-align:center;margin-top:10px">Estrazione casuale e uniforme tra ${r.gira || r.vinc || r.conf ? r.ids.length : pool.length} colleghi. Non viene salvato nulla.</p>`;
 }
-A['ruota-toggle'] = ds => { const r = ruotaSt(); if(r.gira) return; r.sel[ds.id] = !r.sel[ds.id]; r.vinc = null; render(); };
-A['ruota-tutti'] = ds => { const r = ruotaSt(); if(r.gira) return; cercaFiltra('ruota-lista', membriAttivi()).forEach(m => { if(ds.v === '1') r.sel[m.id] = true; else delete r.sel[m.id]; }); r.vinc = null; render(); };
-A['ruota-gira'] = () => {
-  const r = ruotaSt(); if(r.gira) return;
-  const ids = membriAttivi().slice().sort((a, b) => (nomeBreve(a.id) || nomeM(a.id)).localeCompare(nomeBreve(b.id) || nomeM(b.id))).filter(m => r.sel[m.id]).map(m => m.id);
-  if(ids.length < 2) return toast('Scegli almeno 2 colleghi', 'err');
-  LS.set('ruotaSel', ids);
-  const n = ids.length, A_ = 360 / n, k = rndInt(n), jit = (rndInt(1000) / 1000 - 0.5) * 0.7 * A_;
-  r.ids = ids; r.win = ids[k]; r.vinc = null; r.gira = true; r.from = r.ang; r.t0 = Date.now();
+function ruotaParti(ids){
+  const r = ruotaSt(), n = ids.length, A_ = 360 / n, k = rndInt(n), jit = (rndInt(1000) / 1000 - 0.5) * 0.7 * A_;
+  r.ids = ids; r.win = ids[k]; r.vinc = null; r.conf = null; r.fine = false; r.gira = true; r.from = r.ang; r.t0 = Date.now();
   r.ang = (r.from - (r.from % 360)) + 1800 + ((360 - ((k + 0.5) * A_ + jit)) % 360 + 360) % 360;
   render();
   setTimeout(() => { r.gira = false; r.vinc = r.win; try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){} render(); }, 4300);
+}
+A['ruota-gira'] = () => {
+  const r = ruotaSt(); if(r.gira) return;
+  if(r.conf || r.fine || !r.vinc) ruotaReset();   // nuova estrazione: si riparte da tutti i colleghi attivi
+  const ids = ruotaPool();
+  if(ids.length < 2) return toast('Servono almeno 2 colleghi attivi', 'err');
+  ruotaParti(ids);
+};
+A['ruota-presente'] = () => { const r = ruotaSt(); if(r.gira || !r.vinc || r.conf) return; r.conf = r.vinc; render(); };
+A['ruota-assente'] = () => {
+  const r = ruotaSt(); if(r.gira || !r.vinc || r.conf) return;
+  if(!r.ass.includes(r.vinc)) r.ass.push(r.vinc);
+  r.vinc = null; r.win = null;
+  const ids = ruotaPool();
+  if(!ids.length){ r.fine = true; r.ids = []; return render(); }
+  if(ids.length === 1){ r.ids = ids; r.win = ids[0]; r.vinc = ids[0]; return render(); }   // ne resta uno solo: niente giro, solo la verifica
+  ruotaParti(ids);   // nuova estrazione subito, senza chi è risultato assente
 };
 
 /* Bacheca delle Perle: listener limitato, attivo solo con la pagina aperta e l'app in primo piano */
