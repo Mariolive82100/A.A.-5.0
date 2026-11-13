@@ -478,7 +478,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.47.0';
+const VERSION = '1.48.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -5043,12 +5043,47 @@ document.addEventListener('click', () => { if(backTimer) backRiarma(); }, true);
   document.addEventListener('click', arma, true); document.addEventListener('keydown', arma, true);
 })();
 
-A['card-share'] = (ds, el) => {
+/* scheda -> immagine PNG: la scheda viene clonata con gli stili calcolati e disegnata in un SVG (foreignObject) poi su canvas. Tutto in locale, nessuna lettura/scrittura. */
+async function cardImmagine(c){
+  const rc = c.getBoundingClientRect(), W = Math.ceil(rc.width), H = Math.ceil(rc.height);
+  const cl = c.cloneNode(true);
+  const src = [c, ...c.querySelectorAll('*')], dst = [cl, ...cl.querySelectorAll('*')];
+  src.forEach((e, i) => {
+    const d = dst[i]; if(!d || !d.style) return;
+    const cs = getComputedStyle(e); let t = '';
+    for(let k = 0; k < cs.length; k++){ const n = cs[k]; t += n + ':' + cs.getPropertyValue(n) + ';'; }
+    d.setAttribute('style', t);
+  });
+  cl.querySelectorAll('.cs-btn, script, .hint-i, .ibtn, button.hint-i, #btn-st-img').forEach(x => x.remove());
+  cl.style.margin = '0'; cl.style.width = W + 'px'; cl.style.height = H + 'px'; cl.style.boxSizing = 'border-box'; cl.style.position = 'static';
+  cl.querySelectorAll('use').forEach(u => {   // le icone del gruppo di simboli stanno fuori dalla scheda: si copiano dentro
+    const id = (u.getAttribute('href') || u.getAttribute('xlink:href') || '').replace('#', ''), sym = id && document.getElementById(id), sv = u.closest('svg');
+    if(sym && sv){ if(sym.getAttribute('viewBox')) sv.setAttribute('viewBox', sym.getAttribute('viewBox')); const g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.innerHTML = sym.innerHTML; u.replaceWith(g); } else u.remove();
+  });
+  cl.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  const bg = getComputedStyle(document.body).backgroundColor || '#0b1220', PAD = 18, FOOT = 34, CW = W + PAD * 2, CH = H + PAD + FOOT;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject x="0" y="0" width="100%" height="100%">${new XMLSerializer().serializeToString(cl)}</foreignObject></svg>`;
+  const img = new Image();
+  await new Promise((ok, ko) => { img.onload = ok; img.onerror = () => ko(new Error('img')); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const K = 2, cv = document.createElement('canvas'); cv.width = CW * K; cv.height = CH * K;
+  const x = cv.getContext('2d'); x.scale(K, K);
+  x.fillStyle = bg; x.fillRect(0, 0, CW, CH);
+  x.drawImage(img, PAD, PAD, W, H);
+  x.fillStyle = '#9aa7bd'; x.font = '600 13px system-ui, sans-serif'; x.textAlign = 'center';
+  x.fillText(`☕ ${st.gruppo.nome || 'Saletta'} — Armieri 5.0`, CW / 2, PAD + H + 22);
+  return await new Promise((res, rej) => { try { cv.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/png'); } catch(e){ rej(e); } });
+}
+A['card-share'] = async (ds, el) => {
   const c = el && el.closest('.card'); if(!c) return;
-  const {titolo, corpo} = cardTesto(c);
-  const testo = `☕ ${st.gruppo.nome || 'Saletta'} — Armieri 5.0\n\n${corpo}`;
-  if(navigator.share){ navigator.share({title: titolo || 'Armieri 5.0', text: testo}).catch(() => {}); return; }
-  try { navigator.clipboard.writeText(testo).then(() => toast('Scheda copiata: incollala dove vuoi')).catch(() => toast('Condivisione non disponibile', 'err')); } catch(e){ toast('Condivisione non disponibile', 'err'); }
+  const {titolo, corpo} = cardTesto(c), testo = `☕ ${st.gruppo.nome || 'Saletta'} — Armieri 5.0\n\n${corpo}`;
+  try {
+    const blob = await cardImmagine(c);
+    const nome = 'armieri_' + (titolo || 'scheda').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) + '_' + oggiISO() + '.png';
+    await condividiBlob(blob, nome, titolo || 'Armieri 5.0', `☕ ${st.gruppo.nome || 'Saletta'} — ${titolo || 'Armieri 5.0'}`, 'Immagine scaricata: allegala al messaggio');
+  } catch(e){   // se il browser non riesce a disegnare la scheda, si ripiega sul testo
+    if(navigator.share){ navigator.share({title: titolo || 'Armieri 5.0', text: testo}).catch(() => {}); return; }
+    try { navigator.clipboard.writeText(testo).then(() => toast('Immagine non disponibile: scheda copiata come testo')).catch(() => toast('Condivisione non disponibile', 'err')); } catch(e2){ toast('Condivisione non disponibile', 'err'); }
+  }
 };
 /* ---------- avvio ---------- */
 (function boot(){
