@@ -477,7 +477,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.45.0';
+const VERSION = '1.45.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -4575,7 +4575,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if(!el || el.disabled) return;
   const f = A[el.dataset.act];
-  if(f){ e.preventDefault(); guard(f)(el.dataset, el); }
+  if(f){ if(!(el.type === 'checkbox')) e.preventDefault(); guard(f)(el.dataset, el); }   // sui checkbox il preventDefault annullava il flag appena toccato
 });
 document.addEventListener('change', e => {
   if(e.target && (e.target.name === 'q-met' || e.target.name === 'q-cred')) quotaAggiorna();
@@ -4874,10 +4874,10 @@ A['bac-salva'] = ds => {
 A['bac-chiudi'] = ds => { const e = bacEv(ds.id); if(!e || e.tipo !== 'sondaggio') return; C('eventi').doc(e.id).update({chiuso: e.chiuso !== true}).catch(er => toast(errMsg(er), 'err')); };
 A['bac-fissa'] = ds => { const e = bacEv(ds.id); if(!e || !moderatore()) return; C('eventi').doc(e.id).update({fissato: e.fissato !== true}).catch(er => toast(errMsg(er), 'err')); };
 A['bac-elimina'] = ds => { const e = bacEv(ds.id); if(!e || !confirm(isBac(e) ? 'Eliminare questa voce dalla bacheca?' : 'Eliminare questo evento?')) return; C('eventi').doc(e.id).delete().catch(er => toast(errMsg(er), 'err')); };
-A['bac-aperta'] = () => {
-  if(!sonoCreatore()) return;
-  const on = !bacAperta();
-  G().update({bachecaAperta: on}).then(() => toast(on ? 'I colleghi possono pubblicare in Bacheca' : 'Pubblicazione riservata a Creatore e Supervisor')).catch(e => toast(errMsg(e), 'err'));
+A['bac-aperta'] = (ds, el) => {
+  if(!sonoCreatore()){ if(el) el.checked = bacAperta(); return; }
+  const on = el && el.type === 'checkbox' ? !!el.checked : !bacAperta();
+  G().update({bachecaAperta: on}).then(() => toast(on ? 'I colleghi possono pubblicare in Bacheca' : 'Pubblicazione riservata a Creatore e Supervisor')).catch(e => { if(el) el.checked = bacAperta(); toast(errMsg(e), 'err'); });
 };
 /* una tantum: il Creatore toglie dal documento del gruppo i vecchi campi 'avviso' e 'sondaggio' (1 sola scrittura) */
 let bacPulito = false;
