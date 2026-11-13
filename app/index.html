@@ -60,6 +60,7 @@ main{max-width:640px;margin:0 auto;padding:14px 14px calc(96px + var(--safe-b))}
 h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .sub{font-size:12.5px;color:var(--mut);margin:0 0 14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card.cs-card{position:relative}.cs-card>h3,.cs-card>.between{padding-right:34px}.cs-btn{position:absolute;top:6px;right:6px;width:30px;height:30px}.cs-btn svg{width:17px;height:17px}
 .card h3{margin:0 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2);display:flex;align-items:center;gap:6px;justify-content:space-between}
 .row{display:flex;align-items:center;gap:10px}
 .between{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -477,7 +478,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.46.0';
+const VERSION = '1.47.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1048,11 +1049,28 @@ function doRender(){
   main.classList.remove('wide'); main.dataset.p = st.page;
   main.innerHTML = fn(d);
   restore();
+  if(st.page === 'classifiche') cardShareMark();
   rimettiScroll();
   perleSync();
   bacPulisciVecchi();
 }
 
+/* icona «condividi» su ogni scheda di Classifica e Statistiche: condivide il contenuto della scheda come testo (nessuna lettura/scrittura) */
+function cardShareMark(){
+  document.querySelectorAll('#main .card').forEach(c => {
+    if(c.querySelector('.cs-btn') || c.parentElement.closest('.card')) return;
+    const h = c.querySelector(':scope > h3') || c.querySelector(':scope > .between');
+    if(!h) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'iconbtn cs-btn'; b.dataset.act = 'card-share'; b.setAttribute('aria-label', 'Condividi questa scheda');
+    b.innerHTML = ic('share', 's'); c.classList.add('cs-card'); c.appendChild(b);
+  });
+}
+function cardTesto(c){
+  const bt = new Set([...c.querySelectorAll('button')].map(x => (x.innerText || '').trim()).filter(Boolean));
+  const h = c.querySelector(':scope > h3, :scope > .between'), titolo = h ? (h.innerText || '').replace(/\s*\n\s*/g, ' · ').trim() : '';
+  const righe = (c.innerText || '').replace(/\t+/g, ' · ').split('\n').map(x => x.trim()).filter(x => x && !bt.has(x));
+  return {titolo: titolo.replace(/\s*·\s*$/, ''), corpo: righe.join('\n')};
+}
 function renderDrawer(){
   const nav = (p, icona, label, id) => `<button class="nb ${st.page===p?'on':''}"${id ? ` id="${id}"` : ''} data-act="go" data-p="${p}">${ic(icona)}${label}</button>`;
   const voci = [];
@@ -5025,6 +5043,13 @@ document.addEventListener('click', () => { if(backTimer) backRiarma(); }, true);
   document.addEventListener('click', arma, true); document.addEventListener('keydown', arma, true);
 })();
 
+A['card-share'] = (ds, el) => {
+  const c = el && el.closest('.card'); if(!c) return;
+  const {titolo, corpo} = cardTesto(c);
+  const testo = `☕ ${st.gruppo.nome || 'Saletta'} — Armieri 5.0\n\n${corpo}`;
+  if(navigator.share){ navigator.share({title: titolo || 'Armieri 5.0', text: testo}).catch(() => {}); return; }
+  try { navigator.clipboard.writeText(testo).then(() => toast('Scheda copiata: incollala dove vuoi')).catch(() => toast('Condivisione non disponibile', 'err')); } catch(e){ toast('Condivisione non disponibile', 'err'); }
+};
 /* ---------- avvio ---------- */
 (function boot(){
   const m = location.hash.match(/g=([A-Za-z0-9-]+)/);
