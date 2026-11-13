@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.55.0';
+const VERSION = '1.56.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1098,7 +1098,7 @@ function renderDrawer(){
     ${voci.length ? `<div class="mut" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px 2px">🛡️ Gestione</div>${voci.join('')}<div class="sep"></div>` : ''}
     <button class="nb ${st.page==='impostazioni'?'on':''}" data-act="go" data-p="impostazioni">${ic('settings')}Impostazioni</button>
     <button class="nb ${st.page==='regolamento'?'on':''}" data-act="go" data-p="regolamento">${ic('receipt')}Regolamento</button>
-    <button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>
+    ${sonoCreatore() ? `<button class="nb" id="nb-condividi-app" data-act="condividi-app">${ic('share')}Condividi app</button>` : ''}
     <button class="nb" data-act="info">${ic('info')}Info</button>
     <div style="margin-top:auto;padding:14px 8px 0;font-size:11px" class="mut">Armieri 5.0 v${VERSION}</div>`;
   if(st.isAdmin){ qsFiltra(); if(qsFoc && $('qs-in')){ const i = $('qs-in'); i.focus({preventScroll:true}); i.setSelectionRange(i.value.length, i.value.length); } } else st.qsQ = '';
@@ -1245,7 +1245,7 @@ function entryInstall(){
 
 function entryWelcome(){
   return `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1><p>Caffè, snack, cassa e turni della saletta,<br>condivisi con i colleghi.</p></div>
-  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Me l'ha mandato un collega o il Supervisor</span></button>`;
+  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Te lo manda il Creatore del gruppo</span></button>`;
 }
 
 function entryJoin(){
@@ -1830,7 +1830,7 @@ function pRegolamento(){
     '<b>Collega:</b> registra consumi, spese, ricariche e regali; consulta e svolge i compiti nel Briefing; riceve notifiche personali.',
     '<b>Creatore:</b> ha tutti i poteri, non può essere revocato ed è l\'unico che nomina e revoca i Supervisor e ne sceglie i permessi (☰ → Gestione Supervisor). Solo lui può ripristinare un backup.',
     '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti, PIN, archivia / espelli) · 🎯 <i>Compiti e Regole</i> (compiti nel Briefing, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
-    '<b>Accesso:</b> si entra solo con il codice del gruppo, che il Creatore o un Supervisor può mandare come link (☰ → Impostazioni → «Copia link di accesso»). Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
+    '<b>Accesso:</b> si entra solo con il codice del gruppo, che solo il Creatore può vedere e mandare come link (☰ → Impostazioni → «Invita i colleghi»); la condivisione dell\'app e il codice non sono visibili a Supervisor e colleghi, a cui basta chiederlo al Creatore. Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
     `${eur(g.quotaAnnua)} di contributo al fondo, <b>separato dal saldo</b>: non crea debiti né blocca i consumi.`,
@@ -2883,7 +2883,7 @@ function pImpostazioni(){
   ${sonoCreatore() ? `<div class="card" id="card-bacheca-sw"><h3>📢 Bacheca in Home</h3><label class="check"><input type="checkbox" id="bac-aperta" data-act="bac-aperta" ${bacAperta() ? 'checked' : ''}><b style="flex:1;font-size:14px">Consenti ai colleghi di pubblicare in Bacheca</b></label><p class="hint" style="margin:6px 0 0">Acceso: tutti possono pubblicare avvisi, eventi e sondaggi e gestire i propri. Spento: i colleghi consultano e votano, e pubblicano solo i compleanni; il resto lo pubblicano Creatore e Supervisor con «Strumenti di Sistema».</p></div>` : ''}
   ${st.isAdmin && !sonoCreatore() ? `<div class="card"><div class="between"><div><b>Ruolo di Supervisor</b><div class="mut" style="font-size:12px">${badgePerm(permDi(st.uid)) || 'nessun permesso'}</div></div><button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia</button></div></div>` : ''}
   <div class="card"><div class="between"><div><b>Regolamento</b><div class="mut" style="font-size:12px">Regole di crediti, quote e compiti</div></div><button class="btn sm" data-act="go" data-p="regolamento">${ic('receipt','s')} Leggi</button></div></div>
-  ${st.isAdmin ? `<div class="card"><h3>Invita i colleghi</h3>
+  ${sonoCreatore() ? `<div class="card" id="card-invita"><h3>Invita i colleghi</h3>
     <div class="code mono" style="margin-bottom:10px">${esc(st.gid)}</div>
     <div class="grid2"><button class="btn sm" data-act="copia" data-v="${esc(st.gid)}">${ic('copy','s')} Copia codice</button>
     <button class="btn sm amber" data-act="condividi" data-v="${esc(link)}">${ic('share','s')} Invia link</button></div>
@@ -2951,6 +2951,7 @@ A['entry'] = ds => { st.entry = ds.v || null; render(); };
 /* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
 A['condividi-app'] = async () => {
   A['drawer-close']();
+  if(!sonoCreatore()) return;
   const url = appUrl();
   if(navigator.share){
     try { await navigator.share({title: 'Armieri 5.0', url}); return; }
@@ -3115,9 +3116,11 @@ A['conferma-elimina-gruppo'] = async () => {
 A['esci-gruppo'] = force => {
   if(force !== true && st.isAdmin && st.gid){
     const unico = st.admins.length <= 1;
-    const msg = (sonoCreatore() ? 'ATTENZIONE: sei il Creatore del gruppo. ' : '') + 'Per rientrare servono il codice del gruppo e il tuo PIN personale.\n\nCodice: ' + st.gid + '\n\nPremi OK per copiare il codice e uscire, Annulla per restare.';
+    const cre = sonoCreatore();
+    const msg = cre ? 'ATTENZIONE: sei il Creatore del gruppo. Per rientrare servono il codice del gruppo e il tuo PIN personale.\n\nCodice: ' + st.gid + '\n\nPremi OK per copiare il codice e uscire, Annulla per restare.'
+      : 'Uscire dal gruppo su questo telefono? Su questo telefono basterà il tuo PIN personale per rientrare; da un altro telefono servirà il codice, che ti dà il Creatore.';
     if(!confirm(msg)) return;
-    try { navigator.clipboard && navigator.clipboard.writeText(st.gid); } catch(e){}
+    if(cre){ try { navigator.clipboard && navigator.clipboard.writeText(st.gid); } catch(e){} }
   } else if(force !== true && !confirm('Uscire dal gruppo su questo telefono? Potrai rientrare con il codice.')) return;
   if(force === true) LS.del('ultimoGruppo'); else if(st.gid) LS.set('ultimoGruppo', {gid: st.gid, nome: (st.gruppo && st.gruppo.nome) || ''});   // l'ultimo codice resta sul telefono
   disconnect(); st.gid = null; st.mid = null; st.entry = null; st.autoUlt = false; LS.del('gid'); LS.del('mid'); render();
@@ -4207,7 +4210,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v22';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v23';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
@@ -4401,7 +4404,7 @@ async function costruisciBackup(){
   const d = derived();
   const ts = x => x && x.toMillis ? x.toMillis() : (x || null);
   return {
-    app: 'Armieri 5.0', formato: 2, versione: VERSION, esportato: new Date().toISOString(), gruppo: {...st.gruppo, id: st.gid},
+    app: 'Armieri 5.0', formato: 2, versione: VERSION, esportato: new Date().toISOString(), gruppo: {...st.gruppo, ...(sonoCreatore() ? {id: st.gid} : {})},
     membri: st.membri, prodotti: st.prodotti, eventi: st.eventi.map(e => ({...e, ts: ts(e.ts)})),
     chiusure: st.chiusure.map(c => ({...c, fino: ts(c.fino), da: ts(c.da) || 0, ts: ts(c.ts)})),
     archivio: arch.docs.map(x => ({id: x.id, ...x.data()})),
@@ -4683,13 +4686,14 @@ A['rd-wa'] = () => {
 };
 
 /* --- impostazioni --- */
-A['copia'] = ds => { (navigator.clipboard ? navigator.clipboard.writeText(ds.v) : Promise.reject()).then(() => toast('Copiato')).catch(() => toast('Copia non riuscita: tieni premuto sul codice', 'err')); };
+A['copia'] = ds => { if(ds.v && st.gid && String(ds.v).indexOf(st.gid) >= 0 && !sonoCreatore()) return; (navigator.clipboard ? navigator.clipboard.writeText(ds.v) : Promise.reject()).then(() => toast('Copiato')).catch(() => toast('Copia non riuscita: tieni premuto sul codice', 'err')); };
 A['copia-link'] = () => {
-  if(!st.isAdmin || !st.gid) return;
+  if(!sonoCreatore() || !st.gid) return;
   const link = location.origin + location.pathname + '#g=' + st.gid;
   (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link di accesso copiato: incollalo su WhatsApp')).catch(() => toast('Copia non riuscita: usa «Invia link»', 'err'));
 };
 A['condividi'] = ds => {
+  if(!sonoCreatore()) return;
   const testo = `Entra nella saletta "${st.gruppo.nome}" su Armieri 5.0: ${ds.v}\nCodice: ${st.gid}`;
   if(navigator.share) navigator.share({title: 'Armieri 5.0', text: testo}).catch(() => {});
   else window.open('https://wa.me/?text=' + encodeURIComponent(testo), '_blank');
