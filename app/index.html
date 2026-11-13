@@ -477,7 +477,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.44.0';
+const VERSION = '1.45.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1840,10 +1840,11 @@ function pBriefing(d){
   const link = nSp ? `<button class="avv amber" id="cp-spesa-link" data-act="go" data-p="spesa"><div class="avv-t">🛒 ${nSp} ${nSp === 1 ? 'articolo' : 'articoli'} da comprare in lista</div><div class="avv-m">Apri la Lista della spesa →</div></button>` : '';
   return `<h2>${ic('clipboard')} Briefing</h2><p class="sub" style="margin-bottom:12px">I compiti della saletta. Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: chi gestisce i compiti convalida e i punti arrivano.</p>
   ${avvisoPuntiOff()}${bannerSup()}${link}${cpConvCard()}
-  <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo${gest ? ' <span class="hint" style="text-transform:none;letter-spacing:0">· ✏️ per modificare</span>' : ''}</h3>
-    ${(gest ? cpLista() : cat).length ? (gest ? cpLista() : cat).map(c => cpEd === c.id ? cpFormInline(c) : `<div class="cp-item" id="cp-item-${c.id}" style="margin-bottom:12px">
-      <button class="btn amber block" style="display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left" id="btn-cp-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) && c.on !== false ? '' : 'disabled'}><span>🎯 ${esc(c.nome)}</span><span class="mono">${occupato(c.id) ? 'in corso' : c.on === false ? 'spento' : (cpModo(c) === 'squadra' ? 'monte ' + c.pt : '+' + c.pt) + ' pt'}</span></button>
-      <div class="between" style="margin-top:4px;gap:6px;flex-wrap:wrap"><span class="cp-info" style="display:flex;gap:4px;flex-wrap:wrap;font-size:12px">${cpBadge(c)}${cpCool(c) ? ` <span class="pill">ogni ${cpCool(c)} gg</span>` : ''}</span>${gest ? `<button class="btn sm ghost" id="btn-cp-mod-${c.id}" data-act="cp-edit" data-id="${c.id}">✏️ Modifica</button>` : ''}</div></div>`).join('')
+  <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo</h3>
+    ${(gest ? cpLista() : cat).length ? (gest ? cpLista() : cat).map(c => cpEd === c.id ? cpFormInline(c) : `<div class="cp-item" id="cp-item-${c.id}" style="margin-bottom:10px">
+      <button class="btn amber block" style="display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left" id="btn-cp-${c.id}" data-act="${gest ? 'cp-det' : 'cp-apri'}" data-id="${c.id}" ${gest ? '' : me && !occupato(c.id) && c.on !== false ? '' : 'disabled'}><span>🎯 ${esc(c.nome)}</span><span class="mono">${occupato(c.id) ? 'in corso' : c.on === false ? 'spento' : cpPtTxt(c)}</span></button>
+      ${gest && cpDet === c.id ? `<div class="cp-det" id="cp-det-${c.id}" style="margin-top:6px;padding:10px;border-radius:12px;background:var(--bg2,rgba(255,255,255,.04))"><div style="display:flex;gap:4px;flex-wrap:wrap;font-size:12px;margin-bottom:8px">${cpBadge(c)}${cpCool(c) ? ` <span class="pill">ogni ${cpCool(c)} gg</span>` : ''}${c.on === false ? ' <span class="pill">spento</span>' : ''}</div>
+        <div class="grid2"><button class="btn amber" id="btn-cp-sort-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) && c.on !== false ? '' : 'disabled'}>🎲 Sorteggio</button><button class="btn" id="btn-cp-mod-${c.id}" data-act="cp-edit" data-id="${c.id}">✏️ Modifica</button></div></div>` : ''}</div>`).join('')
       : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato.' : 'Sistema punti disattivato: i compiti sono bloccati.'}</p>`}
     ${cpEd === '' ? cpFormInline(null) : ''}
     ${gest ? `<button class="btn amber block" id="btn-cp-nuovo" data-act="cp-edit" data-id="" ${cpEd !== null || cpLista().length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>${cpLista().length ? '' : `<button class="btn block" id="btn-cp-sugg" data-act="cp-sugg" style="margin-top:8px">Carica compiti suggeriti</button>`}` : ''}
@@ -3200,7 +3201,8 @@ const cpMaxP = c => Math.min(CP_K_MAX, Math.max(1, Number.isInteger(c && c.maxP)
 const cpCool = c => (c && Number.isInteger(c.cool) && c.cool > 0) ? c.cool : 0;
 const cpPtPers = (c, k) => cpModo(c) === 'squadra' ? Math.floor(c.pt / Math.max(1, k)) : c.pt;
 const cpPill = c => cpModo(c) === 'squadra' ? `<span class="pill violet">monte ${c.pt} pt</span>` : `<span class="pill violet">+${c.pt} pt</span>`;
-const cpBadge = c => (cpModo(c) === 'squadra' ? `<span class="pill violet" data-cp-modo="squadra">👥 Montepremi a squadra: ${c.pt} pt divisi</span>` : `<span class="pill violet" data-cp-modo="fisso">👤 Punti a persona: ${c.pt} pt ciascuno</span>`) + ` <span class="pill">${cpMaxP(c)} ${cpMaxP(c) === 1 ? 'persona' : 'persone'}</span>`;
+const cpPtTxt = c => `${c.pt} pt ${cpModo(c) === 'squadra' ? 'tot' : 'a pers.'}`;
+const cpBadge = c => `<span class="pill violet">${cpPtTxt(c)}</span> <span class="pill">${cpMaxP(c)} ${cpMaxP(c) === 1 ? 'persona' : 'persone'}</span>`;
 const cpAttivi = () => ptMaster() ? cpLista().filter(c => c.on !== false) : [];
 const cpAperto = m => m.stato === 'assegnato' || m.stato === 'attesa';
 const cpIncarichi = () => { const s = derived().stornati; return tuttiMov().filter(m => m.tipo === 'compito' && !s.has(m.id)); };
@@ -3236,6 +3238,7 @@ function cpProssimoN(cid, giorno){
   for(let n = 0; n < 10; n++) if(!ids.has(`cp_${cid}_${giorno}_${n}_0`)) return String(n);
   return null;
 }
+let cpDet = null;   // compito aperto nel dettaglio (solo chi gestisce i compiti)
 let cpEd = null;   // compito in modifica sul posto: null = nessuno, '' = nuovo, altrimenti l'id
 let cpE = null;   // sessione di estrazione in memoria: {id, k, sel, scarti, conf, cur, fase, n, giorno, tmr}
 function cpStop(){ if(cpE && cpE.tmr){ clearTimeout(cpE.tmr); cpE.tmr = null; } }
@@ -3442,9 +3445,9 @@ function cpFormInline(o){
   const x = o || {nome: '', pt: 10, on: true, esenti: [], modo: 'fisso', maxP: 1, cool: 0}, id = o ? o.id : '', L = cpLista(), i = L.findIndex(c => c.id === id);
   return `<div class="card" id="cp-form" style="margin:0 0 12px;border:1px solid var(--amber,#f5a524)"><h3>${o ? '✏️ Modifica compito' : '＋ Nuovo compito'}</h3>
     <label class="f"><span>Titolo</span><input class="in" id="cp-nome" maxlength="40" value="${esc(x.nome)}"></label>
-    <label class="f"><span>Modalità punti</span><select class="in" id="cp-modo" data-chg="cp-modo"><option value="fisso" ${cpModo(x) === 'fisso' ? 'selected' : ''}>👤 Punti a persona</option><option value="squadra" ${cpModo(x) === 'squadra' ? 'selected' : ''}>👥 Montepremi a squadra</option></select></label>
+    <label class="f"><span>Modalità punti</span><select class="in" id="cp-modo" data-chg="cp-modo"><option value="fisso" ${cpModo(x) === 'fisso' ? 'selected' : ''}>a pers. — punti a persona</option><option value="squadra" ${cpModo(x) === 'squadra' ? 'selected' : ''}>tot — montepremi a squadra</option></select></label>
     <p class="hint" id="cp-modo-hint" style="margin:-2px 0 8px">${cpHintModo(cpModo(x))}</p>
-    <div class="grid2"><label class="f"><span>Punti</span><input class="in mono" id="cp-pt" inputmode="numeric" value="${x.pt}"></label>
+    <div class="grid2"><label class="f"><span>Punti (a pers. o tot)</span><input class="in mono" id="cp-pt" inputmode="numeric" value="${x.pt}"></label>
       <label class="f"><span>Persone da estrarre (1–${CP_K_MAX})</span><input class="in mono" id="cp-maxp" inputmode="numeric" value="${cpMaxP(x)}"></label></div>
     <label class="f"><span>Frequenza: giorni minimi tra due assegnazioni (0 = nessuna)</span><input class="in mono" id="cp-cool" inputmode="numeric" value="${cpCool(x)}"></label>
     <p class="hint" style="margin:0 0 4px">Colleghi esclusi dal sorteggio (esenzioni permanenti):</p>
@@ -3461,6 +3464,7 @@ A['cp-edit'] = ds => {
   setTimeout(() => { const f = $('cp-form'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80);
 };
 A['cp-edit-chiudi'] = () => { cpEd = null; render(); };
+A['cp-det'] = ds => { if(!can('compiti')) return; cpDet = cpDet === ds.id ? null : ds.id; render(); };
 A['cp-salva'] = ds => {
   if(!can('compiti')) return;
   const M = cpCopia(), nome = val('cp-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('cp-pt')));
