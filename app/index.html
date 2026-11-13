@@ -350,7 +350,10 @@ aside.drawer .sep{height:1px;background:var(--line);margin:8px 4px}
 @media (min-width:700px){html{font-size:17px}}
 
 /* premi del podio nell'header (compatti su mobile: seconda riga sotto la barra) */
-header.hasprize{padding-bottom:38px}
+header.hasprize,header.hasonesta{padding-bottom:38px}
+header.hasonesta .prizepill{padding-right:78px}
+.onpill{position:absolute;right:10px;bottom:6px;font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);white-space:nowrap;cursor:pointer;color:var(--tx)}
+.onpill.green{color:var(--green)}.onpill.amber{color:var(--amber)}.onpill.red{color:var(--red)}.onpill.mut{color:var(--mut)}
 .prizepill{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;gap:2px;font-size:11.5px;font-weight:800;color:#fde68a;white-space:nowrap;cursor:pointer}
 .pz-s{opacity:.5;white-space:pre}
 .rp-grid{display:block}
@@ -406,6 +409,7 @@ header.hasprize{padding-bottom:38px}
   </div>
   <button class="rankpill hidden" id="hdr-rank" data-act="go" data-p="classifiche" aria-label="La tua posizione in classifica nel mese"></button>
   <button class="prizepill hidden" id="hdr-prize" data-act="go" data-p="classifiche" aria-label="Premi del Podio del Mese"></button>
+  <button class="onpill hidden" id="hdr-onesta" data-act="go" data-p="onesta" aria-label="Tasso di Onestà"></button>
   <button class="iconbtn hidden" id="hdr-search" data-act="qs-apri" aria-label="Cerca impostazione o socio" title="Cerca impostazione o socio"><svg class="i"><use href="#i-search"/></svg></button>
   <button class="iconbtn" id="hdr-update" style="margin-left:auto" data-act="aggiorna" aria-label="Aggiorna all'ultima versione" title="Aggiorna all'ultima versione"><svg class="i"><use href="#i-repeat"/></svg></button>
   <button class="sbadge pos hidden" id="hdr-sb" style="margin-left:6px" data-act="go" data-p="registro" aria-label="Saldo"></button>
@@ -478,7 +482,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.49.0';
+const VERSION = '1.51.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1045,7 +1049,7 @@ function doRender(){
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   renderDrawer();
 
-  const fn = {bar:pBar, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, briefing:pBriefing, compiti:pBriefing, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, onesta:pOnesta, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, briefing:pBriefing, compiti:pBriefing, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide'); main.dataset.p = st.page;
   main.innerHTML = fn(d);
   restore();
@@ -1146,9 +1150,9 @@ function qsFiltra(){
 }
 
 const SALETTA_SUB = ['saletta','inventario','gioco','ruota','perle','spesa'];
-const PAGINE_COLLEGA = ['bar','briefing','saletta','classifiche','spesa','gioco','inventario','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
+const PAGINE_COLLEGA = ['bar','onesta','briefing','saletta','classifiche','spesa','gioco','inventario','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
-const PAGINE_ADM = PAGINE_UTENTE.concat(['regole','backup','chiusura','membri','quote','pin','supervisor','statistiche','cassa','feed']);
+const PAGINE_ADM = PAGINE_UTENTE.concat(['onesta','regole','backup','chiusura','membri','quote','pin','supervisor','statistiche','cassa','feed']);
 /* ogni voce di gestione compare solo a chi ha il permesso (il Creatore ha tutto) */
 const PAGINE_PERM = {membri: 'soci', quote: 'soci', pin: 'soci', regole: 'compiti', backup: 'sistema', chiusura: 'sistema'};
 const pagineConsentite = () => st.isAdmin ? PAGINE_ADM.filter(p => (!PAGINE_PERM[p] || can(PAGINE_PERM[p])) && (p !== 'supervisor' || sonoCreatore())) : PAGINE_COLLEGA;
@@ -1184,7 +1188,14 @@ function renderEntry(){
     ? `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1></div><div class="banner red">${ic('alert')}<div>Impossibile collegarsi: ${esc(st.syncErr)}.<br>Controlla la connessione e riapri l'app.</div></div>`
     : `<div class="spin"></div><p class="mut" style="text-align:center">Collegamento in corso…</p>`;
   if(st.entry === 'recupero') return entryRecupero();
-  if(!st.gid) return st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
+  if(!st.gid){
+    if(!st.entry && !st.autoUlt){   // nessuna lettura: il gruppo ricordato sul telefono si apre direttamente (nome salvato in locale)
+      st.autoUlt = true; const u = LS.get('ultimoGruppo', null);
+      if(u && u.gid && normCode(u.gid)){ st.joinCode = normCode(u.gid); st.joinNome = u.nome || ''; st.entry = 'creatore'; } else st.entry = 'join';
+    }
+    if(st.autoJoin){ const c = st.autoJoin; st.autoJoin = null; setTimeout(() => joinVerifica(c), 0); }   // link con codice: la stessa unica verifica del pulsante «Continua»
+    return st.entry === 'creatore' && st.joinCode ? entryCreatore() : st.entry === 'join' ? entryJoin() : entryWelcome();
+  }
   if(!st.ready.g || !st.ready.u || !st.ready.r || !st.ready.a) return `<div class="spin"></div><p class="mut" style="text-align:center">Carico il gruppo…</p>`;
   if(st.mid) return `<div class="spin"></div><p class="mut" style="text-align:center">Accesso approvato, carico i dati…</p>`;
   return entryRichiesta();
@@ -1241,7 +1252,7 @@ function entryJoin(){
     <label class="f"><span>Codice gruppo</span><input class="in mono" id="j-code" placeholder="XXXX-XXXX-XXXX" value="${esc(pre)}" autocapitalize="characters" autocomplete="off" autofocus></label>
     <button class="btn amber block big" data-act="join" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Continua'}</button>
   </div>
-  <button class="btn link" data-act="entry" data-v="">← Indietro</button>`;
+  ${st.joinCode ? `<button class="btn link" data-act="entry" data-v="creatore" style="color:var(--mut);font-size:13px">← Torna a ${esc(st.joinNome || 'questo gruppo')}</button>` : ''}`;
 }
 
 function entryCreatore(){
@@ -1252,7 +1263,7 @@ function entryCreatore(){
     <button class="btn block big" data-act="join-collega">${ic('user','s')} Sono un nuovo collega</button>
     <p class="hint" style="margin:6px 0 0">Invii una richiesta che un Supervisor deve approvare.</p>
   </div>
-  <button class="btn link" data-act="entry" data-v="join">← Cambia codice</button>`;
+  <button class="btn link" id="btn-altro-codice" data-act="entry" data-v="join" style="color:var(--mut);font-size:13px">Usa un altro codice gruppo</button>`;
 }
 
 
@@ -1321,7 +1332,7 @@ function pBar(d){
   const quotaDa = st.gruppo.quotaAnnua > 0 && st.ready.mv && sq !== 'pagata';
   const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && p.esaurito !== true && giacenza(d, p) > 0);
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
-  const scRic = scambiPerMe(d).length;
+  const scRic = scambiPerMe(d).length, oI = onestaIndici(d);
   return `
   ${can('sistema') ? bannerBackup() : ''}
   ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
@@ -1345,9 +1356,9 @@ function pBar(d){
     <div class="blob" style="width:220px;height:220px;background:#7c3aed;top:38%;right:-60px"></div>
     <div class="blob" style="width:180px;height:180px;background:#10b981;bottom:2%;left:20%"></div>
     <div class="grid">
-      <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
-      <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
-      <button class="gbtn" id="btn-benfatto" data-act="benfatto" ${bfRestanti() > 0 ? '' : 'disabled'}><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') && bfRestanti() > 0 ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'Disponibile ' + bfCountdown()}</small></button>
+      <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Caffè<small>${noCaffe ? 'credito insufficiente' : `<span class="mono ${oI.caffe == null ? 'mut' : onCls(oI.caffe)}" id="on-caffe-btn">🛡️ ${onPill(oI.caffe)}</span>`}</small></button>
+      <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Snack e bibite<small>${noSnack ? (snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente') : `<span class="mono ${oI.snack == null ? 'mut' : onCls(oI.snack)}" id="on-snack-btn">🛡️ ${onPill(oI.snack)}</span>`}</small></button>
+      <button class="gbtn" id="btn-altro" data-act="altro-menu"><span class="em">⋯</span>Altro<small>Ben fatto! e novità</small></button>
       <button class="gbtn" id="btn-crediti-home" data-act="crediti-menu"><span class="em">🎁</span>Regala o scambia crediti<small>Tra colleghi</small></button>
     </div>
   </div>
@@ -1724,7 +1735,7 @@ function pRegolamento(){
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
   const nota = (ok, txt) => ok ? '' : txt;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.8 · novembre 2026</p>
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 5.0 · novembre 2026</p>
   ${sez('🎯 Principi', [
     '<b>Registra subito</b> ogni consumo: ognuno risponde del proprio.',
     '<b>Contabilità, non denaro:</b> l\'app tiene crediti e debiti; i soldi passano in contanti o Revolut, fuori dall\'app.',
@@ -1763,7 +1774,7 @@ function pRegolamento(){
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti di oggi, settimana o mese. La pillola in alto mostra la tua posizione del mese.',
     '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
-    '<b>Statistiche · Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati) e un indice per ogni articolo.',
+    '<b>Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati), un indice per il caffè (busta in corso) e uno per snack e bibite. In Home lo vedi nel badge 🛡️ accanto ai premi del Podio e dentro i pulsanti «Caffè» e «Snack e bibite»: toccando il badge si apre la pagina con i dettagli. Verde da 85%, giallo 70–85%, rosso sotto 70%.',
     `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
   ${sez('📢 Bacheca, Eventi &amp; Sondaggi', [
     'In Home trovi la <b>Bacheca</b>: avvisi (ℹ️ Info, 📢 Annuncio, 🥐 Novità in sala), sondaggi e gli eventi della saletta (compleanni, nascite, lauree, feste).',
@@ -1775,6 +1786,7 @@ function pRegolamento(){
     '<b>Collega:</b> registra consumi, spese, ricariche e regali; consulta e svolge i compiti nel Briefing; riceve notifiche personali.',
     '<b>Creatore:</b> ha tutti i poteri, non può essere revocato ed è l\'unico che nomina e revoca i Supervisor e ne sceglie i permessi (☰ → Gestione Supervisor). Solo lui può ripristinare un backup.',
     '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti, PIN, archivia / espelli) · 🎯 <i>Compiti e Regole</i> (compiti nel Briefing, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
+    '<b>Accesso:</b> si entra solo con il codice del gruppo, che il Creatore o un Supervisor può mandare come link (☰ → Impostazioni → «Copia link di accesso»). Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
     `${eur(g.quotaAnnua)} di contributo al fondo, <b>separato dal saldo</b>: non crea debiti né blocca i consumi.`,
@@ -2119,6 +2131,8 @@ function aggiornaPillola(d, av){
   /* premi del Podio del Mese, sempre sott'occhio accanto alla posizione (nascosti se il podio e' spento dal Supervisor) */
   const pz = $('hdr-prize'), premi = (!av && st.mid && podioOn()) ? [1, 2, 3].filter(i => podioPt(i) > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} +${podioPt(i)} pt`) : [];
   if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio a fine mese'; } }
+  const op = $('hdr-onesta'), iO = (op && !av && st.mid && st.page === 'bar') ? onestaIndici(d) : null;
+  if(op){ op.classList.toggle('hidden', !iO); hd.classList.toggle('hasonesta', !!iO); if(iO){ op.className = 'onpill ' + (iO.g == null ? 'mut' : onCls(iO.g)); op.innerHTML = '🛡️ ' + onPill(iO.g); op.title = 'Tasso di Onestà (caffè + snack e bibite)'; } }
   hd.classList.toggle('hasrank', !!x); el.classList.toggle('hidden', !x);
   if(!x) return;
   const med = {1: '🥇 ', 2: '🥈 ', 3: '🥉 '}[x.pos] || '';
@@ -2173,6 +2187,35 @@ const kgTxt = kg => String(Math.round(kg * 100) / 100).replace('.', ',');
 const onCls = pct => pct >= 85 ? 'green' : pct < 70 ? 'red' : 'amber';
 const onCol = pct => pct >= 85 ? 'var(--green)' : pct < 70 ? 'var(--red)' : 'var(--amber)';
 const pctTxt = pct => String(Math.round(pct * 10) / 10).replace('.', ',') + '%';
+/* indici del Tasso di Onestà calcolati sui dati già in memoria: caffè (ciclo/busta in corso, altrimenti cicli conclusi), snack e bibite, aggregato */
+function onestaIndici(d){
+  const S = statoCaffe(d);
+  const pcCh = S && S.capChiusi > 0 ? Math.min(100, S.hc / S.capChiusi * 100) : null;
+  const caffe = S && S.attivo ? Math.min(100, S.pct) : pcCh;
+  let num = 0, den = 0, nIn = 0, dIn = 0;
+  if(pcCh != null){ num += Math.min(S.hc, S.capChiusi); den += S.capChiusi; }
+  let sN = 0, sD = 0;
+  prodListino().forEach(p => { const t = statoProd(d, p); if(t.pct != null){ num += t.cT - t.aT; den += t.cT; sN += t.cT - t.aT; sD += t.cT; } else if(t.car > 0){ nIn += t.reg; dIn += t.car; } });
+  const snack = sD > 0 ? sN / sD * 100 : dIn > 0 ? Math.min(100, nIn / dIn * 100) : null;
+  return {caffe, snack, g: den > 0 ? num / den * 100 : null, S, pcCh};
+}
+const onPill = v => v == null ? 'n/d' : pctTxt(v);
+function pOnesta(d){
+  const I = onestaIndici(d), S = I.S, riga = (nome, v, nota) => `<div class="onr" style="margin-bottom:12px"><div class="between" style="font-size:15px"><span>${nome}</span><b class="mono ${v == null ? 'mut' : onCls(v)}">${onPill(v)}</b></div>${v == null ? '' : `<div class="bar"><i style="width:${v}%;background:${onCol(v)}"></i></div>`}<p class="hint" style="margin:4px 0 0">${nota}</p></div>`;
+  const storico = S && S.hk > 0 ? `Cicli di caffè conclusi finora: <b>${S.hc}</b> caffè registrati su <b>${S.capChiusi}</b> teorici (${kgTxt(S.hk)} kg). I lotti di snack e bibite conclusi sono nel dettaglio per articolo qui sotto.` : 'Ancora nessun ciclo di caffè concluso: lo storico si forma quando il Supervisor azzera una busta o un lotto si esaurisce.';
+  return `${backHome()}<h2>🛡️ Tasso di Onestà</h2>
+  <div class="card" id="on-riepilogo"><h3><span>Riepilogo</span></h3>
+    ${riga('🛡️ <b>Aggregato</b> (caffè + snack e bibite)', I.g, I.g == null ? 'Disponibile appena un ciclo di caffè o un lotto di snack si conclude.' : 'Media ponderata sui cicli e lotti conclusi.')}
+    ${riga('☕ <b>Caffè</b>', I.caffe, S && S.attivo ? `Busta in corso: ${S.registrati} caffè registrati su ${S.capienza} teorici (${kgTxt(S.kg)} kg × ${resaKg()}). Il voto si consolida quando il Supervisor azzera il ciclo.` : 'Nessuna busta in corso: valore dei cicli conclusi.')}
+    ${riga('🍫 <b>Snack e bibite</b>', I.snack, 'Pezzi registrati rispetto ai pezzi caricati nei lotti conclusi (se nessun lotto è concluso, nel lotto in corso).')}
+  </div>
+  <div class="card" id="on-regole"><h3><span>Come si legge</span></h3>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px"><span class="pill green">🟢 85% o più: tutto in ordine</span><span class="pill amber">🟡 70–85%: qualcosa manca</span><span class="pill red">🔴 sotto 70%: ammanchi</span></div>
+    <p class="hint" style="margin:0">Caffè: caffè registrati (giri offerti inclusi) ÷ (kg caricati × ${resaKg()} caffè/kg). Snack e bibite: pezzi registrati ÷ pezzi caricati. Più il valore è vicino al 100%, più le scorte consumate corrispondono ai consumi registrati. Calcolato sui dati già caricati: nessuna lettura in più.</p></div>
+  <div class="card" id="on-storico"><h3><span>Storico</span></h3><p class="hint" style="margin:0">${storico}</p></div>
+  ${cardOnesta(d)}
+  <button class="btn block ghost" data-act="go" data-p="bar" style="margin-top:4px">← Torna alla Home</button>`;
+}
 function cardOnesta(d){
   const S = statoCaffe(d), resa = resaKg(), righe = [];
   let num = 0, den = 0;
@@ -2310,7 +2353,7 @@ function pStatConsumi(d){
         ${lista.length > MAXL ? `<p class="hint" style="margin:6px 0 0">…e altri ${lista.length - MAXL} movimenti nel periodo.</p>` : ''}`
         : '<div class="empty">Nessun pagamento nel periodo scelto.</div>'}</div>`;
   }
-  return filtri + tot + cardOnesta(d) + `<div class="card" id="sc-classifica"><h3><span>🏅 Classifica pagamenti</span></h3>
+  return filtri + tot + `<div class="card" id="sc-classifica"><h3><span>🏅 Classifica pagamenti</span></h3>
     ${R.righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">☕</th><th class="c">🍫</th><th class="c">Pagato</th></tr></thead><tbody>
       ${R.righe.map((x, i) => `<tr><td class="mono">${['🥇', '🥈', '🥉'][i] || i + 1}</td><td><b>${esc(x.nome)}</b>${x.mid === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td><td class="c mono">${x.c}</td><td class="c mono">${x.s}</td><td class="c mono"><b>${eur(x.e)}</b></td></tr>`).join('')}
       </tbody></table>` : '<div class="empty">Nessun pagamento nel periodo scelto.</div>'}
@@ -2757,6 +2800,7 @@ function pImpostazioni(){
     <div class="code mono" style="margin-bottom:10px">${esc(st.gid)}</div>
     <div class="grid2"><button class="btn sm" data-act="copia" data-v="${esc(st.gid)}">${ic('copy','s')} Copia codice</button>
     <button class="btn sm amber" data-act="condividi" data-v="${esc(link)}">${ic('share','s')} Invia link</button></div>
+    <button class="btn block" id="btn-copia-link" data-act="copia-link" style="margin-top:8px">🔗 Copia link di accesso</button>
     ${infoBtn(`Mandalo solo ai colleghi. Per installarla: Chrome → menu ⋮ → <i>Aggiungi a schermata Home</i>; iPhone → Safari → Condividi → <i>Aggiungi alla schermata Home</i>.`, 'Come funziona')}</div>` : ''}
   <div class="card"><h3>Stato</h3>
     <div class="between" style="font-size:13px"><span class="mut">Sincronizzazione</span><span class="row" style="gap:6px"><span class="dot ${({ok:'ok',off:'off',err:'err'})[st.sync]||''}"></span>${st.sync === 'ok' ? 'collegato' : st.sync === 'off' ? 'offline' : st.sync === 'err' ? 'errore' : 'in corso'}</span></div>
@@ -2843,16 +2887,19 @@ A['install-salta'] = () => {
   st.skipInstall = true; render();
 };
 
-A['join'] = async () => {
-  const code = normCode(val('j-code'));
-  if(!code) return toast('Il codice ha 12 caratteri, es. ABCD-EFGH-JKLM', 'err');
-  st.busy = true; render();
+async function joinVerifica(code){
+  st.entry = 'join'; st.busy = true; render();
   try {
-    const s = await db.collection('saletta').doc(code).get({source:'server'});
-    if(!s.exists) { toast('Codice non trovato', 'err'); return; }
-    st.joinCode = code; st.joinNome = s.data().nome || ''; st.entry = 'creatore';
+    const sn = await db.collection('saletta').doc(code).get({source:'server'});
+    if(!sn.exists){ toast('Codice non trovato', 'err'); LS.set('invito', code); return; }
+    st.joinCode = code; st.joinNome = sn.data().nome || ''; st.entry = 'creatore'; LS.del('invito');
   } catch(e){ toast('Impossibile verificare il codice (' + errMsg(e) + ')', 'err'); }
   finally { st.busy = false; render(); }
+}
+A['join'] = () => {
+  const code = normCode(val('j-code'));
+  if(!code) return toast('Il codice ha 12 caratteri, es. ABCD-EFGH-JKLM', 'err');
+  joinVerifica(code);
 };
 
 A['join-collega'] = () => { const code = st.joinCode; if(!code) return; st.gid = code; LS.set('gid', code); LS.del('invito'); st.entry = null; st.joinCode = null; connect(code); render(); };
@@ -2973,7 +3020,7 @@ A['conferma-elimina-gruppo'] = async () => {
     }
     await g.delete();
     await ownUtente.delete().catch(() => {});
-    st.gid = null; st.mid = null; st.entry = null; LS.del('gid'); LS.del('mid'); LS.del('page');
+    st.gid = null; st.mid = null; st.entry = null; LS.del('gid'); LS.del('mid'); LS.del('page'); LS.del('ultimoGruppo');
     toast('Gruppo eliminato');
   } catch(e){ toast('Eliminazione non riuscita (' + errMsg(e) + '). Riprova: i dati già cancellati non tornano.', 'err'); }
   finally { st.busy = false; render(); }
@@ -2985,7 +3032,8 @@ A['esci-gruppo'] = force => {
     if(!confirm(msg)) return;
     try { navigator.clipboard && navigator.clipboard.writeText(st.gid); } catch(e){}
   } else if(force !== true && !confirm('Uscire dal gruppo su questo telefono? Potrai rientrare con il codice.')) return;
-  disconnect(); st.gid = null; st.mid = null; st.entry = null; LS.del('gid'); LS.del('mid'); render();
+  if(force === true) LS.del('ultimoGruppo'); else if(st.gid) LS.set('ultimoGruppo', {gid: st.gid, nome: (st.gruppo && st.gruppo.nome) || ''});   // l'ultimo codice resta sul telefono
+  disconnect(); st.gid = null; st.mid = null; st.entry = null; st.autoUlt = false; LS.del('gid'); LS.del('mid'); render();
 };
 
 /* --- bar --- */
@@ -3500,6 +3548,14 @@ function acAggiorna(){
   if(t) t.innerHTML = !r ? 'Scegli il collega da cui comprare' : !qOk ? 'Indica quanti crediti vuoi comprare (numero intero)' : `Compri <b class="mono green">${q} ${q === 1 ? 'credito' : 'crediti'}</b> da ${esc(nomeBreve(r.value) || nomeM(r.value))} · da pagargli <b class="mono">${eur(q * 100)}</b>`;
   const b = $('ac-invia'); if(b) b.disabled = !(r && qOk);
 }
+A['altro-menu'] = () => {
+  const bf = bfRestanti() > 0;
+  openSheet(`<h3>⋯ Altro</h3>
+    <button class="btn amber block big" id="btn-benfatto" data-act="benfatto" style="margin-bottom:10px" ${bf ? '' : 'disabled'}>👏 Ben fatto!</button>
+    <p class="sub" style="margin:-4px 0 14px" id="bf-stato">${!onP('ptBfOn') && bf ? 'Riconosci un collega (senza punti)' : bf ? bfRestanti() + (bfRestanti() === 1 ? ' gettone disponibile' : ' gettoni disponibili') : 'Disponibile ' + bfCountdown()}</p>
+    <button class="btn block big" id="btn-coming-soon" disabled style="opacity:.55">✨ Coming soon</button>
+    <p class="sub" style="margin:6px 0 0">Novità in arrivo: restate sintonizzati.</p>`);
+};
 A['crediti-menu'] = () => {
   if(!membriAttivi().some(m => m.id !== st.mid)) return toast('Non ci sono altri colleghi', 'err');
   openSheet(`<h3>🎁 Regala o scambia crediti</h3>
@@ -4046,7 +4102,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v16';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v18';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
@@ -4523,6 +4579,11 @@ A['rd-wa'] = () => {
 
 /* --- impostazioni --- */
 A['copia'] = ds => { (navigator.clipboard ? navigator.clipboard.writeText(ds.v) : Promise.reject()).then(() => toast('Copiato')).catch(() => toast('Copia non riuscita: tieni premuto sul codice', 'err')); };
+A['copia-link'] = () => {
+  if(!st.isAdmin || !st.gid) return;
+  const link = location.origin + location.pathname + '#g=' + st.gid;
+  (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link di accesso copiato: incollalo su WhatsApp')).catch(() => toast('Copia non riuscita: usa «Invia link»', 'err'));
+};
 A['condividi'] = ds => {
   const testo = `Entra nella saletta "${st.gruppo.nome}" su Armieri 5.0: ${ds.v}\nCodice: ${st.gid}`;
   if(navigator.share) navigator.share({title: 'Armieri 5.0', text: testo}).catch(() => {});
@@ -5036,8 +5097,11 @@ A['card-share'] = async (ds, el) => {
 };
 /* ---------- avvio ---------- */
 (function boot(){
-  const m = location.hash.match(/g=([A-Za-z0-9-]+)/);
-  if(m){ const c = normCode(m[1]); if(c && !st.gid){ LS.set('invito', c); st.entry = 'join'; } history.replaceState(null, '', location.pathname + location.search); }
+  const h = location.hash.replace(/^#/, ''), q = new URLSearchParams(location.search).get('g');
+  const raw = q || (h.match(/g=([A-Za-z0-9-]+)/) || [])[1] || (normCode(h) ? h : '');   // link: ?g=CODICE, #g=CODICE oppure #CODICE
+  const c = raw ? normCode(raw) : null;
+  if(c && !st.gid){ LS.set('invito', c); st.entry = 'join'; st.autoJoin = c; }
+  if(raw){ const sp = new URLSearchParams(location.search); sp.delete('g'); history.replaceState(null, '', location.pathname + (sp.toString() ? '?' + sp : '')); }
   if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   render();
   initFirebase();
