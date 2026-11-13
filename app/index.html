@@ -110,6 +110,7 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 @keyframes gm-pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 .home .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.55;pointer-events:none;z-index:0}
 .home .grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.home .grid .gbtn:last-child:nth-child(odd){grid-column:1/-1;min-height:min(22vh,150px)}
 .gbtn{position:relative;min-height:min(30vh,210px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px;border-radius:26px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);color:var(--tx);font-weight:800;font-size:clamp(19px,5.4vw,27px);line-height:1.15;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .gbtn:active{transform:scale(.97)}
 .gbtn:disabled{opacity:.42;filter:grayscale(.5)}
@@ -370,7 +371,7 @@ header.hasprize{padding-bottom:38px}
   main,main.wide{max-width:1260px;padding:22px 30px 48px}
   .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start}
   .rp-grid>#card-compiti{grid-column:1/-1}
-  main[data-p="bar"] .home .grid{grid-template-columns:repeat(4,1fr)}
+  main[data-p="bar"] .home .grid{grid-template-columns:repeat(3,1fr)}
   main[data-p="bar"] .gbtn{min-height:190px}
   main[data-p="bar"]>*{max-width:1100px;margin-left:auto;margin-right:auto}
   table{width:100%}
@@ -477,7 +478,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.42.1';
+const VERSION = '1.43.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1338,7 +1339,7 @@ function pBar(d){
       <button class="btn amber block" id="btn-ricarica" data-act="ricarica-nuova">➕ Ricarica o rimborso</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
     </div>
-    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn regalo block" id="btn-regala-home" data-act="regala">🎁 Regala crediti</button><button class="btn acquisto block" id="btn-acquista-home" data-act="acquista">🤝 Acquista crediti da un collega</button></div>
+    <div style="margin-top:8px"><button class="btn regalo block" id="btn-crediti-home" data-act="crediti-menu">🎁 Regala o scambia crediti</button></div>
     ${!ptMaster() ? '' : (() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
@@ -1354,7 +1355,6 @@ function pBar(d){
       <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
       <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
-      <button class="gbtn" id="btn-bacheca" data-act="bac-vai"><span class="em">📢</span>Bacheca${nBacNuovi() ? `<span class="tb tbi" id="badge-bacheca">${nBacNuovi()}</span>` : ''}<small>Eventi, avvisi, sondaggi</small></button>
     </div>
   </div>
   ${bacheca()}
@@ -1432,7 +1432,7 @@ function pCrediti(d){
   <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica o rimborso</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
-    <div class="grid2" style="gap:8px;margin-top:8px"><button class="btn regalo block" id="btn-regala" data-act="regala">🎁 Regala crediti</button><button class="btn acquisto block" id="btn-acquista" data-act="acquista">🤝 Acquista crediti da un collega</button></div></div>
+    <div style="margin-top:8px"><button class="btn regalo block" id="btn-crediti" data-act="crediti-menu">🎁 Regala o scambia crediti</button></div></div>
   ${scambiRicevuti(d)}${scambiInviati(d)}
   ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un Supervisor</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
   ${infoBtn('<b>Ricarica:</b> scegli importo e modalità (contanti in cassetta o Revolut). Quando il Supervisor conferma l\'incasso, i crediti arrivano sul saldo.<br><br><b>Riscatto:</b> chiedi al Fondo Gruppo di restituirti denaro: l\'importo resta riservato finché il Supervisor non ti paga.<br><br><b>Tra colleghi:</b> «Regala crediti» è immediato e senza approvazioni; «Acquista crediti da un collega» richiede che il venditore confermi di aver ricevuto il denaro.', 'Come funzionano ricariche e riscatti')}`;
@@ -1730,7 +1730,7 @@ function pRegolamento(){
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
   const nota = (ok, txt) => ok ? '' : txt;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.7 · novembre 2026</p>
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 4.8 · novembre 2026</p>
   ${sez('🎯 Principi', [
     '<b>Registra subito</b> ogni consumo: ognuno risponde del proprio.',
     '<b>Contabilità, non denaro:</b> l\'app tiene crediti e debiti; i soldi passano in contanti o Revolut, fuori dall\'app.',
@@ -1740,7 +1740,7 @@ function pRegolamento(){
     '<b>Ricarica:</b> la chiedi dal pulsante «Ricarica»; i crediti arrivano quando un Supervisor conferma l\'incasso.',
     '<b>Saldo mai sotto zero:</b> senza credito non si registrano caffè, snack, regali o vendite.',
     '<b>Riscatto in denaro:</b> l\'importo resta riservato finché un Supervisor non lo paga dalla cassa.',
-    '<b>Regala crediti:</b> immediato e definitivo. <b>Acquista da un collega:</b> il venditore conferma dopo aver ricevuto il denaro.'])}
+    '<b>Regala crediti:</b> immediato e definitivo. <b>Scambia / Vendi:</b> il collega conferma dopo aver ricevuto il denaro.'])}
   ${sez('☕ Caffè e snack', [
     `Prezzo da listino (caffè ${eur(g.prezzoCaffe || 0)}), addebitato subito sul saldo.`,
     `Ti sei sbagliato? <b>Annulla entro ${ANNULLA_MIN} minuti.</b>`,
@@ -3531,20 +3531,28 @@ A['regala'] = () => {
 };
 function acAggiorna(){
   if(!$('ac-q')) return;
-  const r = document.querySelector('#sheet input[name="ac-v"]:checked'), max = r ? +r.dataset.max : 0;
-  const raw = val('ac-q'), qOk = /^\d{1,3}$/.test(raw) && +raw >= 1 && +raw <= 500, q = qOk ? +raw : 0, over = r && qOk && q > max;
+  const r = document.querySelector('#sheet input[name="ac-v"]:checked');
+  const raw = val('ac-q'), qOk = /^\d{1,3}$/.test(raw) && +raw >= 1 && +raw <= 500, q = qOk ? +raw : 0;
   const t = $('ac-tot');
-  if(t) t.innerHTML = !r ? 'Scegli il collega da cui comprare' : !qOk ? 'Indica quanti crediti vuoi comprare (numero intero)' : over ? `<span class="red">${esc(nomeBreve(r.value) || nomeM(r.value))} può vendere al massimo <b>${max}</b> ${max === 1 ? 'credito' : 'crediti'}</span>` : `Compri <b class="mono green">${q} ${q === 1 ? 'credito' : 'crediti'}</b> da ${esc(nomeBreve(r.value) || nomeM(r.value))} · da pagargli <b class="mono">${eur(q * 100)}</b>`;
-  const b = $('ac-invia'); if(b) b.disabled = !(r && qOk && !over);
+  if(t) t.innerHTML = !r ? 'Scegli il collega da cui comprare' : !qOk ? 'Indica quanti crediti vuoi comprare (numero intero)' : `Compri <b class="mono green">${q} ${q === 1 ? 'credito' : 'crediti'}</b> da ${esc(nomeBreve(r.value) || nomeM(r.value))} · da pagargli <b class="mono">${eur(q * 100)}</b>`;
+  const b = $('ac-invia'); if(b) b.disabled = !(r && qOk);
 }
+A['crediti-menu'] = () => {
+  if(!membriAttivi().some(m => m.id !== st.mid)) return toast('Non ci sono altri colleghi', 'err');
+  openSheet(`<h3>🎁 Regala o scambia crediti</h3>
+    <p class="sub">Scegli cosa vuoi fare. In entrambi i casi vedi solo i nomi dei colleghi, mai i loro saldi.</p>
+    <button class="btn regalo block big" id="cm-regala" data-act="regala" style="margin-bottom:6px">🎁 Regala crediti</button>
+    <p class="sub" style="margin:0 0 14px">Invio gratuito dal tuo saldo a uno o più colleghi, con causale facoltativa. Immediato e definitivo.</p>
+    <button class="btn acquisto block big" id="cm-scambia" data-act="acquista" style="margin-bottom:6px">🤝 Scambia / Vendi crediti</button>
+    <p class="sub" style="margin:0">Proposta a un collega scelto: lui deve confermare. Parità fissa 1 credito = 1,00 €, pagamento fuori dall'app.</p>`);
+};
 A['acquista'] = () => {
-  const d = derived();
-  const ven = membriAttivi().filter(m => m.id !== st.mid).map(m => ({m, v: vendibile(m.id, d)})).filter(x => x.v >= 100).sort((a, b) => nomeM(a.m.id).localeCompare(nomeM(b.m.id)));
-  if(!ven.length) return toast('Nessun collega ha crediti liberi da vendere', 'err');
-  openSheet(`<h3>🤝 Acquista crediti da un collega</h3>
-    <p class="sub">Ti accordi con il collega e paghi fuori dall'app. I crediti ti arrivano solo quando lui conferma di aver ricevuto il denaro.</p>
+  const ven = membriAttivi().filter(m => m.id !== st.mid).map(m => ({m})).sort((a, b) => nomeM(a.m.id).localeCompare(nomeM(b.m.id)));
+  if(!ven.length) return toast('Non ci sono altri colleghi', 'err');
+  openSheet(`<h3>🤝 Scambia / Vendi crediti</h3>
+    <p class="sub">Proponi a un collega uno scambio: 1 credito = 1,00 €. Vi accordate e paghi fuori dall'app. I crediti ti arrivano solo quando lui conferma di aver ricevuto il denaro.</p>
     <b style="font-size:13px">Da chi compri</b>
-    ${cercaBox('ac-lista')}<div id="ac-lista" style="max-height:30vh;overflow:auto;margin:6px 0 10px">${ven.map(x => `<label class="check" data-q="${qMem(x.m)}"><input type="radio" name="ac-v" value="${x.m.id}" data-max="${Math.floor(x.v / 100)}" data-chg="ac-upd"><b style="flex:1;font-size:14px">${esc(nomeM(x.m.id))}</b><span class="mono green" style="font-size:12.5px">${eur(x.v)}</span></label>`).join('')}${cercaVuoto('ac-lista')}</div>
+    ${cercaBox('ac-lista')}<div id="ac-lista" style="max-height:30vh;overflow:auto;margin:6px 0 10px">${ven.map(x => `<label class="check" data-q="${qMem(x.m)}"><input type="radio" name="ac-v" value="${x.m.id}" data-chg="ac-upd"><b style="flex:1;font-size:14px">${esc(nomeM(x.m.id))}</b></label>`).join('')}${cercaVuoto('ac-lista')}</div>
     <label class="f"><span>Crediti da comprare (1 credito = 1 €)</span><input class="in mono" id="ac-q" inputmode="numeric" maxlength="3" value="1" data-chg="ac-upd"></label>
     <label class="f"><span>Come paghi (fuori dall'app)</span>${segOpts('ac-met', [['contanti','Contanti'],['revolut','Revolut']], 'contanti')}</label>
     <div id="ac-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
@@ -3557,7 +3565,7 @@ A['ac-invia'] = () => {
   if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > 500) return toast('Quantità non valida', 'err');
   if(!['contanti', 'revolut'].includes(metodo)) return toast('Scegli come paghi', 'err');
   const q = +raw, imp = q * 100;
-  if(imp > vendibile(r, derived())) return toast('Il collega non ha abbastanza crediti liberi', 'err');
+  if(imp > vendibile(r, derived())) return toast('Questo collega non può cedere questa quantità in questo momento', 'err');
   addMov({tipo: 'scambio', stato: 'attesa', mid: st.mid, dest: r, daMid: r, aMid: st.mid, importo: imp, metodo});
   closeSheet(); toast(`🤝 Richiesta inviata a ${nomeBreve(r) || nomeM(r)}: i crediti arrivano quando conferma`);
 };
@@ -4070,7 +4078,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v15';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v16';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
