@@ -477,7 +477,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.43.1';
+const VERSION = '1.44.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1090,7 +1090,7 @@ const QS_VOCI = [
   {e:'🔐', t:'Gestione PIN', s:'Reset PIN, PIN temporaneo', perm:'soci', p:'pin', k:'pin reset temporaneo codice password sblocco'},
   {e:'🛡️', t:'Gestione Supervisor', s:'Nomina, permessi e ruoli', perm:'creatore', p:'supervisor', k:'supervisor permessi permesso ruoli ruolo nomina revoca creatore admin amministratore'},
   {e:'⚙️', t:'Regole punti e premi', s:'Punteggi, tessera, soglia, podio', perm:'compiti', p:'regole', k:'punti tessera fedelta ben fatto soglia podio premi regole punteggi scala credito conversione'},
-  {e:'🎯', t:'Gestione compiti', s:'Briefing · crea, modifica, elimina', perm:'compiti', p:'briefing', a:'card-compiti', k:'compiti compito briefing incarichi sorteggio esenti squadra'},
+  {e:'🎯', t:'Gestione compiti', s:'Briefing · crea, modifica, elimina', perm:'compiti', p:'briefing', a:'cp-catalogo', k:'compiti compito briefing incarichi sorteggio esenti squadra'},
   {e:'💾', t:'Backup e ripristino', s:'Esporta i dati, ripristina', perm:'sistema', p:'backup', k:'backup esporta esportazione ripristino ripristina scarica dati salvataggio'},
   {e:'📦', t:'Chiusura periodo', s:'Chiusura, estratti, archivio', perm:'sistema', p:'chiusura', k:'chiusura periodo estratti estratto archivio chiudere'},
   {e:'📢', t:'Bacheca, eventi e sondaggi', s:'Home · avvisi, annunci, sondaggi, eventi', perm:null, p:'bar', a:'bacheca', k:'bacheca avviso avvisi annuncio annunci info novita sondaggio sondaggi evento eventi compleanno compleanni votazione'},
@@ -1840,15 +1840,18 @@ function pBriefing(d){
   const link = nSp ? `<button class="avv amber" id="cp-spesa-link" data-act="go" data-p="spesa"><div class="avv-t">🛒 ${nSp} ${nSp === 1 ? 'articolo' : 'articoli'} da comprare in lista</div><div class="avv-m">Apri la Lista della spesa →</div></button>` : '';
   return `<h2>${ic('clipboard')} Briefing</h2><p class="sub" style="margin-bottom:12px">I compiti della saletta. Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: chi gestisce i compiti convalida e i punti arrivano.</p>
   ${avvisoPuntiOff()}${bannerSup()}${link}${cpConvCard()}
-  <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo</h3>
-    ${cat.length ? cat.map(c => `<button class="btn amber block" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left" id="btn-cp-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) ? '' : 'disabled'}><span>🎯 ${esc(c.nome)}</span><span class="mono">${occupato(c.id) ? 'in corso' : '+' + c.pt + ' pt'}</span></button>`).join('')
-      : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato.' : 'Sistema punti disattivato: i compiti sono bloccati.'}${gest && ptMaster() ? ' Creali qui sotto in «Gestione compiti».' : ''}</p>`}
+  <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo${gest ? ' <span class="hint" style="text-transform:none;letter-spacing:0">· ✏️ per modificare</span>' : ''}</h3>
+    ${(gest ? cpLista() : cat).length ? (gest ? cpLista() : cat).map(c => cpEd === c.id ? cpFormInline(c) : `<div class="cp-item" id="cp-item-${c.id}" style="margin-bottom:12px">
+      <button class="btn amber block" style="display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left" id="btn-cp-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) && c.on !== false ? '' : 'disabled'}><span>🎯 ${esc(c.nome)}</span><span class="mono">${occupato(c.id) ? 'in corso' : c.on === false ? 'spento' : (cpModo(c) === 'squadra' ? 'monte ' + c.pt : '+' + c.pt) + ' pt'}</span></button>
+      <div class="between" style="margin-top:4px;gap:6px;flex-wrap:wrap"><span class="cp-info" style="display:flex;gap:4px;flex-wrap:wrap;font-size:12px">${cpBadge(c)}${cpCool(c) ? ` <span class="pill">ogni ${cpCool(c)} gg</span>` : ''}</span>${gest ? `<button class="btn sm ghost" id="btn-cp-mod-${c.id}" data-act="cp-edit" data-id="${c.id}">✏️ Modifica</button>` : ''}</div></div>`).join('')
+      : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato.' : 'Sistema punti disattivato: i compiti sono bloccati.'}</p>`}
+    ${cpEd === '' ? cpFormInline(null) : ''}
+    ${gest ? `<button class="btn amber block" id="btn-cp-nuovo" data-act="cp-edit" data-id="" ${cpEd !== null || cpLista().length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>${cpLista().length ? '' : `<button class="btn block" id="btn-cp-sugg" data-act="cp-sugg" style="margin-top:8px">Carica compiti suggeriti</button>`}` : ''}
   </div>
   <div class="card" id="cp-incarichi"><h3>📋 Incarichi in corso ${aperti.length ? `<span class="pill violet">${aperti.length}</span>` : ''}</h3>
     ${aperti.length ? `<div class="list">${aperti.map(m => cpRiga(m, me)).join('')}</div>` : '<div class="empty" id="cp-nessuno">Nessun incarico in corso.</div>'}
   </div>
-  ${cpClassifiche()}
-  ${gest ? cardCompiti() : ''}`;
+  ${cpClassifiche()}`;
 }
 
 /* ---------- EVENTI ---------- */
@@ -3193,10 +3196,11 @@ const cpMap = () => { const o = st.gruppo && st.gruppo.compiti; return (o && typ
 const cpLista = () => { const M = cpMap(); return Object.keys(M).filter(k => M[k] && typeof M[k].nome === 'string').map(k => ({...M[k], id: k, pt: Number.isInteger(M[k].pt) ? M[k].pt : 0, esenti: Array.isArray(M[k].esenti) ? M[k].esenti.filter(x => typeof x === 'string') : []})).sort((a, b) => (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome)); };
 /* modalita' dei punti: 'fisso' = punti a ciascun incaricato; 'squadra' = monte punti diviso (per difetto) tra i presenti */
 const cpModo = c => c && c.modo === 'squadra' ? 'squadra' : 'fisso';
-const cpMaxP = c => Math.min(CP_K_MAX, Math.max(1, Number.isInteger(c && c.maxP) ? c.maxP : CP_K_MAX));
+const cpMaxP = c => Math.min(CP_K_MAX, Math.max(1, Number.isInteger(c && c.maxP) ? c.maxP : 1));   // persone estratte: esattamente questo numero (o meno se i colleghi disponibili sono pochi)
 const cpCool = c => (c && Number.isInteger(c.cool) && c.cool > 0) ? c.cool : 0;
 const cpPtPers = (c, k) => cpModo(c) === 'squadra' ? Math.floor(c.pt / Math.max(1, k)) : c.pt;
 const cpPill = c => cpModo(c) === 'squadra' ? `<span class="pill violet">monte ${c.pt} pt</span>` : `<span class="pill violet">+${c.pt} pt</span>`;
+const cpBadge = c => (cpModo(c) === 'squadra' ? `<span class="pill violet" data-cp-modo="squadra">👥 Montepremi a squadra: ${c.pt} pt divisi</span>` : `<span class="pill violet" data-cp-modo="fisso">👤 Punti a persona: ${c.pt} pt ciascuno</span>`) + ` <span class="pill">${cpMaxP(c)} ${cpMaxP(c) === 1 ? 'persona' : 'persone'}</span>`;
 const cpAttivi = () => ptMaster() ? cpLista().filter(c => c.on !== false) : [];
 const cpAperto = m => m.stato === 'assegnato' || m.stato === 'attesa';
 const cpIncarichi = () => { const s = derived().stornati; return tuttiMov().filter(m => m.tipo === 'compito' && !s.has(m.id)); };
@@ -3232,6 +3236,7 @@ function cpProssimoN(cid, giorno){
   for(let n = 0; n < 10; n++) if(!ids.has(`cp_${cid}_${giorno}_${n}_0`)) return String(n);
   return null;
 }
+let cpEd = null;   // compito in modifica sul posto: null = nessuno, '' = nuovo, altrimenti l'id
 let cpE = null;   // sessione di estrazione in memoria: {id, k, sel, scarti, conf, cur, fase, n, giorno, tmr}
 function cpStop(){ if(cpE && cpE.tmr){ clearTimeout(cpE.tmr); cpE.tmr = null; } }
 const cpNome = m => esc(nomeBreve(m) || nomeM(m));
@@ -3241,11 +3246,13 @@ function cpFoglio(){
   const testa = `<h3>🎯 ${esc(c.nome)} ${cpPill(c)}</h3>`;
   const conf = e.conf.length ? `<p class="hint" id="cp-conf" style="margin:8px 0">✅ Confermati: <b>${e.conf.map(cpNome).join(', ')}</b> (${e.conf.length}/${e.k})</p>` : '';
   if(e.fase === 'setup'){
-    const nPool = e.sel.length, nEs = membriAttivi().filter(m => c.esenti.includes(m.id)).length, max = Math.max(1, Math.min(cpModo(c) === 'squadra' ? cpMaxP(c) : CP_K_MAX, nPool));
+    const nPool = e.sel.length, nEs = membriAttivi().filter(m => c.esenti.includes(m.id)).length;
+    e.k = Math.max(1, Math.min(cpMaxP(c), nPool));
     openSheet(`${testa}
       ${nEs ? `<p class="hint" style="margin:0 0 8px">${nEs} ${nEs === 1 ? 'collega escluso' : 'colleghi esclusi'} in modo permanente dai Supervisor per questo compito.</p>` : ''}
-      ${cpModo(c) === 'squadra' ? `<p class="hint" id="cp-squadra" style="margin:0 0 8px">👥 Monte di squadra: <b>${c.pt} pt</b> diviso tra i presenti. Con ${e.k} ${e.k === 1 ? 'persona' : 'persone'} ognuna riceve <b>${cpPtPers(c, e.k)} pt</b>.</p>` : ''}
-      <div class="f"><span>Quante persone devono svolgerlo?</span><div class="row" id="cp-k" data-k="${e.k}" style="justify-content:center;gap:10px;margin-top:6px">${Array.from({length: max}, (_, i) => i + 1).map(n => `<button class="btn ${n === e.k ? 'amber' : 'ghost'}" id="cp-k-${n}" data-act="cp-k" data-v="${n}" style="min-width:52px;font-size:18px">${n}</button>`).join('')}</div></div>
+      <p class="hint" style="margin:0 0 8px">${cpBadge(c)}</p>
+      ${cpModo(c) === 'squadra' ? `<p class="hint" id="cp-squadra" style="margin:0 0 8px">👥 Montepremi di squadra: <b>${c.pt} pt</b> diviso tra chi lo porta a termine. Con ${e.k} ${e.k === 1 ? 'persona' : 'persone'} ognuna riceve <b>${cpPtPers(c, e.k)} pt</b>.</p>` : ''}
+      <div class="stat" id="cp-k" data-k="${e.k}" style="text-align:center;padding:12px;font-size:14px">Verr${e.k === 1 ? 'à estratta' : 'anno estratte'} esattamente <b class="mono">${e.k}</b> ${e.k === 1 ? 'persona' : 'persone'}</div>
       <button class="btn amber block big" id="cp-estrai" data-act="cp-estrai" style="margin-top:14px">🎲 Avvia sorteggio</button>`);
   } else if(e.fase === 'anim'){
     openSheet(`${testa}${conf}<div style="text-align:center;padding:26px 0"><div class="mut" style="font-size:12.5px;margin-bottom:8px">Sorteggio in corso…</div><div id="cp-slot" class="mono" style="font-size:30px;font-weight:800;min-height:40px">🎲</div></div>`);
@@ -3284,11 +3291,6 @@ A['cp-apri'] = ds => {
   if(attesa > 0) return toast(`Compito svolto da poco: si può riassegnare tra ${attesa} ${attesa === 1 ? 'giorno' : 'giorni'}`, 'err');
   cpStop(); cpE = {id: c.id, k: 1, sel: pool.slice(), scarti: [], conf: [], cur: null, fase: 'setup', n: null, giorno: null, tmr: null};
   cpFoglio();
-};
-A['cp-k'] = ds => {
-  const e = cpE; if(!e || e.fase !== 'setup') return;
-  const c0 = cpLista().find(x => x.id === e.id), lim = c0 && cpModo(c0) === 'squadra' ? cpMaxP(c0) : CP_K_MAX;
-  e.k = Math.min(lim, Math.max(1, Number(ds.v) || 1)); cpFoglio();
 };
 A['cp-estrai'] = () => {
   const e = cpE; if(!e || e.fase !== 'setup') return;
@@ -3432,34 +3434,33 @@ A['sv-revoca'] = ds => {
   b.commit().then(() => { closeSheet(); toast(`${m.nome} non è più Supervisor`); }).catch(e => toast(errMsg(e), 'err'));
 };
 /* --- configurazione compiti (admin) --- */
-const cardCompiti = () => {
-  const L = cpLista();
-  return `<div class="card" id="card-compiti"><h3>⚙️ Gestione compiti</h3>
-    <p class="hint" style="margin:0 0 8px">Catalogo libero dei compiti sorteggiabili (pulizie, macchinetta, secchio, spesa…): per ciascuno descrizione, punteggio e colleghi esclusi. I punti arrivano alla convalida di chi gestisce i compiti.</p>
-    ${L.length ? `<div class="list">${L.map((c, i) => `<div class="li" id="cp-row-${c.id}" style="flex-wrap:wrap;gap:8px"><div class="grow" style="flex-basis:100%"><div class="t">${esc(c.nome)} ${cpPill(c)}${cpCool(c) ? ` <span class="pill">ogni ${cpCool(c)} gg</span>` : ''}${c.on === false ? ' <span class="pill">spento</span>' : ''}</div><div class="d">${c.esenti.length ? c.esenti.length + (c.esenti.length === 1 ? ' collega escluso' : ' colleghi esclusi') : 'Nessuna esclusione'}</div></div>
-      <div class="row" style="gap:6px;width:100%;justify-content:flex-end"><button class="btn sm ghost" data-act="cp-su" data-id="${c.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="cp-giu" data-id="${c.id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button>
-      <button class="btn sm ghost" data-act="cp-tgl" data-id="${c.id}">${c.on === false ? 'Accendi' : 'Spegni'}</button><button class="btn sm" data-act="cp-edit" data-id="${c.id}">Modifica</button></div></div>`).join('')}</div>` : '<p class="hint" id="cp-cfg-vuoto">Nessun compito configurato.</p>'}
-    <button class="btn amber block" id="btn-cp-nuovo" data-act="cp-edit" data-id="" ${L.length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>
-    ${L.length ? '' : `<button class="btn block" id="btn-cp-sugg" data-act="cp-sugg" style="margin-top:8px">Carica compiti suggeriti</button>`}
-  </div>`;
-};
-const cpSalvaMappa = (M, msg) => G().update({compiti: M}).then(() => { closeSheet(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
+const cpSalvaMappa = (M, msg, tieni) => G().update({compiti: M}).then(() => { if(!tieni) cpEd = null; render(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
 const cpCopia = () => JSON.parse(JSON.stringify(cpMap()));
+const cpHintModo = m => m === 'squadra' ? 'Montepremi: il punteggio totale viene diviso tra le persone che portano a termine il compito.' : 'Punti a persona: ogni partecipante che completa il compito riceve l\'intero punteggio.';
+/* modifica sul posto: la card del compito si espande in questo modulo (nessuna schermata separata) */
+function cpFormInline(o){
+  const x = o || {nome: '', pt: 10, on: true, esenti: [], modo: 'fisso', maxP: 1, cool: 0}, id = o ? o.id : '', L = cpLista(), i = L.findIndex(c => c.id === id);
+  return `<div class="card" id="cp-form" style="margin:0 0 12px;border:1px solid var(--amber,#f5a524)"><h3>${o ? '✏️ Modifica compito' : '＋ Nuovo compito'}</h3>
+    <label class="f"><span>Titolo</span><input class="in" id="cp-nome" maxlength="40" value="${esc(x.nome)}"></label>
+    <label class="f"><span>Modalità punti</span><select class="in" id="cp-modo" data-chg="cp-modo"><option value="fisso" ${cpModo(x) === 'fisso' ? 'selected' : ''}>👤 Punti a persona</option><option value="squadra" ${cpModo(x) === 'squadra' ? 'selected' : ''}>👥 Montepremi a squadra</option></select></label>
+    <p class="hint" id="cp-modo-hint" style="margin:-2px 0 8px">${cpHintModo(cpModo(x))}</p>
+    <div class="grid2"><label class="f"><span>Punti</span><input class="in mono" id="cp-pt" inputmode="numeric" value="${x.pt}"></label>
+      <label class="f"><span>Persone da estrarre (1–${CP_K_MAX})</span><input class="in mono" id="cp-maxp" inputmode="numeric" value="${cpMaxP(x)}"></label></div>
+    <label class="f"><span>Frequenza: giorni minimi tra due assegnazioni (0 = nessuna)</span><input class="in mono" id="cp-cool" inputmode="numeric" value="${cpCool(x)}"></label>
+    <p class="hint" style="margin:0 0 4px">Colleghi esclusi dal sorteggio (esenzioni permanenti):</p>
+    <div id="cp-esenti" style="max-height:30vh;overflow:auto">${membriAttivi().map(m => `<label class="check"><input type="checkbox" class="cp-es" id="cp-es-${m.id}" value="${m.id}" ${x.esenti.includes(m.id) ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(m.nick || m.nome)}</b></label>`).join('')}</div>
+    <label class="check"><input type="checkbox" id="cp-on" ${x.on !== false ? 'checked' : ''}><b style="flex:1;font-size:14px">Compito attivo</b></label>
+    ${o ? `<div class="row" style="gap:6px;margin:6px 0"><span class="hint" style="margin:0;flex:1">Posizione nell'elenco</span><button class="btn sm ghost" data-act="cp-su" data-id="${id}" aria-label="Sposta su" ${i <= 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="cp-giu" data-id="${id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button></div>` : ''}
+    <div class="grid2" style="margin-top:8px"><button class="btn" id="btn-cp-annulla" data-act="cp-edit-chiudi">Annulla</button><button class="btn amber" id="btn-cp-salva" data-act="cp-salva" data-id="${id}">Salva</button></div>
+    ${o ? `<button class="btn red block" id="btn-cp-del" data-act="cp-del" data-id="${id}" style="margin-top:8px">🗑 Elimina compito</button>` : ''}</div>`;
+}
 A['cp-edit'] = ds => {
   if(!can('compiti')) return;
-  const o = ds.id ? cpLista().find(x => x.id === ds.id) : null; if(ds.id && !o) return;
-  const x = o || {nome: '', pt: 10, on: true, esenti: []};
-  openSheet(`<h3>🎯 ${o ? 'Modifica compito' : 'Nuovo compito'}</h3>
-    <label class="f"><span>Descrizione</span><input class="in" id="cp-nome" maxlength="40" value="${esc(x.nome)}" autofocus></label>
-    <label class="f"><span>Modalità punti</span><select class="in" id="cp-modo"><option value="fisso" ${cpModo(x) === 'fisso' ? 'selected' : ''}>Punti fissi a ogni partecipante</option><option value="squadra" ${cpModo(x) === 'squadra' ? 'selected' : ''}>Monte di squadra diviso tra i presenti</option></select></label>
-    <div class="grid2"><label class="f"><span>Punteggio (o monte)</span><input class="in mono" id="cp-pt" inputmode="numeric" value="${x.pt}"></label>
-      <label class="f"><span>Max partecipanti (squadra)</span><input class="in mono" id="cp-maxp" inputmode="numeric" value="${cpMaxP(x)}"></label></div>
-    <label class="f"><span>Frequenza minima (giorni tra due assegnazioni, 0 = nessuna)</span><input class="in mono" id="cp-cool" inputmode="numeric" value="${cpCool(x)}"></label>
-    <p class="hint" style="margin:0 0 4px">Colleghi esclusi dal sorteggio (esenzioni permanenti):</p>
-    <div id="cp-esenti" style="max-height:30vh;overflow:auto">${membriAttivi().map(m => `<label class="check"><input type="checkbox" class="cp-es" value="${m.id}" ${x.esenti.includes(m.id) ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(m.nick || m.nome)}</b></label>`).join('')}</div>
-    <label class="check"><input type="checkbox" id="cp-on" ${x.on !== false ? 'checked' : ''}><b style="flex:1;font-size:14px">Compito attivo</b></label>
-    <div class="grid2">${o ? `<button class="btn red" id="btn-cp-del" data-act="cp-del" data-id="${ds.id}">Elimina</button>` : '<button class="btn" data-act="sheet-close">Annulla</button>'}<button class="btn amber" id="btn-cp-salva" data-act="cp-salva" data-id="${ds.id}">Salva</button></div>`);
+  if(ds.id && !cpLista().find(x => x.id === ds.id)) return;
+  cpEd = ds.id || ''; render();
+  setTimeout(() => { const f = $('cp-form'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80);
 };
+A['cp-edit-chiudi'] = () => { cpEd = null; render(); };
 A['cp-salva'] = ds => {
   if(!can('compiti')) return;
   const M = cpCopia(), nome = val('cp-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('cp-pt')));
@@ -3471,7 +3472,7 @@ A['cp-salva'] = ds => {
   const esenti = vecchi.filter(k => !mostrati.includes(k)).concat(Array.from(document.querySelectorAll('#sheet input.cp-es')).filter(b => b.checked).map(b => b.value)).slice(0, CP_ESENTI_MAX);
   const ord = ds.id && M[ds.id] ? (M[ds.id].ord || 0) : Math.max(0, ...Object.keys(M).map(k => M[k].ord || 0)) + 1;
   const modo = val('cp-modo') === 'squadra' ? 'squadra' : 'fisso', maxP = Math.floor(Number(val('cp-maxp'))), cool = Math.floor(Number(val('cp-cool') || 0));
-  if(!Number.isInteger(maxP) || maxP < 1 || maxP > CP_K_MAX) return toast('Partecipanti massimi: da 1 a ' + CP_K_MAX, 'err');
+  if(!Number.isInteger(maxP) || maxP < 1 || maxP > CP_K_MAX) return toast('Persone da estrarre: da 1 a ' + CP_K_MAX, 'err');
   if(!Number.isInteger(cool) || cool < 0 || cool > 60) return toast('Frequenza non valida (0–60 giorni)', 'err');
   M[id] = {nome, pt, on: !!($('cp-on') && $('cp-on').checked), ord, esenti, modo, maxP, cool};
   cpSalvaMappa(M, 'Compito salvato');
@@ -3490,7 +3491,7 @@ function cpSposta(id, dir){
   const L = cpLista(), i = L.findIndex(c => c.id === id), j = i + dir; if(i < 0 || j < 0 || j >= L.length) return;
   const M = cpCopia(); L.forEach((c, k) => { M[c.id].ord = k + 1; });
   const t = M[L[i].id].ord; M[L[i].id].ord = M[L[j].id].ord; M[L[j].id].ord = t;
-  cpSalvaMappa(M, 'Ordine aggiornato');
+  cpSalvaMappa(M, 'Ordine aggiornato', true);
 }
 A['cp-su'] = ds => cpSposta(ds.id, -1);
 A['cp-giu'] = ds => cpSposta(ds.id, 1);
@@ -4582,6 +4583,7 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
+  if(el && el.dataset.chg === 'cp-modo'){ const h = $('cp-modo-hint'); if(h) h.textContent = cpHintModo(el.value === 'squadra' ? 'squadra' : 'fisso'); }
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
   if(el && el.dataset.chg === 'ac-upd') acAggiorna();
   if(el && el.dataset.chg === 'bf-upd') bfAggiorna();
