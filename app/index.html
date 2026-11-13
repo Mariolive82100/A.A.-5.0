@@ -110,7 +110,6 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 @keyframes gm-pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 .home .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.55;pointer-events:none;z-index:0}
 .home .grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.home .grid .gbtn:last-child:nth-child(odd){grid-column:1/-1;min-height:min(22vh,150px)}
 .gbtn{position:relative;min-height:min(30vh,210px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px;border-radius:26px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);color:var(--tx);font-weight:800;font-size:clamp(19px,5.4vw,27px);line-height:1.15;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .gbtn:active{transform:scale(.97)}
 .gbtn:disabled{opacity:.42;filter:grayscale(.5)}
@@ -371,7 +370,7 @@ header.hasprize{padding-bottom:38px}
   main,main.wide{max-width:1260px;padding:22px 30px 48px}
   .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start}
   .rp-grid>#card-compiti{grid-column:1/-1}
-  main[data-p="bar"] .home .grid{grid-template-columns:repeat(3,1fr)}
+  main[data-p="bar"] .home .grid{grid-template-columns:repeat(4,1fr)}
   main[data-p="bar"] .gbtn{min-height:190px}
   main[data-p="bar"]>*{max-width:1100px;margin-left:auto;margin-right:auto}
   table{width:100%}
@@ -478,7 +477,7 @@ header.hasprize{padding-bottom:38px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.43.0';
+const VERSION = '1.43.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1339,8 +1338,7 @@ function pBar(d){
       <button class="btn amber block" id="btn-ricarica" data-act="ricarica-nuova">➕ Ricarica o rimborso</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
     </div>
-    <div style="margin-top:8px"><button class="btn regalo block" id="btn-crediti-home" data-act="crediti-menu">🎁 Regala o scambia crediti</button></div>
-    ${!ptMaster() ? '' : (() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
+        ${!ptMaster() ? '' : (() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
     ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
@@ -1354,7 +1352,8 @@ function pBar(d){
     <div class="grid">
       <button class="gbtn" id="btn-caffe" data-act="caffe-menu" ${noCaffe ? 'disabled' : ''}><span class="em">☕</span>Paga caffè<small>${noCaffe ? 'credito insufficiente' : eur(pc) + ' l\'uno'}</small></button>
       <button class="gbtn" id="btn-snack" data-act="snack" ${noSnack ? 'disabled' : ''}><span class="em">🍫</span>Acquista snack${noSnack ? `<small>${snVuoto ? 'nessuno snack disponibile' : 'credito insufficiente'}</small>` : ''}</button>
-      <button class="gbtn" id="btn-benfatto" data-act="benfatto"><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'gettone usato'}</small></button>
+      <button class="gbtn" id="btn-benfatto" data-act="benfatto" ${bfRestanti() > 0 ? '' : 'disabled'}><span class="em">👏</span>Ben fatto!<small>${!onP('ptBfOn') && bfRestanti() > 0 ? 'senza punti' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone' : ' gettoni') : 'Disponibile ' + bfCountdown()}</small></button>
+      <button class="gbtn" id="btn-crediti-home" data-act="crediti-menu"><span class="em">🎁</span>Regala o scambia crediti<small>Tra colleghi</small></button>
     </div>
   </div>
   ${bacheca()}
@@ -3983,6 +3982,11 @@ function bfInizioPeriodo(){
 function bfRinnovo(){
   const i = new Date(bfInizioPeriodo());
   return (bfPeriodo() === 'mese' ? new Date(i.getFullYear(), i.getMonth() + 1, 1) : new Date(i.getFullYear(), i.getMonth(), i.getDate() + 7)).toLocaleDateString('it-IT', {weekday: 'long', day: 'numeric', month: 'long'});
+}
+function bfCountdown(){
+  const i = new Date(bfInizioPeriodo()), f = bfPeriodo() === 'mese' ? new Date(i.getFullYear(), i.getMonth() + 1, 1) : new Date(i.getFullYear(), i.getMonth(), i.getDate() + 7);
+  const min = Math.max(0, Math.ceil((f.getTime() - Date.now()) / 60000)), g = Math.floor(min / 1440), h = Math.floor(min % 1440 / 60), m = min % 60;
+  return 'tra ' + (g ? `${g}g ${h}h` : h ? `${h}h ${m}m` : `${m}m`);
 }
 function bfUsati(){
   const ini = bfInizioPeriodo(), d = derived();
