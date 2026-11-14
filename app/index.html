@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.56.0';
+const VERSION = '1.57.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1345,8 +1345,8 @@ function pBar(d){
     <small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" id="home-saldo" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
     <div class="grid2" style="gap:8px">
-      <button class="btn amber block" id="btn-ricarica" data-act="ricarica-nuova">➕ Ricarica o rimborso</button>
-      <button class="btn green block" id="btn-riscatta" data-act="riscatta-nuovo" ${s > 0 && creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button>
+      <button class="btn amber block" id="btn-ricarica" data-act="ricarica-saldo">➕ Ricarica</button>
+      <button class="btn green block" id="btn-riscatta" data-act="riscatta-menu">💰 Riscatta o rimborso</button>
     </div>
         ${!ptMaster() ? '' : (() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
       return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
@@ -1440,7 +1440,7 @@ function pCrediti(d){
   return `<h2>${ic('wallet')} Crediti ${infoBtn(`1 credito = 1 €. I soldi passano fuori dall'app e un Supervisor conferma.`)}</h2>
   <div class="card" style="text-align:center"><small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
-    <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-nuova">➕ Ricarica o rimborso</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-nuovo" ${creditoLibero() > 0 ? '' : 'disabled'}>💰 Riscatta</button></div>
+    <div class="grid2" style="gap:8px"><button class="btn amber block" id="cr-ricarica" data-act="ricarica-saldo">➕ Ricarica</button><button class="btn green block" id="cr-riscatta" data-act="riscatta-menu">💰 Riscatta o rimborso</button></div>
     <div style="margin-top:8px"><button class="btn regalo block" id="btn-crediti" data-act="crediti-menu">🎁 Regala o scambia crediti</button></div></div>
   ${scambiRicevuti(d)}${scambiInviati(d)}
   ${mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `<div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un Supervisor</div></div><button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : ''}
@@ -1796,7 +1796,7 @@ function pRegolamento(){
     'Ogni prelievo riduce la scorta in inventario. Se un articolo è segnato <b>⚠️ Esaurito</b> non si può acquistare finché non viene ricaricato.'])}
   ${sez('🛒 Spesa e rimborsi', [
     'La <b>Lista della spesa</b> è solo un <b>promemoria</b>: chiunque aggiunge ciò che manca e chi lo compra lo spunta per toglierlo dall\'elenco. Non genera rimborsi.',
-    'Hai anticipato dei soldi per il gruppo (acquisti per la saletta o spese straordinarie come un telegramma o un omaggio autorizzato)? Da Home tocca <b>➕ Ricarica o rimborso → 🧾 Rimborso spesa</b>: indica motivo, importo e se vuoi il rimborso <b>in crediti</b> o in <b>denaro reale</b>.',
+    'Hai anticipato dei soldi per il gruppo (acquisti per la saletta o spese straordinarie come un telegramma o un omaggio autorizzato)? Da Home tocca <b>💰 Riscatta o rimborso → 🧾 Rimborso spesa</b>: indica motivo, importo e se vuoi il rimborso <b>in crediti</b> o in <b>denaro reale</b>.',
     'Il rimborso può essere <b>tutto in crediti</b>, <b>tutto in denaro reale</b> oppure <b>misto</b> (una parte in denaro e una in crediti, con le due quote che sommano esattamente il totale). Per il denaro il Supervisor sceglie contanti o Revolut: la cassa cala solo della quota in denaro e il tuo saldo sale solo della quota in crediti.',
     'Il rimborso vale solo dopo la <b>convalida</b> di un Supervisor ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
@@ -2468,12 +2468,12 @@ function pSpesa(d){
       <div class="av">☐</div><div class="grow"><div class="t" style="white-space:normal;font-size:14px">${esc(x.nome)}</div><div class="d">${esc(nomeBreve(x.richiestoDa) || '(sconosciuto)')} · ${x.ts ? quando(tms(x.ts)) : 'ora'}</div></div></button>
       ${puoDel ? `<button class="iconbtn" style="width:32px;height:32px" data-act="spesa-del" data-id="${x.id}" aria-label="Elimina">${ic('trash','s')}</button>` : ''}</div>`;
   };
-  return `${backHome()}<h2>🛒 Lista della spesa ${infoBtn(`Promemoria condiviso di ciò che manca in saletta. Tocca un articolo quando l'hai comprato per toglierlo dall'elenco. Se hai anticipato dei soldi, chiedi il rimborso da ➕ Ricarica o rimborso in Home.`)}</h2>
+  return `${backHome()}<h2>🛒 Lista della spesa ${infoBtn(`Promemoria condiviso di ciò che manca in saletta. Tocca un articolo quando l'hai comprato per toglierlo dall'elenco. Se hai anticipato dei soldi, chiedi il rimborso da ➕ Ricarica in Home.`)}</h2>
   <div class="card"><div class="row" style="gap:8px;align-items:flex-end"><label class="f" style="flex:1;margin:0"><span>Cosa serve?</span><input class="in" id="sp-nome" maxlength="60" placeholder="es. Caffè in grani" autocomplete="off"></label>
     <button class="btn amber" id="btn-spesa-add" data-act="spesa-aggiungi">${ic('plus','s')} Aggiungi</button></div></div>
   <div class="card"><h3><span>Da comprare</span><b class="mono amber">${attivi.length}</b></h3>
     ${attivi.length ? `<div class="list">${attivi.map(riga).join('')}</div>` : '<div class="empty">Niente da comprare. 🎉</div>'}
-    ${infoBtn(`Tocca un articolo per segnarlo come comprato. Se accanto a «Acquistati di recente» ti sei sbagliato, puoi rimetterlo in lista. Per farti rimborsare una spesa usa ➕ Ricarica o rimborso → Rimborso spesa.`, 'Come funziona')}
+    ${infoBtn(`Tocca un articolo per segnarlo come comprato. Se accanto a «Acquistati di recente» ti sei sbagliato, puoi rimetterlo in lista. Per farti rimborsare una spesa usa 💰 Riscatta o rimborso → Rimborso spesa.`, 'Come funziona')}
   </div>
   ${miei.length ? `<div class="card"><h3><span>${ic('clock','s')} I tuoi in rimborso</span><b class="mono">${miei.length}</b></h3><div class="list">${miei.map(x => { const orfano = st.ready.mv && !d.movs.some(m => m.id === x.richiestaId && m.stato !== 'annullata' && m.stato !== 'rifiutata'); return `<div class="li"><div class="av">⏳</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${esc(x.nome)}</div><div class="d">${orfano ? 'richiesta non inviata' : 'in attesa di convalida'}</div></div>${orfano ? `<button class="btn sm ghost" data-act="spesa-rilascia" data-id="${x.id}">Rimetti in lista</button>` : ''}</div>`; }).join('')}</div>
     <p class="hint" style="margin:8px 0 0">Per annullare la richiesta vai in Notifiche → In attesa.</p></div>` : ''}
@@ -2575,7 +2575,7 @@ function pCassa(d){
     <button class="btn sm green" data-act="cassa-op" data-v="entrata">${ic('in','s')} Entrata</button>
     <button class="btn sm" data-act="cassa-op" data-v="giroconto">${ic('repeat','s')} Giroconto</button></div>
     <button class="btn sm block" style="margin:-4px 0 12px" data-act="cassa-corr">${ic('edit','s')} Correggi saldo (contanti / Revolut)</button>`
-    : `<div class="banner sky">${ic('lock')}<div>Entrate, giroconti e storni li registrano il Creatore e i Supervisor autorizzati. Se hai preso soldi dalla cassa per fare la spesa chiedi il rimborso da <b>➕ Ricarica o rimborso → Rimborso spesa</b> in Home.</div></div>`}
+    : `<div class="banner sky">${ic('lock')}<div>Entrate, giroconti e storni li registrano il Creatore e i Supervisor autorizzati. Se hai preso soldi dalla cassa per fare la spesa chiedi il rimborso da <b>💰 Riscatta o rimborso → Rimborso spesa</b> in Home.</div></div>`}
   <div class="card"><h3>Movimenti di cassa</h3>${righeMov(movC.slice(0, 200), d)}</div>`;
 }
 
@@ -3174,11 +3174,16 @@ A['prendi-snack'] = ds => {
 };
 
 /* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un Supervisor --- */
-A['ricarica-nuova'] = () => openSheet(`<h3>${ic('wallet')} Cosa vuoi fare?</h3>
-  <p class="sub">Scegli se caricare il tuo saldo o farti rimborsare una spesa anticipata per il gruppo.</p>
-  <button class="btn amber block big" id="scelta-ricarica" data-act="ricarica-saldo">💶 Ricarica saldo</button>
-  <button class="btn green block big" id="scelta-rimborso" data-act="rimborso-nuovo" style="margin-top:8px">🧾 Rimborso spesa</button>
-  ${infoBtn(`Ricarica saldo: versi contanti o Revolut e ricevi crediti. Rimborso spesa: hai anticipato dei soldi per la saletta o per il gruppo (acquisti, un telegramma, un omaggio…) e chiedi di essere rimborsato.`, 'Differenza')}`);
+A['riscatta-menu'] = () => {
+  const puoRisc = (saldo(st.mid) || 0) > 0 && creditoLibero() > 0;
+  openSheet(`<h3>${ic('wallet')} Riscatta o rimborso</h3>
+  <p class="sub">Chiedi al gruppo di restituirti valore: crediti convertiti in denaro, oppure una spesa che hai anticipato.</p>
+  <button class="btn green block big" id="scelta-riscatto" data-act="riscatta-nuovo" ${puoRisc ? '' : 'disabled'}>💰 Riscatta crediti in denaro</button>
+  ${puoRisc ? '' : '<p class="hint" style="margin:4px 0 0">Per riscattare servono crediti liberi sul saldo.</p>'}
+  <button class="btn amber block big" id="scelta-rimborso" data-act="rimborso-nuovo" style="margin-top:8px">🧾 Rimborso spesa</button>
+  ${infoBtn(`Riscatta crediti: chiedi al Fondo Gruppo di restituirti denaro in cambio dei tuoi crediti. Rimborso spesa: hai anticipato dei soldi per la saletta o per il gruppo (acquisti, un telegramma, un omaggio…) e chiedi di essere rimborsato in crediti, in denaro o in modo misto.`, 'Differenza')}`);
+};
+A['ricarica-nuova'] = () => A['ricarica-saldo']();
 A['ricarica-saldo'] = () => {
   const deb = debitoLibero(), base = deb > 0 ? deb : 1000;
   openSheet(`<h3>${ic('wallet')} Ricarica crediti</h3>
@@ -4210,7 +4215,7 @@ A['recupera'] = async () => {
   finally { st.busy = false; render(); }
 };
 let offertaAdminAperta = false;
-const REG_KEY = 'regolamento_letto_v23';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
+const REG_KEY = 'regolamento_letto_v24';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
   openSheet(`<h3>📜 Regolamento Aggiornato</h3>
