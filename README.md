@@ -6,7 +6,7 @@ Dati su **Firebase** (Firestore + accesso anonimo), sito pubblicato su **GitHub 
 ```
 app/                    il sito (cio' che viene pubblicato)
   config.js             <- UNICO file da compilare con la config Firebase
-  index.html, sw.js, manifest.webmanifest, icone, vendor/ (SDK Firebase 10.12.2)
+  index.html, sw.js, manifest.webmanifest, icone (SDK Firebase 10.14.1 caricato dal CDN)
 firestore.rules         regole di sicurezza del database
 firestore.indexes.json  indici del database
 firebase.json           configurazione Firebase CLI
