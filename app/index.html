@@ -403,7 +403,7 @@ header.hasonesta .prizepill{padding-right:78px}
 
 <header id="hdr" class="hidden">
   <button class="iconbtn" id="hdr-menu" data-act="drawer" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
-  <button class="iconbtn" id="hdr-reg" style="width:36px;margin-right:-2px" data-act="go" data-p="regolamento" aria-label="Regolamento" title="Regolamento"><span style="font-size:20px;line-height:1">📜</span><span class="rdot hidden" id="hdr-reg-dot"></span></button>
+
   <div class="brand" data-act="go" data-p="bar" style="cursor:pointer" role="button" aria-label="Home">
     <b id="hdr-name"><svg class="i s"><use href="#i-coffee"/></svg>Armieri 5.0</b>
     <small><span class="dot" id="syncdot"></span><span id="hdr-sub"></span></small>
@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.62.0';
+const VERSION = '1.63.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1043,7 +1043,7 @@ function doRender(){
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos'); sb.textContent = eurS(s); sb.dataset.p = 'crediti'; sb.setAttribute('aria-label', 'Saldo: tocca per ricaricare');
   aggiornaPillola(d, false);
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
-  $('hdr-reg-dot').classList.toggle('hidden', !!LS.get(REG_KEY));
+  const rd = $('hdr-reg-dot'); if(rd) rd.classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden'); $('hdr-search').classList.toggle('hidden', !st.isAdmin);
   const tabs = [['bar','Home','coffee'],['briefing','Briefing','clipboard'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = cn.tot, cs = cpSegnali();
