@@ -175,7 +175,7 @@ service cloud.firestore {
           .concat(can('cassa') ? ['revolutAttivo'] : [])
           .concat(can('compiti') ? ['compiti', 'resaKg', 'scalaDa', 'puntiPulizia', 'ptCaffe', 'ptSnack', 'ptSpesa', 'ptBenFatto', 'sogliaPunti', 'creditiSoglia',
               'ptSnackEuro', 'ptSpesaEuro', 'ptSpesaMax', 'podioOn', 'podio1', 'podio2', 'podio3', 'bfN', 'bfPeriodo', 'puntiPerCredito', 'puntiCaffePerCredito',
-              'ptOn', 'ptCaffeOn', 'ptBfOn'] : []);
+              'ptOn', 'ptCaffeOn', 'ptBfOn', 'sfide'] : []);
       }
 
       // Documento del gruppo (nome, prezzo caffe', quota annua)
@@ -225,6 +225,8 @@ service cloud.firestore {
         && request.resource.data.get('bfPeriodo', 'settimana') in ['settimana', 'mese']
         // compiti di oggi: mappa di configurazione (max 20 voci)
         && request.resource.data.get('compiti', {}) is map && request.resource.data.get('compiti', {}).size() <= 20
+        // sfide settimanali e mensili: mappa nel documento del gruppo (max 30 voci; forma delle voci validata dall'app)
+        && request.resource.data.get('sfide', {}) is map && request.resource.data.get('sfide', {}).size() <= 30
         && request.resource.data.get('puntiPerCredito', 3) is int && request.resource.data.get('puntiPerCredito', 3) >= 1
         && request.resource.data.get('puntiCaffePerCredito', 30) is int && request.resource.data.get('puntiCaffePerCredito', 30) >= 1
         && request.resource.data.creatoDa == resource.data.creatoDa
@@ -235,7 +237,7 @@ service cloud.firestore {
         && request.resource.data.get('bachecaAperta', false) is bool
         )
         && ((isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(chiaviGruppoConsentite()))
-            || (isSupervisor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['compiti']))));
+            || (isSupervisor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['compiti', 'sfide']))));
 
       // PIN amministratore: nessuno puo' leggerlo dall'app
       match /segreti/{doc} {

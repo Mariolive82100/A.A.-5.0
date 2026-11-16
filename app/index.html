@@ -463,6 +463,7 @@ header.hasonesta .prizepill{padding-right:78px}
   <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-1.97 1.5C7 19 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98 1.97 1.5C17 19 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
   <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/></symbol>
   <symbol id="i-brush" viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
@@ -483,7 +484,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.65.0';
+const VERSION = '1.66.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -975,7 +976,7 @@ function openSheet(html){
   $('sheet').classList.add('on'); $('sheet-ov').classList.add('on');
   const f = $('sheet').querySelector('[autofocus]'); if(f) setTimeout(() => f.focus(), 250);
 }
-function closeSheet(){ cpStop(); cpE = null; $('sheet').classList.remove('on'); $('sheet-ov').classList.remove('on'); }
+function closeSheet(){ $('sheet').classList.remove('on'); $('sheet-ov').classList.remove('on'); }
 const val = id => { const e = $(id); return e ? e.value.trim() : ''; };
 const radio = name => { const e = document.querySelector(`input[name="${name}"]:checked`); return e ? e.value : null; };
 function segOpts(name, opts, sel, off){
@@ -991,7 +992,7 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], compiti:['Briefing','clipboard'], briefing:['Briefing','clipboard'], supervisor:['Gestione Supervisor','shield'], pin:['Gestione PIN','lock'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], sfide:['Sfide','trophy'], supervisor:['Gestione Supervisor','shield'], pin:['Gestione PIN','lock'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote annuali','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Gestione Soci','users'], statistiche:['Classifica e statistiche','chart'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
@@ -1035,9 +1036,9 @@ function doRender(){
 
   $('syncdot').className = 'dot ' + ({ok:'ok', off:'off', err:'err'}[st.sync] || '');
   $('hdr-sub').textContent = st.sync === 'err' ? 'Errore: ' + st.syncErr : st.sync === 'off' ? 'Offline · si sincronizza dopo' : st.sync === 'ok' ? (st.gruppo.nome || 'Saletta') : 'Collegamento…';
+  if(st.page === 'briefing' || st.page === 'compiti') st.page = 'sfide';   // il vecchio Briefing è diventato Sfide
   if(!pagineConsentite().includes(st.page)) st.page = 'bar';
   if(st.page === 'statistiche'){ st.page = 'classifiche'; st.clMod = 'stat'; }
-  if(st.page === 'compiti') st.page = 'briefing';
   const cn = contatori(d);
   $('hdr-name').innerHTML = `${ic('coffee','s')}${esc(nomeBreve(st.mid))}`;
   const sb = $('hdr-sb'); sb.className = 'sbadge ' + (s < 0 ? 'neg' : 'pos'); sb.textContent = eurS(s); sb.dataset.p = 'crediti'; sb.setAttribute('aria-label', 'Saldo: tocca per ricaricare');
@@ -1045,15 +1046,15 @@ function doRender(){
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
   const rd = $('hdr-reg-dot'); if(rd) rd.classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden'); $('hdr-search').classList.toggle('hidden', !st.isAdmin);
-  const tabs = [['bar','Home','coffee'],['briefing','Briefing','clipboard'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
+  const tabs = [['bar','Home','coffee'],['sfide','Sfide','trophy'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = cn.tot, cs = cpSegnali();
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'briefing' && cs.dot ? '<span class="tdot" id="dot-briefing" aria-label="Compiti da svolgere"></span>' : ''}${p === 'briefing' && cs.conv ? `<span class="tb" id="tb-briefing">${cs.conv}</span>` : ''}${p === 'saletta' && perleNuova() ? '<span class="tdot" id="dot-saletta" aria-label="Nuova perla nella bacheca"></span>' : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'sfide' && cs.conv ? `<span class="tb" id="tb-sfide">${cs.conv}</span>` : ''}${p === 'saletta' && perleNuova() ? '<span class="tdot" id="dot-saletta" aria-label="Nuova perla nella bacheca"></span>' : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   renderDrawer();
 
-  const fn = {bar:pBar, onesta:pOnesta, caffereg:pCaffeReg, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, briefing:pBriefing, compiti:pBriefing, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, onesta:pOnesta, caffereg:pCaffeReg, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, sfide:pSfide, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide'); main.dataset.p = st.page;
   main.innerHTML = fn(d);
   restore();
@@ -1117,7 +1118,7 @@ const QS_VOCI = [
   {e:'🔐', t:'Gestione PIN', s:'Reset PIN, PIN temporaneo', perm:'soci', p:'pin', k:'pin reset temporaneo codice password sblocco'},
   {e:'🛡️', t:'Gestione Supervisor', s:'Nomina, permessi e ruoli', perm:'creatore', p:'supervisor', k:'supervisor permessi permesso ruoli ruolo nomina revoca creatore admin amministratore'},
   {e:'⚙️', t:'Regole punti e premi', s:'Punteggi, tessera, soglia, podio', perm:'compiti', p:'regole', k:'punti tessera fedelta ben fatto soglia podio premi regole punteggi scala credito conversione'},
-  {e:'🎯', t:'Gestione compiti', s:'Briefing · crea, modifica, elimina', perm:'compiti', p:'briefing', a:'cp-catalogo', k:'compiti compito briefing incarichi sorteggio esenti squadra'},
+  {e:'🏆', t:'Gestione sfide', s:'Sfide · crea, modifica, attiva, elimina', perm:'compiti', p:'sfide', a:'sf-panoramica', k:'sfide sfida settimanali mensili settimanale mensile punti incarichi sospeso compiti briefing'},
   {e:'💾', t:'Backup e ripristino', s:'Esporta i dati, ripristina', perm:'sistema', p:'backup', k:'backup esporta esportazione ripristino ripristina scarica dati salvataggio'},
   {e:'📦', t:'Chiusura periodo', s:'Chiusura, estratti, archivio', perm:'sistema', p:'chiusura', k:'chiusura periodo estratti estratto archivio chiudere'},
   {e:'📢', t:'Bacheca, eventi e sondaggi', s:'Home · avvisi, annunci, sondaggi, eventi', perm:null, p:'bar', a:'bacheca', k:'bacheca avviso avvisi annuncio annunci info novita sondaggio sondaggi evento eventi compleanno compleanni votazione'},
@@ -1155,7 +1156,7 @@ function qsFiltra(){
 }
 
 const SALETTA_SUB = ['saletta','inventario','gioco','ruota','perle','spesa'];
-const PAGINE_COLLEGA = ['bar','onesta','caffereg','briefing','saletta','classifiche','spesa','gioco','inventario','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
+const PAGINE_COLLEGA = ['bar','onesta','caffereg','sfide','saletta','classifiche','spesa','gioco','inventario','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
 const PAGINE_ADM = PAGINE_UTENTE.concat(['onesta','regole','backup','chiusura','membri','quote','pin','supervisor','statistiche','cassa','feed']);
 /* ogni voce di gestione compare solo a chi ha il permesso (il Creatore ha tutto) */
@@ -1811,19 +1812,16 @@ function pRegolamento(){
     'Il rimborso può essere <b>tutto in crediti</b>, <b>tutto in denaro reale</b> oppure <b>misto</b> (una parte in denaro e una in crediti, con le due quote che sommano esattamente il totale). Per il denaro il Supervisor sceglie contanti o Revolut: la cassa cala solo della quota in denaro e il tuo saldo sale solo della quota in crediti.',
     'Il rimborso vale solo dopo la <b>convalida</b> di un Supervisor ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
-  ${sez('🎯 Compiti di oggi', [
-    'Nella scheda <b>📋 Briefing</b> (la seconda in basso, dopo Home): il Creatore e i Supervisor con il permesso «Compiti e Regole» decidono i compiti (pulizie, macchinetta, secchio, spesa…), ciascuno con il suo punteggio. Tutti i colleghi li consultano e registrano quelli svolti.',
-    'Su ogni compito premi <b>🎲 Sorteggia</b>: l\'app ti chiede <b>quante persone</b> vuoi sorteggiare e poi parte il sorteggio (chi gestisce i compiti ha anche <b>✏️ Modifica</b> sulla stessa riga). Chi ha svolto meno incarichi di quel tipo nel periodo ha più probabilità di uscire. Chi è escluso da chi gestisce i compiti non partecipa.',
-    'Chi esce deve essere <b>presente</b>: se non c\'è o non può, si scarta e si estrae un altro. L\'incarico vale solo dopo «È presente».',
-    'Svolto il compito premi <b>Ho fatto!</b>: chi gestisce i compiti convalida e solo allora ricevi i punti. Se rifiuta o annulla, niente punti e il compito torna sorteggiabile.',
-    'Non ci sono scadenze né orari: l\'incarico resta aperto finché non viene concluso o annullato da chi gestisce i compiti. Un solo incarico alla volta per compito.',
+  ${sez('🏆 Sfide', [
+    'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi due categorie: <b>Sfide Settimanali</b> e <b>Sfide Mensili</b>. Ogni pulsante indica quante sfide sono attive; toccalo per vedere l\'elenco.',
+    'Solo il Creatore e i Supervisor con il permesso «Sfide e Regole» possono <b>creare, modificare, attivare o disattivare ed eliminare</b> le sfide. Ogni sfida ha un titolo o descrizione, la periodicità (settimanale o mensile), i punti in palio e lo stato (attiva o disattiva). I colleghi vedono solo le sfide attive.',
+    'In questa prima fase le sfide sono soltanto catalogate: partecipazione e assegnazione dei punti arriveranno con i prossimi aggiornamenti.',
+    'Il vecchio sistema dei compiti con sorteggio non c\'è più. Gli incarichi già assegnati restano in <b>Incarichi in sospeso</b> (visibili solo a chi gestisce le sfide), dove si convalidano o si annullano; i punti già convalidati restano.',
     '🛡️ <b>Supervisor:</b> colleghi di fiducia nominati dal Creatore, senza scadenza finché non revocati. Ognuno ha solo i permessi che il Creatore gli concede (vedi «Ruoli»).',
-    'Nessuno convalida un <b>proprio</b> compito: serve un altro Supervisor con il permesso «Compiti e Regole» o il Creatore (unica eccezione: il Creatore, se è l\'unico a poter convalidare).',
-    '🛒 Anche <b>chi va a fare la spesa</b> si decide da qui; la Lista della spesa è solo un promemoria degli articoli da comprare.',
-    !ptMaster() ? '⚠️ Sistema punti disattivato: i compiti sono bloccati.' : ''])}
+    'Nessuno convalida un <b>proprio</b> incarico in sospeso: serve un altro Supervisor con il permesso «Sfide e Regole» o il Creatore (unica eccezione: il Creatore, se è l\'unico a poter convalidare).'])}
     ${sez('⭐ Punti Collega Modello', [
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
-    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati (sopra) · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).${podioOn() ? ` 🏅 Podio del mese: bonus di ${podioPt(1)}, ${podioPt(2)} e ${podioPt(3)} punti ai primi tre in classifica del mese solare, assegnati dal Supervisor a inizio mese.` : ''}`,
+    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).${podioOn() ? ` 🏅 Podio del mese: bonus di ${podioPt(1)}, ${podioPt(2)} e ${podioPt(3)} punti ai primi tre in classifica del mese solare, assegnati dal Supervisor a inizio mese.` : ''}`,
     `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}). La classifica non cambia.`,
     `<b>Ben fatto!</b> riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
@@ -1838,9 +1836,9 @@ function pRegolamento(){
       : '🔒 <b>Oggi pubblicano solo il Creatore e i Supervisor con «Strumenti di Sistema».</b> I colleghi consultano la bacheca e votano; i <b>compleanni</b> li può inserire chiunque.',
     'Il Creatore (e i Supervisor con «Strumenti di Sistema») possono modificare, fissare in evidenza, chiudere o eliminare qualsiasi voce.'])}
   ${sez('🔑 Ruoli', [
-    '<b>Collega:</b> registra consumi, spese, ricariche e regali; consulta e svolge i compiti nel Briefing; riceve notifiche personali.',
+    '<b>Collega:</b> registra consumi, spese, ricariche e regali; consulta le sfide nella scheda Sfide; riceve notifiche personali.',
     '<b>Creatore:</b> ha tutti i poteri, non può essere revocato ed è l\'unico che nomina e revoca i Supervisor e ne sceglie i permessi (☰ → Gestione Supervisor). Solo lui può ripristinare un backup.',
-    '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti — anche impostando direttamente il nuovo saldo —, PIN, archivia / espelli) · 🎯 <i>Compiti e Regole</i> (compiti nel Briefing, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
+    '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti — anche impostando direttamente il nuovo saldo —, PIN, archivia / espelli) · 🏆 <i>Sfide e Regole</i> (sfide, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
     '<b>Accesso:</b> si entra solo con il codice del gruppo, che solo il Creatore può vedere e mandare come link (☰ → Impostazioni → «Invita i colleghi»); la condivisione dell\'app e il codice non sono visibili a Supervisor e colleghi, a cui basta chiederlo al Creatore. Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
@@ -1851,7 +1849,7 @@ function pRegolamento(){
     'Backup (.json e .csv) almeno ogni 7 giorni.'])}`;
 }
 
-/* ---------- COMPITI DI OGGI ---------- */
+/* ---------- SFIDE (ex Briefing) ---------- */
 const avvisoPuntiOff = () => ptMaster() ? '' : `<div class="banner amber" id="punti-off">${ic('alert')}<div class="grow"><b>Sistema punti disattivato</b><br><span style="font-size:12.5px">Nessun punto viene accreditato: le classifiche mostrano lo storico.</span></div></div>`;
 /* riga di un incarico in corso: chi, da quanto, azione coerente con lo stato */
 function cpRiga(m, me){
@@ -1873,48 +1871,50 @@ function cpRiga(m, me){
       <div class="d">+${m.punti || 0} pt · ${eta}${da}${m.stato === 'attesa' ? ' · svolto, da convalidare' : ''}</div></div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${az}</div></div>`;
 }
-const cpPerPt = (a, b) => b.pt - a.pt || (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome);
-const cpAperte = new Set();   // schede classifica espanse (tutte chiuse di default)
-/* classifica per compito: volte e punti dei soli incarichi convalidati nel periodo in memoria; in cima chi ha fatto meno (più probabile al prossimo sorteggio) */
-function cpClassifiche(){
-  const cat = cpLista().filter(c => c.on !== false).sort(cpPerPt); if(!cat.length) return '';
-  const inc = cpIncarichi().filter(m => m.stato === 'confermata'), att = membriAttivi();
-  const nm = id => esc(nomeBreve(id) || nomeM(id));
-  return `<div class="card" id="cp-classifiche"><h3>🏆 Classifica per compito</h3>
-    <p class="hint" style="margin:0 0 8px">Periodo corrente. In cima chi lo ha svolto meno volte: è il più probabile al prossimo sorteggio.</p>
-    ${cat.map(c => {
-      const R = {}; inc.filter(m => m.cp === c.id).forEach(m => { const r = R[m.mid] = R[m.mid] || {n: 0, pt: 0, t: 0}; r.n++; r.pt += m.punti || 0; r.t = Math.max(r.t, m.t || 0); });
-      const righe = att.filter(m => !c.esenti.includes(m.id)).map(m => ({id: m.id, nome: nm(m.id), ...(R[m.id] || {n: 0, pt: 0, t: 0})})).sort((a, b) => a.n - b.n || a.t - b.t || a.nome.localeCompare(b.nome));
-      const esenti = att.filter(m => c.esenti.includes(m.id)).map(m => nm(m.id));
-      const min = righe.length ? righe[0].n : 0, top = righe.filter(r => r.n === min), vis = top.slice(0, 3).map(r => r.nome).join(', ') + (top.length > 3 ? ` +${top.length - 3}` : '');
-      const open = cpAperte.has(c.id);
-      return `<div class="pbar" id="cp-sc-${c.id}" style="padding:0;overflow:hidden"><button class="btn ghost block" style="display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;border:0;padding:11px 14px;height:auto" data-act="cp-sc" data-id="${c.id}" aria-expanded="${open}">
-        <span style="min-width:0"><b>🎯 ${esc(c.nome)}</b> ${cpPill(c)}${righe.length ? `<span class="hint" style="display:block;margin-top:3px;font-size:11.5px;white-space:normal">Più probabili: ${vis} (${min} ${min === 1 ? 'volta' : 'volte'})</span>` : ''}</span><span class="mut">${open ? '▲' : '▼'}</span></button>
-        ${open ? `<div style="padding:0 14px 12px">${righe.length ? `<table><thead><tr><th>#</th><th>Collega</th><th class="c">Volte</th><th class="c">Punti</th><th class="c">Ultima</th></tr></thead><tbody>
-          ${righe.map((r, i) => `<tr><td class="mut mono">${i + 1}</td><td><b>${r.nome}</b>${r.id === st.mid ? ' <span class="pill violet">tu</span>' : ''}</td><td class="c mono">${r.n}</td><td class="c mono violet">${r.pt}</td><td class="c mut" style="font-size:11px">${r.t ? quando(r.t) : '—'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nessun collega disponibile.</div>'}
-          ${esenti.length ? `<p class="hint" style="margin:8px 0 0;font-size:11.5px">Esenti: ${esenti.join(', ')}</p>` : ''}</div>` : ''}</div>`;
-    }).join('')}
-  </div>`;
+/* Catalogo delle sfide nella mappa «sfide» del documento del gruppo, già in memoria (st.gruppo): nessuna lettura né listener in più.
+   sfide: {id: {nome, per: 'sett'|'mese', pt, on, ord}} (max 30). Le gestisce solo chi ha il permesso «Sfide e Regole» (can('compiti')). */
+const SF_MAX = 30;
+const SF_PER = {sett: ['Sfide Settimanali', '📅', 'Settimanale'], mese: ['Sfide Mensili', '🗓️', 'Mensile']};
+let sfSez = null;   // sezione aperta: null = panoramica, 'sett' | 'mese'
+let sfEd = null;   // sfida in modifica sul posto: null = nessuna, '' = nuova, altrimenti l'id
+const sfMap = () => { const o = st.gruppo && st.gruppo.sfide; return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; };
+const sfCopia = () => JSON.parse(JSON.stringify(sfMap()));
+const sfLista = per => { const M = sfMap(); return Object.keys(M).filter(k => M[k] && typeof M[k].nome === 'string' && (M[k].per === 'sett' || M[k].per === 'mese')).map(k => ({...M[k], id: k, pt: Number.isInteger(M[k].pt) ? M[k].pt : 0})).filter(x => !per || x.per === per).sort((a, b) => (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome)); };
+const sfAttive = per => sfLista(per).filter(x => x.on !== false);
+const sfConteggio = n => n === 0 ? 'nessuna sfida attiva' : n === 1 ? '1 sfida attiva' : n + ' sfide attive';
+function sfForm(o, per){
+  const x = o || {nome: '', per, pt: 10, on: true}, id = o ? o.id : '';
+  return `<div class="card" id="sf-form" style="margin:0 0 12px;border:1px solid var(--amber,#f5a524)"><h3>${o ? '✏️ Modifica sfida' : '＋ Nuova sfida'}</h3>
+    <label class="f"><span>Titolo / Descrizione</span><input class="in" id="sf-nome" maxlength="80" value="${esc(x.nome)}"></label>
+    <label class="f"><span>Periodicità</span><select class="in" id="sf-per"><option value="sett" ${x.per === 'sett' ? 'selected' : ''}>Settimanale</option><option value="mese" ${x.per === 'mese' ? 'selected' : ''}>Mensile</option></select></label>
+    <label class="f"><span>Punti in palio</span><input class="in mono" id="sf-pt" inputmode="numeric" value="${x.pt}"></label>
+    <label class="check"><input type="checkbox" id="sf-on" ${x.on !== false ? 'checked' : ''}><b style="flex:1;font-size:14px">Sfida attiva</b></label>
+    <div class="grid2" style="margin-top:8px"><button class="btn" id="btn-sf-annulla" data-act="sf-edit-chiudi">Annulla</button><button class="btn amber" id="btn-sf-salva" data-act="sf-salva" data-id="${id}">Salva</button></div>
+    ${o ? `<button class="btn red block" id="btn-sf-del" data-act="sf-del" data-id="${id}" style="margin-top:8px">🗑 Elimina sfida</button>` : ''}</div>`;
 }
-function pBriefing(d){
-  const me = st.mid, cat = cpAttivi().slice().sort(cpPerPt), aperti = cpAperti().slice().sort((a, b) => a.t - b.t), nSp = nSpesa();
-  const occupato = id => aperti.some(m => m.cp === id), gest = can('compiti');
-  const link = nSp ? `<button class="avv amber" id="cp-spesa-link" data-act="go" data-p="spesa"><div class="avv-t">🛒 ${nSp} ${nSp === 1 ? 'articolo' : 'articoli'} da comprare in lista</div><div class="avv-m">Apri la Lista della spesa →</div></button>` : '';
-  return `<h2>${ic('clipboard')} Briefing</h2><p class="sub" style="margin-bottom:12px">I compiti della saletta. Tocca un compito: il sorteggio sceglie chi lo svolge. Quando hai finito premi «Ho fatto!»: chi gestisce i compiti convalida e i punti arrivano.</p>
-  ${avvisoPuntiOff()}${bannerSup()}${link}${cpConvCard()}
-  <div class="card" id="cp-catalogo"><h3>🎲 Sorteggio istantaneo</h3>
-    ${(gest ? cpLista() : cat).length ? (gest ? cpLista() : cat).map(c => cpEd === c.id ? cpFormInline(c) : `<div class="cp-item" id="cp-item-${c.id}" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 11px;border-radius:14px;background:var(--bg2,rgba(255,255,255,.04))">
-      <div style="min-width:0;flex:1 1 120px"><b>🎯 ${esc(c.nome)}</b><div class="mono mut" style="font-size:12px;margin-top:2px">${occupato(c.id) ? 'in corso' : c.on === false ? 'spento' : cpPtTxt(c)}</div></div>
-      <button class="btn sm amber" id="btn-cp-${c.id}" data-act="cp-apri" data-id="${c.id}" ${me && !occupato(c.id) && c.on !== false ? '' : 'disabled'}>🎲 Sorteggia</button>
-      ${gest ? `<button class="btn sm" id="btn-cp-mod-${c.id}" data-act="cp-edit" data-id="${c.id}">✏️ Modifica</button>` : ''}</div>`).join('')
-      : `<p class="hint" id="cp-vuoto" style="margin:0">${ptMaster() ? 'Nessun compito configurato.' : 'Sistema punti disattivato: i compiti sono bloccati.'}</p>`}
-    ${cpEd === '' ? cpFormInline(null) : ''}
-    ${gest ? `<button class="btn amber block" id="btn-cp-nuovo" data-act="cp-edit" data-id="" ${cpEd !== null || cpLista().length >= CP_MAX ? 'disabled' : ''}>＋ Nuovo compito</button>${cpLista().length ? '' : `<button class="btn block" id="btn-cp-sugg" data-act="cp-sugg" style="margin-top:8px">Carica compiti suggeriti</button>`}` : ''}
-  </div>
-  <div class="card" id="cp-incarichi"><h3>📋 Incarichi in corso ${aperti.length ? `<span class="pill violet">${aperti.length}</span>` : ''}</h3>
-    ${aperti.length ? `<div class="list">${aperti.map(m => cpRiga(m, me)).join('')}</div>` : '<div class="empty" id="cp-nessuno">Nessun incarico in corso.</div>'}
-  </div>
-  ${cpClassifiche()}`;
+function pSfide(d){
+  const gest = can('compiti');
+  if(!sfSez){
+    const aperti = gest ? cpAperti().slice().sort((a, b) => a.t - b.t) : [];
+    return `<h2>${ic('trophy')} Sfide</h2><p class="sub" style="margin-bottom:12px">Scegli una categoria per vedere le sfide in corso.</p>
+    <div class="grid2" id="sf-panoramica" style="gap:12px">
+      ${['sett', 'mese'].map(k => `<button class="gbtn sm" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}"><span class="em">${SF_PER[k][1]}</span>${SF_PER[k][0]}<small>${sfConteggio(sfAttive(k).length)}</small></button>`).join('')}
+    </div>
+    ${aperti.length ? `<div class="card" id="sf-sospesi" style="margin-top:14px"><h3>📋 Incarichi in sospeso <span class="pill violet">${aperti.length}</span></h3>
+      <p class="hint" style="margin:0 0 8px">Compiti del vecchio Briefing ancora da svolgere o da convalidare: convalidali o annullali per chiuderli.</p>
+      <div class="list">${aperti.map(m => cpRiga(m, st.mid)).join('')}</div></div>` : ''}`;
+  }
+  const [titolo, em] = SF_PER[sfSez], L = gest ? sfLista(sfSez) : sfAttive(sfSez);
+  return `<button class="btn link" style="padding:0;margin:0 0 8px" id="sf-back" data-act="sf-back">← Sfide</button>
+  <h2>${em} ${titolo}</h2><p class="sub" style="margin-bottom:12px">${sfConteggio(sfAttive(sfSez).length)}</p>
+  <div class="card" id="sf-lista">
+    ${L.length ? L.map(x => sfEd === x.id ? sfForm(x, sfSez) : `<div class="cp-item" id="sf-item-${x.id}" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 11px;border-radius:14px;background:var(--bg2,rgba(255,255,255,.04))">
+      <div style="min-width:0;flex:1 1 140px"><b>🏆 ${esc(x.nome)}</b><div class="mono mut" style="font-size:12px;margin-top:2px">${x.pt} pt in palio${x.on === false ? ' · disattiva' : ''}</div></div>
+      ${gest ? `<button class="btn sm" id="btn-sf-mod-${x.id}" data-act="sf-edit" data-id="${x.id}">✏️ Modifica</button><button class="btn sm ghost" id="btn-sf-tgl-${x.id}" data-act="sf-tgl" data-id="${x.id}">${x.on === false ? 'Attiva' : 'Disattiva'}</button>` : ''}</div>`).join('')
+      : `<p class="hint" id="sf-vuoto" style="margin:0">${gest ? 'Nessuna sfida in questa categoria: creane una.' : 'Nessuna sfida attiva al momento.'}</p>`}
+    ${sfEd === '' ? sfForm(null, sfSez) : ''}
+    ${gest ? `<button class="btn amber block" id="btn-sf-nuova" data-act="sf-edit" data-id="" ${sfEd !== null || sfLista().length >= SF_MAX ? 'disabled' : ''}>＋ Nuova sfida</button>` : ''}
+  </div>`;
 }
 
 /* ---------- EVENTI ---------- */
@@ -2965,7 +2965,7 @@ A['aggiorna'] = async () => {
 };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
-A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['go'] = ds => { if(ds.p === 'sfide'){ sfSez = null; sfEd = null; } if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
 
 /* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
@@ -3312,134 +3312,12 @@ A['conferma-paga-spesa'] = ds => {
     .then(() => { aggiornaArticoli(mv, true); closeSheet(); toast('Spesa pagata dalla cassa ✓'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
-/* --- Compiti di oggi: catalogo nella mappa «compiti» del documento del gruppo (nessuna lettura in più). Il sorteggio avviene in memoria;
-   si scrive su Firestore solo alla conferma «È presente»: un movimento 'compito' per incaricato, con ID deterministico (create-only). --- */
-const CP_MAX = 20, CP_K_MAX = 5, CP_ESENTI_MAX = 30;
-const cpMap = () => { const o = st.gruppo && st.gruppo.compiti; return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; };
-const cpLista = () => { const M = cpMap(); return Object.keys(M).filter(k => M[k] && typeof M[k].nome === 'string').map(k => ({...M[k], id: k, pt: Number.isInteger(M[k].pt) ? M[k].pt : 0, esenti: Array.isArray(M[k].esenti) ? M[k].esenti.filter(x => typeof x === 'string') : []})).sort((a, b) => (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome)); };
-/* modalita' dei punti: 'fisso' = punti a ciascun incaricato; 'squadra' = monte punti diviso (per difetto) tra i presenti */
-const cpModo = c => c && c.modo === 'squadra' ? 'squadra' : 'fisso';
-/* persone estratte: le sceglie chi sorteggia (1..CP_K_MAX). Solo i compiti a monte di squadra salvati con un vecchio limite 'maxP' restano limitati finche' non si salvano da Modifica (le regole del database controllano quel limite) */
-const cpKMax = c => cpModo(c) === 'squadra' && Number.isInteger(c && c.maxP) ? Math.min(CP_K_MAX, Math.max(1, c.maxP)) : CP_K_MAX;
-const cpPtPers = (c, k) => cpModo(c) === 'squadra' ? Math.floor(c.pt / Math.max(1, k)) : c.pt;
-const cpPill = c => cpModo(c) === 'squadra' ? `<span class="pill violet">monte ${c.pt} pt</span>` : `<span class="pill violet">+${c.pt} pt</span>`;
-const cpPtTxt = c => `${c.pt} pt ${cpModo(c) === 'squadra' ? 'tot' : 'a pers.'}`;
-const cpBadge = c => `<span class="pill violet">${cpPtTxt(c)}</span>`;
-const cpAttivi = () => ptMaster() ? cpLista().filter(c => c.on !== false) : [];
+/* --- Incarichi dei vecchi compiti: restano solo quelli ancora aperti (assegnato / in attesa), gestiti da «Incarichi in sospeso» in Sfide e dalle Notifiche --- */
 const cpAperto = m => m.stato === 'assegnato' || m.stato === 'attesa';
 const cpIncarichi = () => { const s = derived().stornati; return tuttiMov().filter(m => m.tipo === 'compito' && !s.has(m.id)); };
 const cpAperti = () => cpIncarichi().filter(cpAperto);
-const nCpAperti = () => ptMaster() ? cpAperti().length : 0;   // badge: incarichi estratti e ancora da svolgere o da convalidare
-const badgeCompiti = () => { const n = nCpAperti(); return n ? `<span class="tb" id="badge-compiti" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${n}</span>` : ''; };
-/* compiti che chiunque puo' prendere in carico adesso: attivi, non gia' assegnati o in attesa di convalida, con almeno un collega nel bacino */
-const nCpDisponibili = () => {
-  if(!st.mid || !ptMaster()) return 0;
-  const occ = new Set(cpAperti().map(m => m.cp));
-  return cpAttivi().filter(c => !occ.has(c.id) && membriAttivi().some(m => !c.esenti.includes(m.id))).length;
-};
-/* segnali sul tab Briefing: pallino se c'e' qualcosa da fare (compito libero o a me assegnato), numero se ci sono compiti da convalidare */
-const cpSegnali = () => ({dot: ptMaster() && (nCpDisponibili() > 0 || cpMiei().length > 0), conv: nCpConv()});
-const cpMiei = () => st.mid ? cpAperti().filter(m => m.mid === st.mid && m.stato === 'assegnato') : [];
-const rnd = () => { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; } catch(e){ return Math.random(); } };
-/* pesi: 1 / (1 + incarichi già convalidati in quel compito nel periodo in memoria) */
-function cpPesca(c, pool){
-  const fatti = {}; cpIncarichi().filter(m => m.cp === c.id && m.stato === 'confermata').forEach(m => { fatti[m.mid] = (fatti[m.mid] || 0) + 1; });
-  const P = pool.map(mid => ({mid, w: 1 / (1 + (fatti[mid] || 0))})), tot = P.reduce((a, x) => a + x.w, 0);
-  let r = rnd() * tot; for(const x of P){ r -= x.w; if(r < 0) return x.mid; }
-  return P[P.length - 1].mid;
-}
-function cpProssimoN(cid, giorno){
-  const ids = new Set(tuttiMov().map(m => m.id));
-  for(let n = 0; n < 10; n++) if(!ids.has(`cp_${cid}_${giorno}_${n}_0`)) return String(n);
-  return null;
-}
-let cpDet = null;   // compito aperto nel dettaglio (solo chi gestisce i compiti)
-let cpEd = null;   // compito in modifica sul posto: null = nessuno, '' = nuovo, altrimenti l'id
-let cpE = null;   // sessione di estrazione in memoria: {id, k, sel, scarti, conf, cur, fase, n, giorno, tmr}
-function cpStop(){ if(cpE && cpE.tmr){ clearTimeout(cpE.tmr); cpE.tmr = null; } }
-const cpNome = m => esc(nomeBreve(m) || nomeM(m));
-const cpDisp = e => e.sel.filter(m => !e.scarti.includes(m) && !e.conf.includes(m));
-function cpFoglio(){
-  const e = cpE, c = e && cpLista().find(x => x.id === e.id); if(!c) return closeSheet();
-  const testa = `<h3>🎯 ${esc(c.nome)} ${cpPill(c)}</h3>`;
-  const conf = e.conf.length ? `<p class="hint" id="cp-conf" style="margin:8px 0">✅ Confermati: <b>${e.conf.map(cpNome).join(', ')}</b> (${e.conf.length}/${e.k})</p>` : '';
-  if(e.fase === 'setup'){
-    const nPool = e.sel.length, nEs = membriAttivi().filter(m => c.esenti.includes(m.id)).length, kMax = Math.max(1, Math.min(cpKMax(c), nPool));
-    e.k = Math.max(1, Math.min(e.k || 1, kMax));
-    openSheet(`${testa}
-      ${nEs ? `<p class="hint" style="margin:0 0 8px">${nEs} ${nEs === 1 ? 'collega escluso' : 'colleghi esclusi'} in modo permanente dai Supervisor per questo compito.</p>` : ''}
-      <p class="hint" style="margin:0 0 8px">${cpBadge(c)}</p>
-      <div class="stat" id="cp-k" data-k="${e.k}" style="text-align:center;padding:12px"><div style="font-size:14px;margin-bottom:8px">Quante persone vuoi sorteggiare?</div>
-        <div class="row" style="justify-content:center;gap:14px;align-items:center"><button class="btn" id="cp-k-meno" data-act="cp-k" data-v="-1" aria-label="Una persona in meno" ${e.k <= 1 ? 'disabled' : ''}>−</button><b class="mono" id="cp-k-val" style="font-size:32px;min-width:44px">${e.k}</b><button class="btn" id="cp-k-piu" data-act="cp-k" data-v="1" aria-label="Una persona in più" ${e.k >= kMax ? 'disabled' : ''}>＋</button></div>
-        <div class="hint" style="margin-top:6px">Da 1 a ${kMax}${kMax < CP_K_MAX && cpModo(c) === 'squadra' && Number.isInteger(c.maxP) ? ' (limite impostato in precedenza: salva il compito da «Modifica» per sbloccare fino a ' + CP_K_MAX + ')' : nPool < CP_K_MAX ? ' (colleghi disponibili: ' + nPool + ')' : ''}</div></div>
-      ${cpModo(c) === 'squadra' ? `<p class="hint" id="cp-squadra" style="margin:8px 0 0">👥 Montepremi di squadra: <b>${c.pt} pt</b> diviso tra chi lo porta a termine. Con ${e.k} ${e.k === 1 ? 'persona' : 'persone'} ognuna riceve <b>${cpPtPers(c, e.k)} pt</b>.</p>` : ''}
-      <button class="btn amber block big" id="cp-estrai" data-act="cp-estrai" style="margin-top:14px">🎲 Avvia sorteggio</button>`);
-  } else if(e.fase === 'anim'){
-    openSheet(`${testa}${conf}<div style="text-align:center;padding:26px 0"><div class="mut" style="font-size:12.5px;margin-bottom:8px">Sorteggio in corso…</div><div id="cp-slot" class="mono" style="font-size:30px;font-weight:800;min-height:40px">🎲</div></div>`);
-  } else if(e.fase === 'verifica'){
-    openSheet(`${testa}${conf}<div style="text-align:center;padding:14px 0 6px"><div class="mut" style="font-size:12.5px">È uscito</div><div id="cp-uscito" style="font-size:30px;font-weight:800;margin:6px 0">🎉 ${cpNome(e.cur)}</div><p class="tx2" style="font-size:13.5px;margin:0">Verifica di persona: l'incarico vale solo se è presente.</p></div>
-      <div class="grid2" style="margin-top:10px"><button class="btn red" id="cp-assente" data-act="cp-assente">❌ Non è presente / Non disponibile</button><button class="btn green" id="cp-presente" data-act="cp-presente">✅ È presente</button></div>`);
-  } else {
-    openSheet(`${testa}${conf}<div class="empty" id="cp-esaurito">Nessun altro collega disponibile per questo compito.</div><button class="btn block" data-act="sheet-close">Chiudi</button>`);
-  }
-}
-function cpAnim(){
-  const e = cpE, c = e && cpLista().find(x => x.id === e.id); if(!c) return;
-  cpStop();
-  const disp = cpDisp(e);
-  if(!disp.length){ e.fase = 'esaurito'; e.cur = null; return cpFoglio(); }
-  e.cur = cpPesca(c, disp); e.fase = 'anim'; cpFoglio();
-  const passi = (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 0 : 22;
-  let i = 0;
-  const tick = () => {
-    const el = $('cp-slot');
-    if(cpE !== e || (passi && !el)){ e.tmr = null; return; }
-    if(i >= passi){ e.tmr = null; e.fase = 'verifica'; cpFoglio(); return; }
-    el.textContent = nomeBreve(disp.length > 1 ? disp[Math.floor(Math.random() * disp.length)] : e.cur) || nomeM(e.cur); i++;
-    e.tmr = setTimeout(tick, 40 + i * i * 0.35);
-  };
-  tick();
-}
-A['cp-apri'] = ds => {
-  if(!st.mid) return;
-  const c = cpLista().find(x => x.id === ds.id); if(!c || c.on === false) return toast('Compito non più disponibile', 'err');
-  if(!ptMaster()) return toast('🚫 Sistema punti disattivato dal Supervisor', 'err');
-  if(cpAperti().some(m => m.cp === c.id)) return toast('Compito già assegnato: attendi che venga concluso', 'err');
-  const pool = membriAttivi().filter(m => !c.esenti.includes(m.id)).map(m => m.id);
-  if(!pool.length) return toast('Nessun collega disponibile: tutti esclusi dai Supervisor', 'err');
-  cpStop(); cpE = {id: c.id, k: 1, sel: pool.slice(), scarti: [], conf: [], cur: null, fase: 'setup', n: null, giorno: null, tmr: null};
-  cpFoglio();
-};
-A['cp-k'] = ds => {
-  const e = cpE, c = e && cpLista().find(x => x.id === e.id); if(!e || !c || e.fase !== 'setup') return;
-  const kMax = Math.max(1, Math.min(cpKMax(c), e.sel.length));
-  e.k = Math.max(1, Math.min(kMax, (e.k || 1) + (Number(ds.v) < 0 ? -1 : 1))); cpFoglio();
-};
-A['cp-estrai'] = () => {
-  const e = cpE; if(!e || e.fase !== 'setup') return;
-  if(e.sel.length < e.k) return toast(`Servono almeno ${e.k} ${e.k === 1 ? 'collega disponibile' : 'colleghi disponibili'}`, 'err');
-  e.scarti = []; e.conf = []; cpAnim();   // bacino = tutti tranne gli esenti; gli assenti si scartano dopo l'uscita
-};
-A['cp-assente'] = () => {
-  const e = cpE; if(!e || e.fase !== 'verifica' || !e.cur) return;
-  e.scarti.push(e.cur); e.cur = null; cpAnim();   // scartato per questo sorteggio: nessuna scrittura
-};
-A['cp-presente'] = () => {
-  const e = cpE; if(!e || e.fase !== 'verifica' || !e.cur) return;
-  const c = cpLista().find(x => x.id === e.id);
-  if(!c || c.on === false){ closeSheet(); return toast('Compito non più disponibile', 'err'); }
-  if(!e.conf.length){
-    if(cpAperti().some(m => m.cp === c.id)){ closeSheet(); return toast('Compito appena assegnato da un collega', 'err'); }
-    e.giorno = oggiISO(); e.n = cpProssimoN(c.id, e.giorno);
-    if(e.n === null){ closeSheet(); return toast('Troppe estrazioni oggi per questo compito', 'err'); }
-  }
-  const mid = e.cur, p = String(e.conf.length), id = `cp_${c.id}_${e.giorno}_${e.n}_${p}`;
-  e.conf.push(mid); e.cur = null;
-  addMov({tipo: 'compito', stato: 'assegnato', cp: c.id, giorno: e.giorno, n: e.n, p, mid, da: st.mid, punti: cpPtPers(c, e.k), ...(cpModo(c) === 'squadra' ? {nPart: e.k} : {}), nome: c.nome.slice(0, 40)}, id, true,
-    er => { e.conf = e.conf.filter(x => x !== mid); toast(/permission/i.test((er && (er.code || er.message)) || '') ? 'Assegnazione rifiutata: compito già estratto da un collega, modificato o collega escluso' : 'Operazione rifiutata (' + errMsg(er) + ')', 'err'); });
-  if(e.conf.length >= e.k){ const fatti = e.conf.map(x => nomeBreve(x) || nomeM(x)).join(', '); closeSheet(); toast(`🎯 ${c.nome}: ${fatti}`); return; }
-  cpAnim();
-};
+/* segnale sul tab Sfide: numero di incarichi in sospeso da convalidare (solo chi gestisce) */
+const cpSegnali = () => ({conv: nCpConv()});
 A['cp-fatto'] = ds => {
   const m = tuttiMov().find(x => x.id === ds.id);
   if(!m || m.tipo !== 'compito' || m.mid !== st.mid || m.stato !== 'assegnato' || m._pending) return toast('Questo incarico non è più da svolgere', 'err');
@@ -3449,10 +3327,9 @@ A['cp-fatto'] = ds => {
 A['cp-annulla'] = ds => {
   const m = tuttiMov().find(x => x.id === ds.id);
   if(!can('compiti') || !m || m.tipo !== 'compito' || m.stato !== 'assegnato') return;
-  if(!confirm('Annullare questo incarico?\n\nNessun punto: il compito torna sorteggiabile.')) return;
+  if(!confirm('Annullare questo incarico?\n\nViene chiuso senza assegnare punti.')) return;
   C('movimenti').doc(m.id).update({stato: 'annullata', esitoDa: myName(), esitoTs: TS()}).then(() => toast('Incarico annullato')).catch(e => toast(errMsg(e), 'err'));
 };
-A['cp-sc'] = ds => { if(cpAperte.has(ds.id)) cpAperte.delete(ds.id); else cpAperte.add(ds.id); render(); };
 
 /* --- Ruoli (v1.40.0): Creatore e Supervisor ---
    Il Creatore ha tutti i poteri e solo lui nomina i Supervisor e ne sceglie i permessi.
@@ -3462,7 +3339,7 @@ const PERMESSI = [
   ['cassa', '💶', 'Cassa e Storni', 'Entrate, giroconti, correzione saldo cassa, storni'],
   ['inventario', '📦', 'Inventario e Scorte', 'Prezzi e articoli, giacenze, scorta caffè, Esaurito'],
   ['soci', '👥', 'Quote e Saldi Soci', 'Quote annuali, saldi e punti, PIN, archivia / espelli'],
-  ['compiti', '🎯', 'Compiti e Regole', 'Compiti nel Briefing, parametri di punteggio e premi'],
+  ['compiti', '🏆', 'Sfide e Regole', 'Sfide settimanali e mensili, parametri di punteggio e premi'],
   ['sistema', '🛠️', 'Strumenti di Sistema', 'Moderazione della Bacheca in Home, backup, chiusura periodo']];
 const PERM_IDS = PERMESSI.map(x => x[0]);
 function sonoCreatore(){ return !!st.gruppo && (st.gruppo.creatoDa === st.uid || (!!st.mid && st.gruppo.creatoreMid === st.mid)); }
@@ -3472,7 +3349,7 @@ function can(p){ return sonoCreatore() || (!!st.admDoc && permDi(st.uid).include
 const canAccessi = () => can('inbox') || can('soci');
 function ruolo(){ return sonoCreatore() ? 'Creatore' : st.isAdmin ? 'Supervisor' : 'Collega'; }
 const midDiUid = uid => { const u = st.utenti.find(x => x.id === uid); return u ? u.mid : null; };
-/* vecchi «supervisori dei compiti» (lista sul gruppo): continuano a funzionare con il solo permesso Compiti e Regole */
+/* vecchi «supervisori dei compiti» (lista sul gruppo): continuano a funzionare con il solo permesso Sfide e Regole */
 const supervisoriIds = () => { const v = st.gruppo && st.gruppo.supervisori; return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; };
 const isSup = () => !!st.mid && supervisoriIds().includes(st.mid);
 /* mid -> [uid dei telefoni con documento admin], escluso il Creatore (lo leggono solo Creatore e Supervisor) */
@@ -3486,8 +3363,6 @@ const badgePerm = ids => PERMESSI.filter(x => ids.includes(x[0])).map(x => `<spa
 const cpSoloAdmin = () => sonoCreatore() && supervisoriIds().length === 0 && !st.admins.some(a => permDi(a.id).includes('compiti') && midDiUid(a.id) !== st.mid);   // il Creatore è l'unico a poter convalidare: può chiudere anche un compito proprio
 const cpPuoConv = m => m.stato === 'attesa' && !m._pending && !m._local && can('compiti') && (m.mid !== st.mid || cpSoloAdmin());
 const nCpConv = () => (can('compiti') && ptMaster()) ? cpAperti().filter(cpPuoConv).length : 0;
-const supPubblici = () => Array.from(new Set((Array.isArray(st.gruppo.supMids) ? st.gruppo.supMids : []).concat(supervisoriIds())));
-const bannerSup = () => { const ids = supPubblici(), L = membriAttivi().filter(m => ids.includes(m.id)); return L.length ? `<div class="banner" id="cp-sup" style="margin-bottom:10px"><div class="grow">🛡️ <b>Supervisor:</b> ${L.map(m => esc(m.nick || m.nome)).join(', ')}<br><span style="font-size:12px" class="mut">Insieme al Creatore gestiscono richieste, cassa e compiti, ciascuno per le proprie competenze.</span></div></div>` : ''; };
 function cpConvCard(){
   if(!can('compiti') || !ptMaster()) return '';
   const l = cpAperti().filter(cpPuoConv); if(!l.length) return '';
@@ -3556,73 +3431,37 @@ A['sv-revoca'] = ds => {
   b.update(G(), up);
   b.commit().then(() => { closeSheet(); toast(`${m.nome} non è più Supervisor`); }).catch(e => toast(errMsg(e), 'err'));
 };
-/* --- configurazione compiti (admin) --- */
-const cpSalvaMappa = (M, msg, tieni) => G().update({compiti: M}).then(() => { if(!tieni) cpEd = null; render(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
-const cpCopia = () => JSON.parse(JSON.stringify(cpMap()));
-const cpHintModo = m => m === 'squadra' ? 'Montepremi: il punteggio totale viene diviso tra le persone che portano a termine il compito.' : 'Punti a persona: ogni partecipante che completa il compito riceve l\'intero punteggio.';
-/* modifica sul posto: la card del compito si espande in questo modulo (nessuna schermata separata) */
-function cpFormInline(o){
-  const x = o || {nome: '', pt: 10, on: true, esenti: [], modo: 'fisso'}, id = o ? o.id : '', L = cpLista(), i = L.findIndex(c => c.id === id);
-  return `<div class="card" id="cp-form" style="margin:0 0 12px;border:1px solid var(--amber,#f5a524)"><h3>${o ? '✏️ Modifica compito' : '＋ Nuovo compito'}</h3>
-    <label class="f"><span>Titolo</span><input class="in" id="cp-nome" maxlength="40" value="${esc(x.nome)}"></label>
-    <label class="f"><span>Modalità punti</span><select class="in" id="cp-modo" data-chg="cp-modo"><option value="fisso" ${cpModo(x) === 'fisso' ? 'selected' : ''}>a pers. — punti a persona</option><option value="squadra" ${cpModo(x) === 'squadra' ? 'selected' : ''}>tot — montepremi a squadra</option></select></label>
-    <p class="hint" id="cp-modo-hint" style="margin:-2px 0 8px">${cpHintModo(cpModo(x))}</p>
-    <label class="f"><span>Punti (a pers. o tot)</span><input class="in mono" id="cp-pt" inputmode="numeric" value="${x.pt}"></label>
-    <p class="hint" style="margin:0 0 4px">Colleghi esclusi dal sorteggio (esenzioni permanenti):</p>
-    <div id="cp-esenti" style="max-height:30vh;overflow:auto">${membriAttivi().map(m => `<label class="check"><input type="checkbox" class="cp-es" id="cp-es-${m.id}" value="${m.id}" ${x.esenti.includes(m.id) ? 'checked' : ''}><b style="flex:1;font-size:14px">${esc(m.nick || m.nome)}</b></label>`).join('')}</div>
-    <label class="check"><input type="checkbox" id="cp-on" ${x.on !== false ? 'checked' : ''}><b style="flex:1;font-size:14px">Compito attivo</b></label>
-    ${o ? `<div class="row" style="gap:6px;margin:6px 0"><span class="hint" style="margin:0;flex:1">Posizione nell'elenco</span><button class="btn sm ghost" data-act="cp-su" data-id="${id}" aria-label="Sposta su" ${i <= 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-act="cp-giu" data-id="${id}" aria-label="Sposta giù" ${i === L.length - 1 ? 'disabled' : ''}>↓</button></div>` : ''}
-    <div class="grid2" style="margin-top:8px"><button class="btn" id="btn-cp-annulla" data-act="cp-edit-chiudi">Annulla</button><button class="btn amber" id="btn-cp-salva" data-act="cp-salva" data-id="${id}">Salva</button></div>
-    ${o ? `<button class="btn red block" id="btn-cp-del" data-act="cp-del" data-id="${id}" style="margin-top:8px">🗑 Elimina compito</button>` : ''}</div>`;
-}
-A['cp-edit'] = ds => {
+/* --- gestione sfide (solo chi ha «Sfide e Regole») --- */
+const sfSalvaMappa = (M, msg) => G().update({sfide: M}).then(() => { sfEd = null; render(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
+A['sf-apri'] = ds => { if(ds.s !== 'sett' && ds.s !== 'mese') return; sfSez = ds.s; sfEd = null; window.scrollTo(0, 0); render(); };
+A['sf-back'] = () => { sfSez = null; sfEd = null; window.scrollTo(0, 0); render(); };
+A['sf-edit'] = ds => {
   if(!can('compiti')) return;
-  if(ds.id && !cpLista().find(x => x.id === ds.id)) return;
-  cpEd = ds.id || ''; render();
-  setTimeout(() => { const f = $('cp-form'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80);
+  if(ds.id && !sfMap()[ds.id]) return;
+  sfEd = ds.id || ''; render();
+  setTimeout(() => { const f = $('sf-form'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80);
 };
-A['cp-edit-chiudi'] = () => { cpEd = null; render(); };
-A['cp-det'] = ds => { if(!can('compiti')) return; cpDet = cpDet === ds.id ? null : ds.id; render(); };
-A['cp-salva'] = ds => {
+A['sf-edit-chiudi'] = () => { sfEd = null; render(); };
+A['sf-salva'] = ds => {
   if(!can('compiti')) return;
-  const M = cpCopia(), nome = val('cp-nome').replace(/\s+/g, ' ').slice(0, 40), pt = Math.floor(Number(val('cp-pt')));
-  if(nome.length < 2) return toast('Scrivi la descrizione', 'err');
-  if(!Number.isInteger(pt) || pt < 0 || pt > 500) return toast('Punteggio non valido (0–500)', 'err');
-  if(!ds.id && Object.keys(M).length >= CP_MAX) return toast('Massimo ' + CP_MAX + ' compiti', 'err');
-  const id = ds.id || ('c' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 4));
-  const mostrati = membriAttivi().map(m => m.id), vecchi = ds.id && M[ds.id] && Array.isArray(M[ds.id].esenti) ? M[ds.id].esenti : [];
-  const esenti = vecchi.filter(k => !mostrati.includes(k)).concat(Array.from(document.querySelectorAll('#sheet input.cp-es')).filter(b => b.checked).map(b => b.value)).slice(0, CP_ESENTI_MAX);
+  const M = sfCopia(), nome = val('sf-nome').replace(/\s+/g, ' ').slice(0, 80), pt = Math.floor(Number(val('sf-pt'))), per = val('sf-per') === 'mese' ? 'mese' : 'sett';
+  if(nome.length < 2) return toast('Scrivi il titolo della sfida', 'err');
+  if(!Number.isInteger(pt) || pt < 0 || pt > 1000) return toast('Punti non validi (0–1000)', 'err');
+  if(!ds.id && Object.keys(M).length >= SF_MAX) return toast('Massimo ' + SF_MAX + ' sfide', 'err');
+  if(ds.id && !M[ds.id]) return;
+  const id = ds.id || ('s' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 4));
   const ord = ds.id && M[ds.id] ? (M[ds.id].ord || 0) : Math.max(0, ...Object.keys(M).map(k => M[k].ord || 0)) + 1;
-  const modo = val('cp-modo') === 'squadra' ? 'squadra' : 'fisso';
-  M[id] = {nome, pt, on: !!($('cp-on') && $('cp-on').checked), ord, esenti, modo};
-  cpSalvaMappa(M, 'Compito salvato');
+  M[id] = {nome, per, pt, on: !!($('sf-on') && $('sf-on').checked), ord};
+  sfSalvaMappa(M, 'Sfida salvata');
 };
-A['cp-del'] = ds => {
-  if(!can('compiti') || !cpMap()[ds.id]) return;
-  if(!confirm('Eliminare questo compito?\n\nGli incarichi già assegnati e i punti già convalidati restano.')) return;
-  const M = cpCopia(); delete M[ds.id]; cpSalvaMappa(M, 'Compito eliminato');
+A['sf-del'] = ds => {
+  if(!can('compiti') || !sfMap()[ds.id]) return;
+  if(!confirm('Eliminare questa sfida?')) return;
+  const M = sfCopia(); delete M[ds.id]; sfSalvaMappa(M, 'Sfida eliminata');
 };
-A['cp-tgl'] = ds => {
-  if(!can('compiti') || !cpMap()[ds.id]) return;
-  const M = cpCopia(); M[ds.id].on = M[ds.id].on === false; cpSalvaMappa(M, M[ds.id].on ? 'Compito acceso' : 'Compito spento');
-};
-function cpSposta(id, dir){
-  if(!can('compiti')) return;
-  const L = cpLista(), i = L.findIndex(c => c.id === id), j = i + dir; if(i < 0 || j < 0 || j >= L.length) return;
-  const M = cpCopia(); L.forEach((c, k) => { M[c.id].ord = k + 1; });
-  const t = M[L[i].id].ord; M[L[i].id].ord = M[L[j].id].ord; M[L[j].id].ord = t;
-  cpSalvaMappa(M, 'Ordine aggiornato', true);
-}
-A['cp-su'] = ds => cpSposta(ds.id, -1);
-A['cp-giu'] = ds => cpSposta(ds.id, 1);
-A['cp-sugg'] = () => {
-  if(!can('compiti') || cpLista().length) return;
-  cpSalvaMappa({
-    cpmacc: {nome: 'Pulizia macchinetta', pt: 10, on: true, ord: 1, esenti: []},
-    cpsecchio: {nome: 'Svuotare il secchio', pt: 5, on: true, ord: 2, esenti: []},
-    cpgenerale: {nome: 'Pulizia generale della saletta', pt: 50, on: true, ord: 3, esenti: []},
-    cpspesa: {nome: 'Fare la spesa', pt: 10, on: true, ord: 4, esenti: []}
-  }, 'Compiti suggeriti caricati');
+A['sf-tgl'] = ds => {
+  if(!can('compiti') || !sfMap()[ds.id]) return;
+  const M = sfCopia(); M[ds.id].on = M[ds.id].on === false; sfSalvaMappa(M, M[ds.id].on ? 'Sfida attivata' : 'Sfida disattivata');
 };
 /* --- regala crediti (immediato, senza approvazione) --- */
 function rgAggiorna(){
@@ -4776,7 +4615,6 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'saldate'){ st.salDa = $('sal-da').value; st.salA = $('sal-a').value; st.scSel = null; render(); }
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
-  if(el && el.dataset.chg === 'cp-modo'){ const h = $('cp-modo-hint'); if(h) h.textContent = cpHintModo(el.value === 'squadra' ? 'squadra' : 'fisso'); }
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
   if(el && el.dataset.chg === 'ac-upd') acAggiorna();
   if(el && el.dataset.chg === 'bf-upd') bfAggiorna();
