@@ -484,7 +484,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.70.0';
+const VERSION = '1.70.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1349,7 +1349,6 @@ function bannerChiusura(d){
   return `<div class="banner sky" id="banner-chiusura">${ic('archive')}<div class="grow">📦 <b>Momento ideale per la Chiusura Periodo</b><br><span style="font-size:12.5px">${sub}</span>
     <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn sm" id="btn-chiusura-apri" data-act="go" data-p="chiusura">Apri Chiusura periodo</button>${nasc}</div></div></div>`;
 }
-A['chiusura-nascondi'] = () => { LS.set('chiusuraNasc_' + st.gid, oggiISO()); render(); };
 function pBar(d){
   const s = d.S.saldi[st.mid] || 0;
   const g = st.gruppo, pc = g.prezzoCaffe || 0, q = st.caffeQta;
@@ -3629,6 +3628,7 @@ A['sv-revoca'] = ds => {
 };
 /* --- sfide fisse: navigazione e assegnazione del premio (unica azione dell'admin) --- */
 A['sf-apri'] = ds => { if(ds.s !== 'sett' && ds.s !== 'mese') return; sfSez = ds.s; sfDet = null; sfTab = 'corso'; window.scrollTo(0, 0); render(); };
+A['chiusura-nascondi'] = () => { LS.set('chiusuraNasc_' + st.gid, oggiISO()); render(); };
 A['sf-tab'] = ds => { sfTab = ds.t === 'concluso' ? 'concluso' : 'corso'; render(); };
 A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; sfDet = ds.id; sfTab = 'corso'; window.scrollTo(0, 0); render(); };
 A['sf-back'] = () => { sfTab = 'corso'; if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
