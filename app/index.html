@@ -383,10 +383,10 @@ header.hasonesta .prizepill{padding-right:78px}
   main[data-p="spesa"],main[data-p="compiti"],main[data-p="gioco"],main[data-p="ruota"],main[data-p="perle"],main[data-p="impostazioni"],main[data-p="regolamento"],main[data-p="notifiche"],main[data-p="crediti"]{max-width:860px}
   main[data-p="saletta"]{max-width:980px}
   main[data-p="saletta"] .grid2{grid-template-columns:repeat(3,1fr)}
-  /* Classifica: filtri a tutta larghezza, sotto due colonne bilanciate (sinistra: scheda e albo; destra: podio completo) */
-  .cl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:0 18px;align-items:start}
-  .cl-grid>.clg-h{grid-column:1;grid-row:1}.cl-grid>.clg-a{grid-column:1;grid-row:2}
-  .cl-grid>.clg-p{grid-column:2;grid-row:1/3}
+  /* Classifica: filtri a tutta larghezza, sotto due colonne (sinistra: la mia scheda; destra: podio completo). L'Albo d'onore è ora in Sfide */
+  .cl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 18px;align-items:start}
+  .cl-grid>.clg-h{grid-column:1;grid-row:1}
+  .cl-grid>.clg-p{grid-column:2;grid-row:1}
   /* Cassa e registro: cruscotto a tutta larghezza con i 4 indicatori su una riga */
   #cassa-dash .grid2{grid-template-columns:repeat(3,minmax(0,1fr))}
   #cassa-dash .cd-wide{grid-column:auto}
@@ -484,7 +484,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.67.0';
+const VERSION = '1.68.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1118,7 +1118,7 @@ const QS_VOCI = [
   {e:'🔐', t:'Gestione PIN', s:'Reset PIN, PIN temporaneo', perm:'soci', p:'pin', k:'pin reset temporaneo codice password sblocco'},
   {e:'🛡️', t:'Gestione Supervisor', s:'Nomina, permessi e ruoli', perm:'creatore', p:'supervisor', k:'supervisor permessi permesso ruoli ruolo nomina revoca creatore admin amministratore'},
   {e:'⚙️', t:'Regole punti e premi', s:'Punteggi, tessera, soglia, podio', perm:'compiti', p:'regole', k:'punti tessera fedelta ben fatto soglia podio premi regole punteggi scala credito conversione'},
-  {e:'🏆', t:'Gestione sfide', s:'Sfide · crea, modifica, attiva, elimina', perm:'compiti', p:'sfide', a:'sf-panoramica', k:'sfide sfida settimanali mensili settimanale mensile punti incarichi sospeso compiti briefing'},
+  {e:'🏆', t:'Premi delle sfide', s:'Sfide · assegna i premi a periodo concluso', perm:'compiti', p:'sfide', a:'sf-panoramica', k:'sfide sfida premi premio assegna benefattore ricarica albo onore incarichi sospeso compiti briefing'},
   {e:'💾', t:'Backup e ripristino', s:'Esporta i dati, ripristina', perm:'sistema', p:'backup', k:'backup esporta esportazione ripristino ripristina scarica dati salvataggio'},
   {e:'📦', t:'Chiusura periodo', s:'Chiusura, estratti, archivio', perm:'sistema', p:'chiusura', k:'chiusura periodo estratti estratto archivio chiudere'},
   {e:'📢', t:'Bacheca, eventi e sondaggi', s:'Home · avvisi, annunci, sondaggi, eventi', perm:null, p:'bar', a:'bacheca', k:'bacheca avviso avvisi annuncio annunci info novita sondaggio sondaggi evento eventi compleanno compleanni votazione'},
@@ -1814,11 +1814,11 @@ function pRegolamento(){
     'Il rimborso vale solo dopo la <b>convalida</b> di un Supervisor ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🏆 Sfide', [
-    'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi due categorie: <b>Sfide Settimanali</b> e <b>Sfide Mensili</b>. Ogni pulsante indica quante sfide sono attive; toccalo per vedere l\'elenco.',
-    'Solo il Creatore e i Supervisor con il permesso «Sfide e Regole» possono <b>creare, modificare, attivare o disattivare ed eliminare</b> le sfide. Ogni sfida ha un titolo o descrizione, la periodicità (settimanale o mensile), i punti in palio e lo stato (attiva o disattiva). I colleghi vedono solo le sfide attive.',
-    '<b>Sfide automatiche</b> (si calcolano da sole, senza che tu debba fare nulla): 🍻 <b>Offro un giro</b> (settimanale: vince chi offre più giri di caffè, cioè 2 o più caffè in una volta, da lunedì a domenica) · 💰 <b>Il ricco della settimana</b> (settimanale: vince chi ha più credito personale a fine settimana) · 🔋 <b>Ricarica Top del Mese</b> (mensile: vince chi ricarica di più nel mese solare, contano le ricariche convalidate). Ogni scheda mostra la classifica provvisoria, i punti in palio e il tempo che manca alla chiusura.',
-    '<b>Privacy:</b> nelle sfide del credito e delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi.',
-    '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti al vincitore con un tocco (a pari merito li ricevono tutti i primi). Il premio compare nel registro e va nella <b>Tessera Fedeltà</b>, come i bonus del podio; un premio non si può assegnare due volte. Le sfide automatiche non si eliminano, ma si possono modificare e disattivare.',
+    'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi due categorie: <b>Sfide Settimanali</b> e <b>Sfide Mensili</b>. Tocca una categoria per vedere le sfide con i punti in palio, il tempo rimasto e <b>la tua posizione</b>; tocca una sfida per aprire la <b>classifica completa</b>.',
+    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. 🤝 <b>Il benefattore</b> (settimanale, da lunedì a domenica): vince chi offre più giri di caffè, cioè 2 o più caffè registrati insieme; a parità conta il totale dei caffè offerti. 🔋 <b>Ricarica Top del Mese</b> (mensile): vince chi ricarica di più nel mese solare, contano le ricariche convalidate.',
+    '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi.',
+    '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti al vincitore con un tocco (a pari merito li ricevono tutti i primi). Il premio compare nel registro e va nella <b>Tessera Fedeltà</b>, come i bonus del podio; un premio non si può assegnare due volte.',
+    '<b>🏅 Albo d\'onore</b> (prima era in Classifica e statistiche, ora è nella scheda Sfide): titoli goliardici del periodo scelto (Re della Caffeina, Mastro Lindo, Superstar della Spesa, Collega), chi è in testa nelle sfide in corso e i premi già assegnati. A pari merito il titolo è condiviso.',
     '<b>⚔️ Lancia una sfida</b>: i duelli 1 contro 1 tra colleghi arriveranno presto (coming soon).',
     'Il vecchio sistema dei compiti con sorteggio non c\'è più. Gli incarichi già assegnati restano in <b>Incarichi in sospeso</b> (visibili solo a chi gestisce le sfide), dove si convalidano o si annullano; i punti già convalidati restano.',
     '🛡️ <b>Supervisor:</b> colleghi di fiducia nominati dal Creatore, senza scadenza finché non revocati. Ognuno ha solo i permessi che il Creatore gli concede (vedi «Ruoli»).',
@@ -1875,35 +1875,19 @@ function cpRiga(m, me){
       <div class="d">+${m.punti || 0} pt · ${eta}${da}${m.stato === 'attesa' ? ' · svolto, da convalidare' : ''}</div></div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${az}</div></div>`;
 }
-/* Catalogo delle sfide nella mappa «sfide» del documento del gruppo, già in memoria (st.gruppo): nessuna lettura né listener in più.
-   sfide: {id: {nome, per: 'sett'|'mese', pt, on, ord[, tipo]}} (max 30). Le gestisce solo chi ha il permesso «Sfide e Regole» (can('compiti')).
-   Le 3 sfide automatiche (tipo giro / ricco / ricarica) esistono sempre con i valori di SF_AUTO: si scrivono nella mappa solo quando l'admin le modifica o le disattiva.
-   Le classifiche si calcolano interamente in memoria dai movimenti già caricati. I premi sono movimenti 'bonus_podio' (Tessera Fedeltà) con ID unico: nessun doppio accredito. */
-const SF_MAX = 30;
+/* Sfide FISSE: il catalogo vive nel codice (nessuna creazione o modifica manuale, nessuna lettura in più). Le classifiche si calcolano in memoria
+   dai movimenti già caricati. I premi sono movimenti 'bonus_podio' (Tessera Fedeltà) con ID unico: nessun doppio accredito.
+   Le eventuali voci della vecchia mappa «sfide» nel documento del gruppo vengono ignorate (titoli e punti sono quelli di SF_FISSE). */
 const SF_PER = {sett: ['Sfide Settimanali', '📅', 'Settimanale'], mese: ['Sfide Mensili', '🗓️', 'Mensile']};
-const SF_AUTO = {
-  sfauto_giro: {nome: '🍻 Offro un giro', per: 'sett', pt: 20, on: true, ord: -3, tipo: 'giro'},
-  sfauto_ricco: {nome: '💰 Il ricco della settimana', per: 'sett', pt: 20, on: true, ord: -2, tipo: 'ricco'},
-  sfauto_ricarica: {nome: '🔋 Ricarica Top del Mese', per: 'mese', pt: 30, on: true, ord: -1, tipo: 'ricarica'}
-};
-const SF_DESCR = {
-  giro: 'Vince chi offre più giri di caffè (2 o più caffè in una volta) da lunedì a domenica.',
-  ricco: 'Vince chi ha più credito personale a fine settimana. Si vede solo l\'ordine, mai gli importi.',
-  ricarica: 'Vince chi ricarica di più nel mese solare (ricariche convalidate). Si vede solo l\'ordine, mai gli importi.'
+const SF_FISSE = {
+  sfauto_giro: {id: 'sfauto_giro', nome: '🤝 Il benefattore', per: 'sett', pt: 20, tipo: 'giro', icona: '🤝',
+    descr: 'Vince chi offre più giri di caffè nella settimana (2 o più caffè registrati insieme), da lunedì a domenica. A parità conta il totale dei caffè offerti.'},
+  sfauto_ricarica: {id: 'sfauto_ricarica', nome: '🔋 Ricarica Top del Mese', per: 'mese', pt: 30, tipo: 'ricarica', icona: '🔋',
+    descr: 'Vince chi ricarica di più nel mese solare (ricariche convalidate). Si vede solo l\'ordine dei colleghi, mai gli importi.'}
 };
 let sfSez = null;   // sezione aperta: null = panoramica, 'sett' | 'mese'
-let sfEd = null;   // sfida in modifica sul posto: null = nessuna, '' = nuova, altrimenti l'id
-const sfMap = () => { const o = st.gruppo && st.gruppo.sfide; return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; };
-const sfCopia = () => JSON.parse(JSON.stringify(sfMap()));
-/* catalogo completo: sfide automatiche (valori predefiniti + eventuali modifiche dell'admin) e sfide manuali */
-const sfTutte = () => {
-  const M = sfMap(), out = {};
-  Object.keys(SF_AUTO).forEach(k => { out[k] = {...SF_AUTO[k], ...(M[k] && typeof M[k] === 'object' ? M[k] : {}), per: SF_AUTO[k].per, tipo: SF_AUTO[k].tipo}; });
-  Object.keys(M).forEach(k => { if(!(k in SF_AUTO)) out[k] = M[k]; });
-  return out;
-};
-const sfLista = per => { const M = sfTutte(); return Object.keys(M).filter(k => M[k] && typeof M[k].nome === 'string' && (M[k].per === 'sett' || M[k].per === 'mese')).map(k => ({...M[k], id: k, pt: Number.isInteger(M[k].pt) ? M[k].pt : 0})).filter(x => !per || x.per === per).sort((a, b) => (a.ord || 0) - (b.ord || 0) || a.nome.localeCompare(b.nome)); };
-const sfAttive = per => sfLista(per).filter(x => x.on !== false);
+let sfDet = null;   // sfida aperta nel dettaglio (classifica completa): null = elenco
+const sfLista = per => Object.values(SF_FISSE).filter(x => !per || x.per === per);
 const sfConteggio = n => n === 0 ? 'nessuna sfida attiva' : n === 1 ? '1 sfida attiva' : n + ' sfide attive';
 /* periodo che contiene `rif`: settimana lunedì–domenica o mese solare (ora locale) */
 function sfPeriodo(per, rif){
@@ -1919,19 +1903,8 @@ function sfRimanente(fine){
   const ms = Math.max(0, fine - Date.now()), g = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
   return g > 0 ? g + (g === 1 ? ' giorno ' : ' giorni ') + h + ' h' : h > 0 ? h + ' h ' + m + ' min' : Math.max(1, m) + ' min';
 }
-/* saldi di tutti a un dato istante (solo admin: ricostruiti dalla chiusura + movimenti in memoria); null se non calcolabili */
-function saldiAl(T){
-  if(!st.isAdmin) return null;
-  const last = ultimaChiusura();
-  if(last && last.fino && last.fino.toMillis && last.fino.toMillis() > T) return null;
-  const S = last && last.stato ? JSON.parse(JSON.stringify(last.stato)) : emptyState();
-  ['saldi','stock','turni','ultimo','punti','puntiConv','pcaf','pcafConv','pspesa','pbf','pRisc','quote','dovute'].forEach(k => S[k] = S[k] || {});
-  S.cassa = S.cassa || {contanti: 0, revolut: 0};
-  tuttiMov().forEach(m => { if(m.t <= T) applyMov(S, m); });
-  return S.saldi;
-}
-/* classifica in memoria di una sfida automatica nel periodo p: righe ordinate {id, pos, v, v2, txt}. «ricco» e «ricarica» non espongono mai gli importi (txt vuoto) */
-function sfClassifica(tipo, p, saldi){
+/* classifica in memoria di una sfida nel periodo p: righe ordinate {id, pos, v, v2, txt}. «ricarica» non espone mai gli importi (txt vuoto) */
+function sfClassifica(tipo, p){
   const att = new Set(membriAttivi().map(m => m.id)), R = {}, storn = derived().stornati;
   const tConf = m => { const e = m.esitoTs; return e && typeof e.toMillis === 'function' ? e.toMillis() : m.t; };
   let righe = [];
@@ -1948,9 +1921,6 @@ function sfClassifica(tipo, p, saldi){
       const r = R[m.mid] = R[m.mid] || {id: m.mid, v: 0, v2: 0}; r.v += m.importo || 0;
     });
     righe = Object.values(R).filter(r => r.v > 0).map(r => ({...r, txt: ''}));
-  } else if(tipo === 'ricco'){
-    const S = saldi || derived().S.saldi;
-    righe = Array.from(att).filter(id => (S[id] || 0) > 0).map(id => ({id, v: S[id], v2: 0, txt: ''}));
   }
   righe.sort((a, b) => b.v - a.v || b.v2 - a.v2 || (nomeBreve(a.id) || '').localeCompare(nomeBreve(b.id) || ''));
   righe.forEach(r => { r.pos = 1 + righe.filter(x => x.v > r.v || (x.v === r.v && x.v2 > r.v2)).length; });
@@ -1958,48 +1928,88 @@ function sfClassifica(tipo, p, saldi){
 }
 /* periodi conclusi con un vincitore e premio ancora da assegnare (solo admin con «Sfide e Regole»; fino a 4 settimane / 2 mesi indietro) */
 function sfDaAssegnare(x){
-  if(!st.isAdmin || !can('compiti') || !ptMaster() || !x.tipo || x.on === false || !(x.pt > 0)) return [];
+  if(!st.isAdmin || !can('compiti') || !ptMaster() || !x.tipo || !(x.pt > 0)) return [];
   const oggi = new Date(), N = x.per === 'sett' ? 4 : 2, fatti = tuttiMov().filter(m => m.tipo === 'bonus_podio' && m.sfida === x.id), ch = ultimaChiusura(), fino = ch && ch.fino && ch.fino.toMillis ? ch.fino.toMillis() : 0, out = [];
   for(let k = 1; k <= N; k++){
     const p = sfPeriodo(x.per, x.per === 'sett' ? new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate() - 7 * k) : new Date(oggi.getFullYear(), oggi.getMonth() - k, 1));
     if(fatti.some(m => m.periodo === p.key)) continue;
-    let saldi = null;
-    if(x.tipo === 'ricco'){ saldi = saldiAl(p.a); if(!saldi) continue; }
-    const R = sfClassifica(x.tipo, p, saldi); if(!R.length) continue;
-    out.push({p, win: R.filter(r => r.pos === 1), parziale: x.tipo !== 'ricco' && fino > p.da});
+    const R = sfClassifica(x.tipo, p); if(!R.length) continue;
+    out.push({p, win: R.filter(r => r.pos === 1), parziale: fino > p.da});
   }
   return out;
 }
-function sfCard(x, gest){
-  const p = sfPeriodo(x.per, new Date()), off = x.on === false;
-  const med = pos => ['🥇', '🥈', '🥉'][pos - 1] || '🏅';
-  let corpo = '';
-  if(x.tipo){
-    const R = sfClassifica(x.tipo, p), vis = R.filter(r => r.pos <= 3).slice(0, 5), io = R.find(r => r.id === st.mid);
-    corpo = `<p class="hint" style="margin:6px 0 4px">${esc(SF_DESCR[x.tipo] || '')}</p>
-      <div style="margin:4px 0"><div class="mut" style="font-size:11.5px;margin-bottom:2px">Classifica provvisoria · ${esc(p.label)}</div>
-      ${vis.length ? vis.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:2px 0;font-size:14px"><span>${med(r.pos)}</span><b style="flex:1;min-width:0">${esc(nomeBreve(r.id) || nomeM(r.id))}${r.id === st.mid ? ' <span class="pill violet">tu</span>' : ''}</b>${r.txt ? `<span class="mono mut" style="font-size:12px">${r.txt}</span>` : ''}</div>`).join('') : '<div class="hint" style="margin:0">Nessuno in classifica per ora.</div>'}
-      ${io ? (io.pos > 3 ? `<div class="hint" style="margin:4px 0 0">La tua posizione: <b>${io.pos}°</b></div>` : '') : (R.length ? '<div class="hint" style="margin:4px 0 0">Non sei ancora in classifica.</div>' : '')}</div>`;
-  }
-  const da = gest ? sfDaAssegnare(x) : [];
-  const box = da.map(e => `<div class="banner amber" style="margin:8px 0 0;flex-wrap:wrap;gap:8px"><div class="grow">🏁 <b>${esc(e.p.label)}</b> conclusa<br><span style="font-size:12.5px">${e.win.length === 1 ? 'Vincitore' : 'Pari merito'}: ${e.win.map(r => '<b>' + esc(nomeBreve(r.id) || nomeM(r.id)) + '</b>').join(', ')} · +${x.pt} pt${e.parziale ? ' · ⚠️ dati parziali (chiusura a metà periodo)' : ''}</span></div><button class="btn sm amber" id="btn-sf-ass-${x.id}-${e.p.key}" data-act="sf-assegna" data-id="${x.id}" data-k="${e.p.key}">🏆 Assegna</button></div>`).join('');
-  return `<div class="cp-item" id="sf-item-${x.id}" style="margin-bottom:12px;padding:10px 12px;border-radius:14px;background:var(--bg2,rgba(255,255,255,.04))">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="min-width:0;flex:1 1 140px"><b>${esc(x.nome)}</b></div><span class="pill violet">+${x.pt} pt</span>${off ? '<span class="pill mut">disattiva</span>' : ''}</div>
-    ${corpo}
-    <div class="mut" style="font-size:12px;margin-top:6px">⏳ Chiude tra ${sfRimanente(p.fine)} · ${esc(p.label)}</div>
-    ${box}
-    ${gest ? `<div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" id="btn-sf-mod-${x.id}" data-act="sf-edit" data-id="${x.id}">✏️ Modifica</button><button class="btn sm ghost" id="btn-sf-tgl-${x.id}" data-act="sf-tgl" data-id="${x.id}">${off ? 'Attiva' : 'Disattiva'}</button></div>` : ''}</div>`;
+const sfNome = id => esc(nomeBreve(id) || nomeM(id));
+const sfMed = pos => ['🥇', '🥈', '🥉'][pos - 1] || '🏅';
+/* riquadro dell'admin per assegnare il premio di un periodo concluso (solo questa azione resta all'admin) */
+function sfBox(x){
+  return sfDaAssegnare(x).map(e => `<div class="banner amber" style="margin:8px 0 0;flex-wrap:wrap;gap:8px"><div class="grow">🏁 <b>${esc(e.p.label)}</b> conclusa<br><span style="font-size:12.5px">${e.win.length === 1 ? 'Vincitore' : 'Pari merito'}: ${e.win.map(r => '<b>' + sfNome(r.id) + '</b>').join(', ')} · +${x.pt} pt${e.parziale ? ' · ⚠️ dati parziali (chiusura a metà periodo)' : ''}</span></div><button class="btn sm amber" id="btn-sf-ass-${x.id}-${e.p.key}" data-act="sf-assegna" data-id="${x.id}" data-k="${e.p.key}">🏆 Assegna</button></div>`).join('');
 }
-function sfForm(o, per){
-  const x = o || {nome: '', per, pt: 10, on: true}, id = o ? o.id : '', auto = !!(o && o.tipo);
-  return `<div class="card" id="sf-form" style="margin:0 0 12px;border:1px solid var(--amber,#f5a524)"><h3>${o ? '✏️ Modifica sfida' : '＋ Nuova sfida'}</h3>
-    <label class="f"><span>Titolo / Descrizione</span><input class="in" id="sf-nome" maxlength="80" value="${esc(x.nome)}"></label>
-    <label class="f"><span>Periodicità</span><select class="in" id="sf-per" ${auto ? 'disabled' : ''}><option value="sett" ${x.per === 'sett' ? 'selected' : ''}>Settimanale</option><option value="mese" ${x.per === 'mese' ? 'selected' : ''}>Mensile</option></select></label>
-    ${auto ? '<p class="hint" style="margin:-2px 0 8px">Sfida automatica: la classifica si calcola da sola; puoi cambiare titolo, punti e stato.</p>' : ''}
-    <label class="f"><span>Punti in palio</span><input class="in mono" id="sf-pt" inputmode="numeric" value="${x.pt}"></label>
-    <label class="check"><input type="checkbox" id="sf-on" ${x.on !== false ? 'checked' : ''}><b style="flex:1;font-size:14px">Sfida attiva</b></label>
-    <div class="grid2" style="margin-top:8px"><button class="btn" id="btn-sf-annulla" data-act="sf-edit-chiudi">Annulla</button><button class="btn amber" id="btn-sf-salva" data-act="sf-salva" data-id="${id}">Salva</button></div>
-    ${o && !auto ? `<button class="btn red block" id="btn-sf-del" data-act="sf-del" data-id="${id}" style="margin-top:8px">🗑 Elimina sfida</button>` : ''}</div>`;
+/* livello 2: card compatta con la mia posizione; tocco = classifica completa */
+function sfCard(x){
+  const p = sfPeriodo(x.per, new Date()), R = sfClassifica(x.tipo, p), io = st.mid ? R.find(r => r.id === st.mid) : null;
+  const pos = io ? `La tua posizione: <b>#${io.pos}</b>${io.pos <= 3 ? ' ' + sfMed(io.pos) : ''}` : 'Non ancora in classifica';
+  return `<div class="cp-item" id="sf-item-${x.id}" style="margin-bottom:12px;border-radius:14px;background:var(--bg2,rgba(255,255,255,.04))">
+    <button class="btn ghost block" id="btn-sf-det-${x.id}" data-act="sf-det" data-id="${x.id}" style="display:block;text-align:left;border:0;padding:11px 12px;height:auto">
+      <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1 1 140px;min-width:0">${esc(x.nome)}</b><span class="pill violet">+${x.pt} pt</span></span>
+      <span style="display:block;margin-top:6px;font-size:14px" id="sf-pos-${x.id}">${pos}</span>
+      <span class="mut" style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:12px"><span>⏳ Chiude tra ${sfRimanente(p.fine)}</span><span>Classifica completa ›</span></span>
+    </button>
+    ${sfBox(x) ? `<div style="padding:0 12px 10px">${sfBox(x)}</div>` : ''}</div>`;
+}
+/* livello 3: classifica completa della sfida */
+function sfDettaglio(x){
+  const p = sfPeriodo(x.per, new Date()), R = sfClassifica(x.tipo, p), fuori = membriAttivi().filter(m => !R.some(r => r.id === m.id));
+  const primi = R.filter(r => r.pos === 1).length, giro = x.tipo === 'giro';
+  const stato = r => r.pos === 1 ? (primi > 1 ? '🥇 In testa (ex aequo)' : '🥇 In testa') : r.pos <= 3 ? '🎖️ Sul podio' : 'In gara';
+  const assegnati = alboSfide().filter(e => e.sfida === x.id);
+  return `<button class="btn link" style="padding:0;margin:0 0 8px" id="sf-back" data-act="sf-back">← ${SF_PER[sfSez][0]}</button>
+  <h2>${esc(x.nome)}</h2><p class="sub" style="margin-bottom:8px">+${x.pt} pt in palio · ⏳ chiude tra ${sfRimanente(p.fine)} · ${esc(p.label)}</p>
+  <div class="card" id="sf-dett"><p class="hint" style="margin:0 0 8px">${esc(x.descr)}</p>
+    ${R.length ? `<table><thead><tr><th>#</th><th>Collega</th>${giro ? '<th class="c">Giri</th>' : ''}<th>Stato</th></tr></thead><tbody>
+      ${R.map(r => `<tr><td class="mono">${r.pos <= 3 ? sfMed(r.pos) : r.pos}</td><td><b>${sfNome(r.id)}</b>${r.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td>${giro ? `<td class="c mono">${r.v}<small class="mut"> · ${r.v2} caffè</small></td>` : ''}<td style="font-size:12.5px">${stato(r)}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty" id="sf-dett-vuoto">Nessuno in classifica per ora.</div>'}
+    ${fuori.length ? `<p class="hint" style="margin:8px 0 0;font-size:12px">Non ancora in classifica: ${fuori.map(m => sfNome(m.id)).join(', ')}.</p>` : ''}
+    ${giro ? '' : '<p class="hint" style="margin:8px 0 0;font-size:12px">🔒 Per privacy si vede solo l\'ordine, non gli importi.</p>'}
+    ${sfBox(x)}</div>
+  ${assegnati.length ? `<div class="card" id="sf-dett-premi"><h3>🏅 Premi già assegnati</h3>${assegnati.map(e => `<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px">${esc(e.periodoTxt || e.periodo || '')}: <b>${e.mids.map(sfNome).join(', ')}</b> · +${e.punti || 0} pt${e.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}</div>`).join('')}</div>` : ''}`;
+}
+/* ---------- Albo d'onore (ex Classifiche): titoli del periodo + vincitori delle sfide; tutto in memoria ---------- */
+const ALBO_PER = [['settimana', 'Settimana'], ['mese', 'Mese'], ['sempre', 'Di sempre']];
+const alboPerKey = () => ALBO_PER.some(x => x[0] === st.alboP) ? st.alboP : 'mese';
+function alboRange(per){
+  const o = new Date();
+  if(per === 'sempre') return null;
+  const p = sfPeriodo(per === 'settimana' ? 'sett' : 'mese', o);
+  return {da: p.da, a: Infinity, label: per === 'settimana' ? 'Questa settimana' : 'Questo mese'};
+}
+/* premi di sfida già assegnati (ultimi 10, raggruppati per sfida e periodo), dai movimenti in memoria */
+function alboSfide(){
+  const storn = derived().stornati, per = {};
+  tuttiMov().forEach(m => {
+    if(m.tipo !== 'bonus_podio' || !m.sfida || storn.has(m.id)) return;
+    const k = m.sfida + '|' + m.periodo, e = per[k] = per[k] || {sfida: m.sfida, periodo: m.periodo, periodoTxt: m.periodoTxt, titolo: m.titolo, punti: m.punti, t: 0, mids: []};
+    e.mids.push(m.mid); e.t = Math.max(e.t, m.t || 0);
+  });
+  return Object.values(per).sort((a, b) => b.t - a.t).slice(0, 10);
+}
+function pAlbo(d){
+  const per = alboPerKey(), T = clTitoli(d, alboRange(per), per), sf = alboSfide();
+  const nm = id => sfNome(id) + (id === st.mid ? ' (tu)' : '');
+  const lead = sfLista().map(x => {
+    const R = sfClassifica(x.tipo, sfPeriodo(x.per, new Date())).filter(r => r.pos === 1);
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${esc(x.nome)} <span class="mut" style="font-size:12px">· ${x.per === 'sett' ? 'settimana in corso' : 'mese in corso'}</span></div>
+      <div class="mut" style="font-size:12.5px;margin-top:2px">${R.length ? `${R.map(r => nm(r.id)).join(', ')} · in testa${R.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`;
+  }).join('');
+  return `<div class="card" id="sf-albo"><h3><span>🏅 Albo d'onore</span></h3>
+    <div class="chips" id="albo-per">${ALBO_PER.map(([v, l]) => `<button id="albo-per-${v}" class="${per === v ? 'on' : ''}" data-act="albo-per" data-v="${v}">${l}</button>`).join('')}</div>
+    <p class="mut" style="font-size:12px;margin:10px 0 0">Titoli del periodo</p>
+    ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
+      <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(nm).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
+    <p class="mut" style="font-size:12px;margin:12px 0 0">Sfide · leader attuali</p>${lead}
+    <p class="mut" style="font-size:12px;margin:12px 0 0">Sfide · premi assegnati</p>
+    ${sf.length ? sf.map(e => `<div style="padding:7px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">🏆 <b>${esc((SF_FISSE[e.sfida] || {}).nome || e.titolo || 'Sfida')}</b> <span class="mut" style="font-size:12px">· ${esc(e.periodoTxt || e.periodo || '')}</span></div>
+      <div class="mut" style="font-size:12.5px;margin-top:2px">${e.mids.map(nm).join(', ')} · +${e.punti || 0} pt${e.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}</div></div>`).join('') : '<div class="hint" style="margin:6px 0 0">Nessun premio assegnato per ora.</div>'}
+    ${infoBtn(`Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più compiti), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). Poi chi è in testa nelle sfide in corso e i premi già assegnati (calcolati sui movimenti dall'ultima chiusura). A pari merito il titolo è condiviso.`, 'Come funziona')}</div>`;
 }
 function pSfide(d){
   const gest = can('compiti');
@@ -2007,23 +2017,20 @@ function pSfide(d){
     const aperti = gest ? cpAperti().slice().sort((a, b) => a.t - b.t) : [];
     return `<h2>${ic('trophy')} Sfide</h2><p class="sub" style="margin-bottom:12px">Scegli una categoria per vedere le sfide in corso.</p>
     <div class="grid2" id="sf-panoramica" style="gap:12px">
-      ${['sett', 'mese'].map(k => `<button class="gbtn sm" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}"><span class="em">${SF_PER[k][1]}</span>${SF_PER[k][0]}<small>${sfConteggio(sfAttive(k).length)}</small></button>`).join('')}
+      ${['sett', 'mese'].map(k => `<button class="gbtn sm" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}"><span class="em">${SF_PER[k][1]}</span>${SF_PER[k][0]}<small>${sfConteggio(sfLista(k).length)}</small></button>`).join('')}
       <button class="gbtn sm" id="sf-btn-duelli" disabled aria-disabled="true"><span class="em">⚔️</span>Lancia una sfida<small>Coming soon</small></button>
     </div>
+    <div style="margin-top:14px">${pAlbo(d)}</div>
     ${aperti.length ? `<div class="card" id="sf-sospesi" style="margin-top:14px"><h3>📋 Incarichi in sospeso <span class="pill violet">${aperti.length}</span></h3>
       <p class="hint" style="margin:0 0 8px">Compiti del vecchio Briefing ancora da svolgere o da convalidare: convalidali o annullali per chiuderli.</p>
       <div class="list">${aperti.map(m => cpRiga(m, st.mid)).join('')}</div></div>` : ''}`;
   }
-  const [titolo, em] = SF_PER[sfSez], L = gest ? sfLista(sfSez) : sfAttive(sfSez);
+  const x = sfDet && SF_FISSE[sfDet] && SF_FISSE[sfDet].per === sfSez ? SF_FISSE[sfDet] : null;
+  if(x) return sfDettaglio(x);
   return `<button class="btn link" style="padding:0;margin:0 0 8px" id="sf-back" data-act="sf-back">← Sfide</button>
-  <h2>${em} ${titolo}</h2><p class="sub" style="margin-bottom:12px">${sfConteggio(sfAttive(sfSez).length)}</p>
+  <h2>${SF_PER[sfSez][1]} ${SF_PER[sfSez][0]}</h2><p class="sub" style="margin-bottom:12px">${sfConteggio(sfLista(sfSez).length)} · tocca una sfida per la classifica completa</p>
   ${avvisoPuntiOff()}
-  <div class="card" id="sf-lista">
-    ${L.length ? L.map(x => sfEd === x.id ? sfForm(x, sfSez) : sfCard(x, gest)).join('')
-      : `<p class="hint" id="sf-vuoto" style="margin:0">${gest ? 'Nessuna sfida in questa categoria: creane una.' : 'Nessuna sfida attiva al momento.'}</p>`}
-    ${sfEd === '' ? sfForm(null, sfSez) : ''}
-    ${gest ? `<button class="btn amber block" id="btn-sf-nuova" data-act="sf-edit" data-id="" ${sfEd !== null || Object.keys(sfMap()).length >= SF_MAX ? 'disabled' : ''}>＋ Nuova sfida</button>` : ''}
-  </div>`;
+  <div class="card" id="sf-lista">${sfLista(sfSez).map(sfCard).join('')}</div>`;
 }
 
 /* ---------- EVENTI ---------- */
@@ -2319,8 +2326,8 @@ function clConteggi(d, r){
   if(!r && !(st.isAdmin && st.arcMov)) storicoPeriodi().forEach(p => { sommaIn(out.caffe, p.caffe); sommaIn(out.turni, p.turni); sommaIn(out.speseN, p.speseN); sommaIn(out.bf, p.bfRic); });
   return out;
 }
-function clTitoli(d, r){
-  const C = clConteggi(d, r), pc = clPerKey();
+function clTitoli(d, r, pc0){
+  const C = clConteggi(d, r), pc = pc0 || clPerKey();
   const bfNome = pc === 'sempre' ? 'Collega di Sempre' : pc === 'mese' ? 'Collega del Mese' : pc === 'settimana' ? 'Collega della Settimana' : 'Collega del Giorno';
   const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '🎯', 'Mastro Lindo', 'compiti'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
   const att = membriAttivi();
@@ -2493,17 +2500,13 @@ function clClassifica(d, R, T, c){
   const riga = (x, i) => `<div class="rk ${x.m.id === st.mid ? 'me' : ''} ${x[key] ? '' : 'z'}"><div class="n">${podio.length + i + 1}</div><div class="nm"><div class="nt"><b class="nn">${esc(x.nome)}</b>${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}${bdg(x.m.id)}</div>
       <div class="mi"><span>☕ ${x.c}</span><span>🎯 ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
       <div class="v">${x[key]}${key !== 'tot' ? `<small>tot ${x.tot}</small>` : ''}</div></div>`;
-  const albo = `<div class="card" id="cl-albo"><h3><span>🏅 Albo d'onore</span></h3>
-    ${T.map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:13.5px">${t.e} <b>${esc(t.nome)}</b></div>
-      <div class="mut" style="font-size:12.5px;margin-top:2px">${t.mids.length ? `${t.mids.map(m => esc(nomeBreve(m) || nomeM(m)) + (m === st.mid ? ' (tu)' : '')).join(', ')} · <b class="mono">${t.v}</b> ${t.u}${t.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}` : 'Nessuno per ora'}</div></div>`).join('')}
-    ${infoBtn(`Titoli goliardici del periodo scelto: Re della Caffeina (più caffè), Mastro Lindo (più turni di pulizia), Superstar della Spesa (più acquisti convalidati), Collega (più «Ben fatto» ricevuti). A pari merito il titolo è condiviso.`, 'Come funziona')}</div>`;
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
     ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un Supervisor. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
-  return {podio: podioCard, albo};
+  return {podio: podioCard};
 }
 function pClassifiche(d){
   const mod = st.clMod === 'stat' ? 'stat' : (st.clMod === 'arc' && st.isAdmin) ? 'arc' : 'classifica';
@@ -2567,7 +2570,7 @@ function pClassificaPunti(d){
   if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
   ${clIo(R.righe, c)}`;
   const Z = clClassifica(d, R, T, c);
-  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div><div class="clg-a">${Z.albo}</div></div>`;
+  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
 A['cl-per'] = ds => { st.clP = ['oggi', 'settimana', 'mese', 'sempre'].includes(ds.v) ? ds.v : 'oggi'; st.scSel = null; render(); };
@@ -3074,7 +3077,7 @@ A['aggiorna'] = async () => {
 };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
-A['go'] = ds => { if(ds.p === 'sfide'){ sfSez = null; sfEd = null; } if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['go'] = ds => { if(ds.p === 'sfide'){ sfSez = null; sfDet = null; } if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
 
 /* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
@@ -3448,7 +3451,7 @@ const PERMESSI = [
   ['cassa', '💶', 'Cassa e Storni', 'Entrate, giroconti, correzione saldo cassa, storni'],
   ['inventario', '📦', 'Inventario e Scorte', 'Prezzi e articoli, giacenze, scorta caffè, Esaurito'],
   ['soci', '👥', 'Quote e Saldi Soci', 'Quote annuali, saldi e punti, PIN, archivia / espelli'],
-  ['compiti', '🏆', 'Sfide e Regole', 'Sfide settimanali e mensili, parametri di punteggio e premi'],
+  ['compiti', '🏆', 'Sfide e Regole', 'Premi delle sfide, parametri di punteggio e premi'],
   ['sistema', '🛠️', 'Strumenti di Sistema', 'Moderazione della Bacheca in Home, backup, chiusura periodo']];
 const PERM_IDS = PERMESSI.map(x => x[0]);
 function sonoCreatore(){ return !!st.gruppo && (st.gruppo.creatoDa === st.uid || (!!st.mid && st.gruppo.creatoreMid === st.mid)); }
@@ -3540,45 +3543,14 @@ A['sv-revoca'] = ds => {
   b.update(G(), up);
   b.commit().then(() => { closeSheet(); toast(`${m.nome} non è più Supervisor`); }).catch(e => toast(errMsg(e), 'err'));
 };
-/* --- gestione sfide (solo chi ha «Sfide e Regole») --- */
-const sfSalvaMappa = (M, msg) => G().update({sfide: M}).then(() => { sfEd = null; render(); toast(msg); }).catch(e => toast(errMsg(e), 'err'));
-A['sf-apri'] = ds => { if(ds.s !== 'sett' && ds.s !== 'mese') return; sfSez = ds.s; sfEd = null; window.scrollTo(0, 0); render(); };
-A['sf-back'] = () => { sfSez = null; sfEd = null; window.scrollTo(0, 0); render(); };
-A['sf-edit'] = ds => {
-  if(!can('compiti')) return;
-  if(ds.id && !sfTutte()[ds.id]) return;
-  sfEd = ds.id || ''; render();
-  setTimeout(() => { const f = $('sf-form'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80);
-};
-A['sf-edit-chiudi'] = () => { sfEd = null; render(); };
-A['sf-salva'] = ds => {
-  if(!can('compiti')) return;
-  const base = ds.id ? sfTutte()[ds.id] : null; if(ds.id && !base) return;
-  const M = sfCopia(), nome = val('sf-nome').replace(/\s+/g, ' ').slice(0, 80), pt = Math.floor(Number(val('sf-pt')));
-  const per = base && base.tipo ? base.per : (val('sf-per') === 'mese' ? 'mese' : 'sett');
-  if(nome.length < 2) return toast('Scrivi il titolo della sfida', 'err');
-  if(!Number.isInteger(pt) || pt < 0 || pt > 1000) return toast('Punti non validi (0–1000)', 'err');
-  if(!ds.id && Object.keys(M).length >= SF_MAX) return toast('Massimo ' + SF_MAX + ' sfide', 'err');
-  const id = ds.id || ('s' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 4));
-  const ord = base ? (base.ord || 0) : Math.max(0, ...Object.keys(M).map(k => M[k].ord || 0)) + 1;
-  M[id] = {nome, per, pt, on: !!($('sf-on') && $('sf-on').checked), ord, ...(base && base.tipo ? {tipo: base.tipo} : {})};
-  sfSalvaMappa(M, 'Sfida salvata');
-};
-A['sf-del'] = ds => {
-  const b = sfTutte()[ds.id];
-  if(!can('compiti') || !b) return;
-  if(b.tipo) return toast('Le sfide automatiche non si eliminano: puoi disattivarle', 'err');
-  if(!confirm('Eliminare questa sfida?')) return;
-  const M = sfCopia(); delete M[ds.id]; sfSalvaMappa(M, 'Sfida eliminata');
-};
-A['sf-tgl'] = ds => {
-  const b = sfTutte()[ds.id];
-  if(!can('compiti') || !b) return;
-  const M = sfCopia(), on = b.on === false; M[ds.id] = {...b, on}; sfSalvaMappa(M, on ? 'Sfida attivata' : 'Sfida disattivata');
-};
+/* --- sfide fisse: navigazione e assegnazione del premio (unica azione dell'admin) --- */
+A['sf-apri'] = ds => { if(ds.s !== 'sett' && ds.s !== 'mese') return; sfSez = ds.s; sfDet = null; window.scrollTo(0, 0); render(); };
+A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; sfDet = ds.id; window.scrollTo(0, 0); render(); };
+A['sf-back'] = () => { if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
+A['albo-per'] = ds => { st.alboP = ALBO_PER.some(x => x[0] === ds.v) ? ds.v : 'mese'; render(); };
 /* premio a fine periodo: un movimento 'bonus_podio' per vincitore con ID deterministico (create-only: nessun doppio accredito) */
 A['sf-assegna'] = ds => {
-  const x = sfLista().find(y => y.id === ds.id); if(!x || !x.tipo || !can('compiti')) return;
+  const x = SF_FISSE[ds.id]; if(!x || !can('compiti')) return;
   const e = sfDaAssegnare(x).find(y => y.p.key === ds.k); if(!e) return toast('Premio già assegnato o non più disponibile', 'err');
   if(e.parziale && !confirm('Nel periodo c\'è stata una chiusura: i dati potrebbero essere parziali.\n\nAssegnare comunque il premio?')) return;
   e.win.forEach(r => addMov({tipo: 'bonus_podio', mid: r.id, pos: 1, sfida: x.id, periodo: e.p.key, periodoTxt: e.p.label, titolo: x.nome.slice(0, 60), punti: x.pt}, `sfi_${x.id}_${e.p.key}_${r.id}`, true, er => toast('Premio non assegnato (' + errMsg(er) + ')', 'err')));
