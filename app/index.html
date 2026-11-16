@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.63.0';
+const VERSION = '1.64.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1047,7 +1047,7 @@ function doRender(){
   $('hdr-menu').classList.remove('hidden'); $('hdr-search').classList.toggle('hidden', !st.isAdmin);
   const tabs = [['bar','Home','coffee'],['briefing','Briefing','clipboard'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
   const nb = cn.tot, cs = cpSegnali();
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'briefing' && cs.dot ? '<span class="tdot" id="dot-briefing" aria-label="Compiti da svolgere"></span>' : ''}${p === 'briefing' && cs.conv ? `<span class="tb" id="tb-briefing">${cs.conv}</span>` : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'briefing' && cs.dot ? '<span class="tdot" id="dot-briefing" aria-label="Compiti da svolgere"></span>' : ''}${p === 'briefing' && cs.conv ? `<span class="tb" id="tb-briefing">${cs.conv}</span>` : ''}${p === 'saletta' && perleNuova() ? '<span class="tdot" id="dot-saletta" aria-label="Nuova perla nella bacheca"></span>' : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
@@ -1060,6 +1060,7 @@ function doRender(){
   if(st.page === 'classifiche') cardShareMark();
   rimettiScroll();
   perleSync();
+  perleCheck();
   bacPulisciVecchi();
 }
 
@@ -1948,7 +1949,7 @@ function pSaletta(d){
     <button class="gbtn sm" id="sal-inventario" data-act="go" data-p="inventario"><span class="em">📦</span>Inventario</button>
     <button class="gbtn sm" id="sal-gioco" data-act="go" data-p="gioco"><span class="em">🎲</span>Chi paga il caffè?</button>
     <button class="gbtn sm" id="sal-ruota" data-act="go" data-p="ruota"><span class="em">☕</span>Ruota del Barista<small>Chi fa i caffè?</small></button>
-    <button class="gbtn sm" id="sal-perle" data-act="go" data-p="perle"><span class="em">💬</span>Bacheca delle Perle<small>Frasi celebri</small></button>
+    <button class="gbtn sm" id="sal-perle" data-act="go" data-p="perle"><span class="em">💬</span>Bacheca delle Perle<small>${perleNuova() ? 'Nuova perla!' : 'Frasi celebri'}</small>${perleNuova() ? '<span class="tb" id="badge-perle" style="top:10px;right:14px;min-width:22px;height:22px;font-size:11px;padding:0 6px">Nuova</span>' : ''}</button>
   </div>`;
 }
 
@@ -5138,6 +5139,29 @@ A['ruota-assente'] = () => {
 
 /* Bacheca delle Perle: listener limitato, attivo solo con la pagina aperta e l'app in primo piano */
 let perleUnsub = null, perleKey = '';
+/* Badge «nuova perla»: nessun listener in più, solo UNA lettura (limit 1) a pagina aperta, al massimo ogni 3 minuti, mai in background */
+const perleKeyVisto = () => 'perleVisto_' + st.gid;
+const perleTs = x => x && x.ts && typeof x.ts.toMillis === 'function' ? x.ts.toMillis() : 0;
+const perleNuova = () => { const u = st.perleUlt; if(!u || !(u.t > 0) || u.mid === st.mid) return false; return u.t > (Number(LS.get(perleKeyVisto())) || Infinity); };
+function perleSegnaVista(L){
+  const t = L && L[0] ? perleTs(L[0]) : 0;
+  if(t > 0 && t > (Number(LS.get(perleKeyVisto())) || 0)) LS.set(perleKeyVisto(), t);
+  st.perleUlt = null;
+}
+function perleCheck(){
+  if(!inAppOra() || document.visibilityState === 'hidden' || st.page === 'perle') return;
+  const ora = Date.now(), c = st.perleChk;
+  if(c && c.gid === st.gid && (c.busy || ora - c.t < 180000)) return;
+  const gid = st.gid; st.perleChk = {gid, t: ora, busy: true};
+  C('perle').orderBy('ts', 'desc').limit(1).get().then(sn => {
+    st.perleChk = {gid, t: Date.now(), busy: false};
+    if(gid !== st.gid) return;
+    const x = sn.docs[0] ? sn.docs[0].data({serverTimestamps: 'estimate'}) : null, t = perleTs(x);
+    st.perleUlt = x ? {t, mid: x.mid} : null;
+    if(t > 0 && !(Number(LS.get(perleKeyVisto())) > 0)) LS.set(perleKeyVisto(), t);   // primo avvio: le perle già presenti non sono «nuove»
+    render();
+  }).catch(() => { st.perleChk = {gid, t: Date.now(), busy: false}; });
+}
 function perleSync(){
   const vuole = !!inAppOra() && st.page === 'perle' && document.visibilityState !== 'hidden';
   const key = vuole ? st.gid + '|' + (st.perleN || 20) : '';
@@ -5147,7 +5171,7 @@ function perleSync(){
   if(!vuole) return;
   st.perleErr = null;
   perleUnsub = C('perle').orderBy('ts', 'desc').limit(st.perleN || 20).onSnapshot(s => {
-    st.perle = s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps: 'estimate'})})); st.perleOk = true; render();
+    st.perle = s.docs.map(d => ({id: d.id, ...d.data({serverTimestamps: 'estimate'})})); st.perleOk = true; perleSegnaVista(st.perle); render();
   }, e => { st.perleOk = true; st.perleErr = errMsg(e); render(); });
 }
 document.addEventListener('visibilitychange', perleSync);
