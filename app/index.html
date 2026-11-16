@@ -119,7 +119,7 @@ h2{font-size:18px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 .tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s}
 .tgl.on{background:var(--green)}
 .tgl.on::after{left:23px}
-.scorta-mini{width:100%;display:flex;flex-direction:column;gap:3px;align-items:center;font-size:11px;font-weight:700;line-height:1.25;text-align:center}.scorta-mini .mut{font-weight:600;opacity:.85}.scorta-mini .bar{width:100%;height:6px}
+.scorta-mini{width:100%;display:flex;flex-direction:column;gap:3px;align-items:center;font-size:11px;font-weight:700;line-height:1.25;text-align:center}.scorta-mini .mut{font-weight:600;opacity:.85}.scorta-mini .bar{width:100%;height:6px}.reale-y{color:#facc15}
 .gbtn small{font-size:12.5px;font-weight:600;color:var(--tx2)}
 .gbtn.sm{min-height:min(19vh,132px);padding:10px;gap:6px;border-radius:22px;font-size:14px}.gbtn.sm .em{font-size:30px}
 .ruota-box{position:relative;width:min(78vw,300px);margin:10px auto 12px}.ruota-box svg{width:100%;height:auto;display:block}
@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.61.0';
+const VERSION = '1.62.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1339,7 +1339,7 @@ function pBar(d){
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
   const scRic = scambiPerMe(d).length, SC = statoCaffe(d), lvC = SC && SC.attivo ? caffeLivello(SC) : null;
   const rD = lvC ? realeDisp(SC) : null;
-  const scortaHome = lvC ? `<div class="scorta-mini" id="home-scorta" aria-label="Scorta caffè stimata e reale"><div class="bar"><i style="width:${lvC.pct}%;background:${lvC.col}"></i></div><span class="mono ${lvC.cls}" id="home-stimata">${scortaRighe(SC).st1}</span>${rD ? `<div class="bar" id="home-reale-bar"><i style="width:${rD.pct}%;background:${rD.col}"></i></div><span class="mono ${rD.cls}" id="home-reale">Reale: ${kgTxt(rD.rest)} kg • ~${rD.tz} caffè (rilev. ${dMese(rD.t)})</span>` : `<span class="mono mut" id="home-reale">${scortaRighe(SC).st2}</span>`}</div>` : '<small id="home-scorta">Scorta non impostata</small>';
+  const scortaHome = lvC ? `<div class="scorta-mini" id="home-scorta" aria-label="Scorta caffè stimata e reale"><div class="bar"><i style="width:${lvC.pct}%;background:${lvC.col}"></i></div><span class="mono ${lvC.cls}" id="home-stimata">${scortaRighe(SC).st1}</span>${rD ? `<div class="bar" id="home-reale-bar"><i style="width:${rD.pct}%;background:${rD.col}"></i></div><span class="mono ${rD.cls}" id="home-reale">Reale: ${kgTxt(rD.rest)} kg • ~${rD.tz} caffè · ${grCaffe()} g l'uno (rilev. ${dMese(rD.t)})</span>` : `<span class="mono mut" id="home-reale">${scortaRighe(SC).st2}</span>`}</div>` : '<small id="home-scorta">Scorta non impostata</small>';
   return `
   ${can('sistema') ? bannerBackup() : ''}
   ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
@@ -1542,6 +1542,7 @@ function busteCaricate(d){
 }
 const busteDisp = d => Math.max(0, busteCaricate(d));
 /* ---------- scorta caffe' in grani (kg) e lotti di snack/bibite: base del Tasso di Onesta' ---------- */
+const grCaffe = () => String(Math.round(10000 / resaKg()) / 10).replace('.', ',');   // grammi stimati per caffè = 1000 ÷ tazzine per kg
 const resaKg = () => { const v = Number(st.gruppo && st.gruppo.resaKg); return v >= 1 && v <= 500 ? v : CAFFE_PER_KG; };
 const cicloCaffe = () => { const c = st.gruppo && st.gruppo.caffeCiclo; return c && typeof c === 'object' ? c : null; };
 const r3 = x => Math.round(x * 1000) / 1000;
@@ -1827,7 +1828,7 @@ function pRegolamento(){
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti di oggi, settimana o mese. La pillola in alto mostra la tua posizione del mese.',
     '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
-    '<b>Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati), un indice per il caffè e uno per snack e bibite. <b>Caffè:</b> il Registro caffè (Inventario → «📒 Registro caffè») è un vero registro cronologico di <b>acquisti</b> (kg aggiunti) e <b>rilevazioni</b> (kg pesati), fino a ' + REG_MAX + ' righe: oltre, le più vecchie vengono assorbite. Il Creatore e i Supervisor con permesso Inventario possono aggiungere, correggere ed eliminare righe: data e ora sono precompilate alle 08:00 di oggi e modificabili, anche con date passate (mai future). La barra della scorta mostra sempre due righe: la quantità <b>stimata</b> attuale (scalata dai caffè pagati) e l\'ultima quantità <b>reale</b> rilevata con la sua data. Il Tasso di Onestà si calcola tra rilevazioni consecutive: kg consumati davvero (rilevazione precedente + acquisti in mezzo − kg pesati, ×' + resaKg() + ' caffè/kg) contro i caffè pagati nello stesso intervallo. Se ci sono acquisti prima della prima rilevazione, l\'app ipotizza una giacenza di 0 kg subito prima del primo acquisto e calcola già il tasso sulla prima pesata; una rilevazione inserita prima degli acquisti diventa invece il punto di partenza. Senza acquisti, la prima rilevazione avvia soltanto il conteggio. Tra una pesata e l\'altra la rimanenza è stimata (barra nel pulsante «Caffè» in Home). In Home il tasso aggregato sta nel badge 🛡️ accanto ai premi del Podio: toccandolo si apre la pagina con i dettagli. Verde da 85%, giallo 70–85%, rosso sotto 70%.',
+    '<b>Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati), un indice per il caffè e uno per snack e bibite. <b>Caffè:</b> il Registro caffè (Inventario → «📒 Registro caffè») è un vero registro cronologico di <b>acquisti</b> (kg aggiunti) e <b>rilevazioni</b> (kg pesati), fino a ' + REG_MAX + ' righe: oltre, le più vecchie vengono assorbite. Il Creatore e i Supervisor con permesso Inventario possono aggiungere, correggere ed eliminare righe: data e ora sono precompilate alle 08:00 di oggi e modificabili, anche con date passate (mai future). La scorta mostra sempre due barre: quella <b>stimata</b> (verde, gialla o rossa; scalata dai caffè pagati) e quella <b>reale</b> (sempre gialla): l\'ultima quantità rilevata con la sua data, scalata dei caffè registrati da allora. Ogni caffè pesa i grammi impostati da chi gestisce (Impostazioni → Regole punti → «A · Consumi e spese»). Il Tasso di Onestà si calcola tra rilevazioni consecutive: kg consumati davvero (rilevazione precedente + acquisti in mezzo − kg pesati, ×' + resaKg() + ' caffè/kg) contro i caffè pagati nello stesso intervallo. Se ci sono acquisti prima della prima rilevazione, l\'app ipotizza una giacenza di 0 kg subito prima del primo acquisto e calcola già il tasso sulla prima pesata; una rilevazione inserita prima degli acquisti diventa invece il punto di partenza. Senza acquisti, la prima rilevazione avvia soltanto il conteggio. Tra una pesata e l\'altra la rimanenza è stimata (barra nel pulsante «Caffè» in Home). In Home il tasso aggregato sta nel badge 🛡️ accanto ai premi del Podio: toccandolo si apre la pagina con i dettagli. Verde da 85%, giallo 70–85%, rosso sotto 70%.',
     `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
   ${sez('📢 Bacheca, Eventi &amp; Sondaggi', [
     'In Home trovi la <b>Bacheca</b>: avvisi (ℹ️ Info, 📢 Annuncio, 🥐 Novità in sala), sondaggi e gli eventi della saletta (compleanni, nascite, lauree, feste).',
@@ -2600,7 +2601,7 @@ function scortaRighe(S){
 function realeDisp(S){
   const u = S && S.ultReale; if(!u) return null;
   const rest = Math.max(0, u.kg - S.registrati / S.resa), lv = caffeLivello({kg: u.kg, restKg: rest});
-  return {...lv, rest, tz: Math.max(0, Math.round(u.kg * S.resa) - S.registrati), t: u.t};
+  return {pct: lv.pct, cls: 'reale-y', col: '#facc15', rest, tz: Math.max(0, Math.round(u.kg * S.resa) - S.registrati), t: u.t};
 }
 function caffeLivello(S){
   const pct = S && S.kg > 0 ? Math.max(0, Math.min(100, S.restKg / S.kg * 100)) : 0, low = S && S.restKg <= 1;
@@ -2817,8 +2818,11 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Tetto punti per spesa</span><input class="in mono" id="rp-spmax" inputmode="numeric" value="${ptSpesaMax()}"></label>
     </div>
     <p class="hint" style="margin:-4px 0 8px;font-size:12px">Snack e spese: punti = importo × tariffa, arrotondati all'intero (le spese anche limitate dal tetto). Il rimborso resta al 100%.</p>
-    <label class="f"><span>☕ Resa stimata per 1 kg di caffè (tazzine)</span><input class="in mono" id="rp-resa" inputmode="numeric" value="${resaKg()}"></label>
-    <p class="hint" style="margin:-4px 0 8px;font-size:12px">Scorta in grani e Tasso di Onestà: ogni caffè registrato scala 1 ÷ resa kg (predefinito ${CAFFE_PER_KG}).</p>
+    <div class="grid2">
+      <label class="f"><span>☕ Tazzine per 1 kg di caffè</span><input class="in mono" id="rp-resa" inputmode="numeric" value="${resaKg()}" data-chg="resa-gr"></label>
+      <label class="f"><span>⚖️ Grammi per caffè</span><input class="in mono" id="rp-gr" inputmode="decimal" value="${grCaffe()}" data-chg="resa-gr"></label>
+    </div>
+    <p class="hint" style="margin:-4px 0 8px;font-size:12px">Sono lo stesso dato: grammi per caffè = 1000 ÷ tazzine per kg (predefinito ${CAFFE_PER_KG} tazzine, circa ${String(Math.round(10000 / CAFFE_PER_KG) / 10).replace('.', ',')} g). Se cambi uno, l'altro si aggiorna. Ogni caffè registrato scala la scorta stimata e la barra «Reale» della Home.</p>
   </div>
   <div class="card" id="rp-b"><h3>B · Obiettivi &amp; collaborazione</h3>
     <div class="grid2">
@@ -4759,6 +4763,13 @@ document.addEventListener('change', e => {
   const el = e.target.closest('[data-chg]');
   if(el && el.dataset.chg === 'rp-data'){ st.rpDa = ($('rp-da') || {}).value || ''; st.rpA = ($('rp-a') || {}).value || ''; render(); }
   if(el && el.dataset.chg === 'rp-sw') document.querySelectorAll('#rp-sw-lista input').forEach(i => { i.disabled = !el.checked; });
+  if(el && el.dataset.chg === 'resa-gr'){
+    const r = $('rp-resa'), g = $('rp-gr');
+    if(r && g){
+      if(e.target === g){ const x = Number(String(g.value).replace(',', '.')); if(x > 0) r.value = Math.max(1, Math.min(500, Math.round(1000 / x))); }
+      const rv = Math.floor(Number(r.value)); if(rv >= 1 && rv <= 500) g.value = String(Math.round(10000 / rv) / 10).replace('.', ',');
+    }
+  }
   if(el && el.dataset.chg === 'corr') corrAggiorna();
   if(el && el.dataset.chg === 'rb-upd' && e.target.name === 's-rimb') rbAggiorna();
   if(el && el.dataset.chg === 'salper'){ st.salPer = el.value; st.scSel = null; render(); }
