@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.59.0';
+const VERSION = '1.60.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1837,7 +1837,7 @@ function pRegolamento(){
   ${sez('🔑 Ruoli', [
     '<b>Collega:</b> registra consumi, spese, ricariche e regali; consulta e svolge i compiti nel Briefing; riceve notifiche personali.',
     '<b>Creatore:</b> ha tutti i poteri, non può essere revocato ed è l\'unico che nomina e revoca i Supervisor e ne sceglie i permessi (☰ → Gestione Supervisor). Solo lui può ripristinare un backup.',
-    '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti, PIN, archivia / espelli) · 🎯 <i>Compiti e Regole</i> (compiti nel Briefing, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
+    '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti — anche impostando direttamente il nuovo saldo —, PIN, archivia / espelli) · 🎯 <i>Compiti e Regole</i> (compiti nel Briefing, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
     '<b>Accesso:</b> si entra solo con il codice del gruppo, che solo il Creatore può vedere e mandare come link (☰ → Impostazioni → «Invita i colleghi»); la condivisione dell\'app e il codice non sono visibili a Supervisor e colleghi, a cui basta chiederlo al Creatore. Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
@@ -4316,11 +4316,12 @@ A['rec-scollega'] = ds => {
 /* Modifica saldo / punti: un'unica finestra (Euro € oppure Punti pt) al posto di Accredita, Rettifica e Modifica punti */
 A['saldo-punti'] = ds => {
   const m = membro(ds.id); if(!m || !can('soci')) return;
-  openSheet(`<h3>${ic('edit')} Modifica saldo / punti ${infoBtn(`Corregge il saldo (€) o i punti (pt) di un collega senza toccare la cassa: omaggi, premi, errori, saldo iniziale. Usa il meno per togliere.`)}</h3>
+  openSheet(`<h3>${ic('edit')} Modifica saldo / punti ${infoBtn(`Corregge il saldo (€) o i punti (pt) di un collega senza toccare la cassa: omaggi, premi, errori, saldo iniziale. Usa il meno per togliere, oppure scegli «Nuovo saldo» e scrivi il saldo finale: l'app registra la differenza.`)}</h3>
     <p class="sub"><b>${esc(nomeM(m.id))}</b> · saldo <b class="mono ${saldo(m.id) < 0 ? 'red' : 'green'}">${eurS(saldo(m.id))}</b> · ⭐ ${ptDisp(derived(), m.id)} pt</p>
     <label class="f"><span>Cosa modifichi</span>${segOpts('sp-k', [['euro','€ Euro'],['pt','⭐ Punti']], 'euro')}</label>
     <label class="f"><span>Tipo di punti (solo se Punti)</span>${segOpts('sp-t', [['pulizia','🎯 Compiti'],['caffe','☕🍫 Consumi']], 'pulizia')}</label>
-    <label class="f"><span>Importo (+ aggiunge, − toglie)</span><input class="in mono" id="sp-imp" inputmode="decimal" placeholder="es. 5,00 oppure -2" autofocus></label>
+    <label class="f"><span>Come inserisci il saldo (solo se Euro)</span>${segOpts('sp-m', [['var','± Variazione'],['nuovo','🎯 Nuovo saldo']], 'var')}</label>
+    <label class="f"><span>Importo (Variazione: + aggiunge, − toglie · Nuovo saldo: il saldo finale)</span><input class="in mono" id="sp-imp" inputmode="decimal" placeholder="es. 5,00 oppure -2" autofocus></label>
     <label class="f"><span>Causale</span><input class="in" id="sp-caus" maxlength="80" placeholder="es. omaggio, correzione, saldo dal vecchio quaderno"></label>
     <button class="btn amber block big" id="btn-sp-ok" data-act="conferma-saldo-punti" data-id="${m.id}">Registra</button>`);
 };
@@ -4332,6 +4333,15 @@ A['conferma-saldo-punti'] = ds => {
     if(!n || Math.abs(n) > 1000) return toast('Variazione non valida', 'err');
     addMov({tipo:'punti_adj', mid, kind: radio('sp-t') === 'caffe' ? 'caffe' : 'pulizia', punti: n, causale: caus.slice(0, 60)});
     closeSheet(); return toast('Punti aggiornati');
+  }
+  if(radio('sp-m') === 'nuovo'){
+    // nuovo saldo: si registra la sola differenza rispetto al saldo di adesso (stessa rettifica di sempre, nessun effetto sulla cassa)
+    const nuovo = parseEuro(val('sp-imp'));
+    if(!Number.isFinite(nuovo) || Math.abs(nuovo) > 500000) return toast('Saldo non valido', 'err');
+    const diff = nuovo - saldo(mid);
+    if(diff === 0){ closeSheet(); return toast('Il saldo è già ' + eurS(nuovo)); }
+    addMov({tipo:'rettifica', mid, importo: diff, causale: caus || ('Saldo impostato a ' + eurS(nuovo))});
+    closeSheet(); return toast('Saldo impostato a ' + eurS(nuovo));
   }
   const imp = parseEuro(val('sp-imp'));
   if(!imp || Math.abs(imp) > 500000) return toast('Importo non valido', 'err');
