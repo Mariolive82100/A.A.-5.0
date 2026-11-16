@@ -483,8 +483,8 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.64.0';
-const MAXOP = 50000, CAFFE_PER_KG = 130;
+const VERSION = '1.65.0';
+const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
 const SOGLIA_SCORTA = 2;          // giacenza sotto cui un articolo e' "da ricomprare"
@@ -1800,7 +1800,7 @@ function pRegolamento(){
     '<b>Ricarica:</b> la chiedi dal pulsante «Ricarica»; i crediti arrivano quando un Supervisor conferma l\'incasso.',
     '<b>Saldo mai sotto zero:</b> senza credito non si registrano caffè, snack, regali o vendite.',
     '<b>Riscatto in denaro:</b> l\'importo resta riservato finché un Supervisor non lo paga dalla cassa.',
-    '<b>Regala crediti:</b> immediato e definitivo. <b>Scambia / Vendi:</b> il collega conferma dopo aver ricevuto il denaro.'])}
+    `<b>Regala crediti:</b> immediato e definitivo, fino a ${MAX_REGALO} crediti (${eur(MAX_REGALO * 100)}) per collega e per regalo. <b>Scambia / Vendi:</b> il collega conferma dopo aver ricevuto il denaro.`])}
   ${sez('☕ Caffè e snack', [
     `Prezzo da listino (caffè ${eur(g.prezzoCaffe || 0)}), addebitato subito sul saldo.`,
     `Ti sei sbagliato? <b>Annulla entro ${ANNULLA_MIN} minuti.</b>`,
@@ -3628,10 +3628,10 @@ A['cp-sugg'] = () => {
 function rgAggiorna(){
   if(!$('rg-q')) return;
   const n = document.querySelectorAll('#sheet input.rg-c:checked').length;
-  const raw = val('rg-q'), qOk = /^\d{1,3}$/.test(raw) && +raw >= 1 && +raw <= 500, q = qOk ? +raw : 0;
+  const raw = val('rg-q'), qOk = /^\d{1,3}$/.test(raw) && +raw >= 1 && +raw <= MAX_REGALO, q = qOk ? +raw : 0;
   const tot = n * q, ins = qOk && tot * 100 > creditoLibero();
   const t = $('rg-tot');
-  if(t) t.innerHTML = !qOk ? 'Indica quanti crediti regalare (numero intero)' : n ? `${n} ${n === 1 ? 'collega' : 'colleghi'} × ${q} ${q === 1 ? 'credito' : 'crediti'} = <b class="mono ${ins ? 'red' : 'green'}">${tot} ${tot === 1 ? 'credito totale' : 'crediti totali'}</b>` : 'Seleziona almeno un collega';
+  if(t) t.innerHTML = !qOk ? `Indica quanti crediti regalare (numero intero da 1 a ${MAX_REGALO})` : n ? `${n} ${n === 1 ? 'collega' : 'colleghi'} × ${q} ${q === 1 ? 'credito' : 'crediti'} = <b class="mono ${ins ? 'red' : 'green'}">${tot} ${tot === 1 ? 'credito totale' : 'crediti totali'}</b>` : 'Seleziona almeno un collega';
   const w = $('rg-warn'); if(w) w.style.display = ins ? '' : 'none';
   const b = $('rg-send'); if(b) b.disabled = !(n > 0 && qOk && !ins);
 }
@@ -3642,7 +3642,7 @@ A['regala'] = () => {
     <p class="sub">Un regalo gratuito: i crediti passano subito ai colleghi scelti, senza approvazione e senza possibilità di annullo. Disponibili: <b class="mono green">${eur(creditoLibero())}</b></p>
     <div class="between" style="margin-bottom:8px"><b style="font-size:13px">Colleghi</b><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="rg-tutti" data-v="1">Seleziona tutti</button><button class="btn sm ghost" data-act="rg-tutti" data-v="0">Deseleziona tutti</button></span></div>
     ${cercaBox('rg-lista')}<div id="rg-lista" style="max-height:34vh;overflow:auto;margin-bottom:10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="rg-c" value="${m.id}" data-chg="rg-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('rg-lista')}</div>
-    <label class="f"><span>Crediti per ogni collega</span><input class="in mono" id="rg-q" inputmode="numeric" maxlength="3" value="1" data-chg="rg-upd"></label>
+    <label class="f"><span>Crediti per ogni collega (massimo ${MAX_REGALO})</span><input class="in mono" id="rg-q" inputmode="numeric" maxlength="2" value="1" data-chg="rg-upd"></label>
     <label class="f"><span>Causale (facoltativa)</span><input class="in" id="rg-msg" maxlength="80" placeholder="Es. Grazie per il turno, Caffè del venerdì, Auguri!"></label>
     <div id="rg-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
     <div id="rg-warn" class="banner red" style="display:none">${ic('alert')}<div><b>Saldo insufficiente</b></div></div>
@@ -3707,7 +3707,7 @@ A['scambio-esito'] = ds => {
 A['rg-tutti'] = ds => { document.querySelectorAll('#sheet input.rg-c').forEach(x => { const l = x.closest('label'); if(!l || !l.hidden) x.checked = ds.v === '1'; }); rgAggiorna(); };
 A['rg-invia'] = () => {
   const ids = [...document.querySelectorAll('#sheet input.rg-c:checked')].map(x => x.value).filter(x => x !== st.mid && membro(x));
-  const raw = val('rg-q'); if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > 500) return toast('Quantità non valida', 'err');
+  const raw = val('rg-q'); if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > MAX_REGALO) return toast(`Quantità non valida: da 1 a ${MAX_REGALO} crediti per collega`, 'err');
   const q = +raw, imp = q * 100, msg = val('rg-msg').slice(0, 80);
   if(!ids.length) return toast('Seleziona almeno un collega', 'err');
   if(ids.length * imp > creditoLibero()) return toast('Saldo insufficiente', 'err');
