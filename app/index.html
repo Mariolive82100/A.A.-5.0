@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.75.0';
+const VERSION = '1.75.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1374,9 +1374,7 @@ function pBar(d){
   const qAtt = d.pendenti.find(m => m.tipo === 'quota' && m.mid === st.mid && String(m.anno) === anno());
   const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && p.esaurito !== true && giacenza(d, p) > 0);
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
-  const scRic = scambiPerMe(d).length, SC = statoCaffe(d), lvC = SC && SC.attivo ? caffeLivello(SC) : null;
-  const rD = lvC ? realeDisp(SC) : null;
-  const scortaHome = lvC ? `<div class="scorta-mini" id="home-scorta" aria-label="Scorta caffè stimata e reale"><div class="bar"><i style="width:${lvC.pct}%;background:${lvC.col}"></i></div><span class="mono ${lvC.cls}" id="home-stimata">${scortaRighe(SC).st1}</span>${rD ? `<div class="bar" id="home-reale-bar"><i style="width:${rD.pct}%;background:${rD.col}"></i></div><span class="mono ${rD.cls}" id="home-reale">Reale: ${kgTxt(rD.rest)} kg • ~${rD.tz} caffè · ${grCaffe()} g l'uno (rilev. ${dMese(rD.t)})</span>` : `<span class="mono mut" id="home-reale">${scortaRighe(SC).st2}</span>`}</div>` : '<small id="home-scorta">Scorta non impostata</small>';
+  const scRic = scambiPerMe(d).length;
   return `
   ${can('sistema') ? bannerBackup() : ''}
   ${bannerChiusura(d)}
@@ -1401,9 +1399,9 @@ function pBar(d){
     <div class="blob" style="width:220px;height:220px;background:#7c3aed;top:38%;right:-60px"></div>
     <div class="blob" style="width:180px;height:180px;background:#10b981;bottom:2%;left:20%"></div>
     <div class="grid">
-      <button class="gbtn" id="btn-paga" data-act="paga-menu" ${noCaffe && noSnack ? 'disabled' : ''}><span class="em">💳</span>Paga${noCaffe && noSnack ? '<small>credito insufficiente</small>' : ''}${scortaHome}</button>
+      <button class="gbtn" id="btn-paga" data-act="paga-menu" ${noCaffe && noSnack ? 'disabled' : ''}><span class="em">💳</span>Paga${noCaffe && noSnack ? '<small>credito insufficiente</small>' : '<small>Caffè, snack e bibite</small>'}</button>
       <button class="gbtn" id="btn-lavoro" data-act="lavoro-menu"><span class="em"><svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" aria-hidden="true" style="color:#7dd3fc;display:block"><path d="M12 1.5l1.3 5.2.6 3.6 7.6 5.7v2.4l-7.4-2.3-.4 3.3 2.2 1.8V23L12 22.2 8.2 23v-1.6l2.2-1.8-.4-3.3-7.5 2.3v-2.4l7.6-5.7.6-3.6z"/></svg></span>Lavoro compiuto<small>+1 in Indefesso</small></button>
-      <button class="gbtn" id="btn-altro" data-act="altro-menu"><span class="em">⋯</span>Altro<small>Ben fatto! e novità</small></button>
+      <button class="gbtn" id="btn-benfatto" data-act="benfatto" ${bfRestanti() > 0 ? '' : 'disabled'}><span class="em">👏</span>Ben fatto<small id="bf-stato">${!onP('ptBfOn') && bfRestanti() > 0 ? 'Riconosci un collega' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone disponibile' : ' gettoni disponibili') : 'Disponibile ' + bfCountdown()}</small></button>
       <button class="gbtn" id="btn-crediti-home" data-act="crediti-menu"><span class="em">🎁</span>Regala o scambia crediti<small>Tra colleghi</small></button>
     </div>
   </div>
@@ -1868,7 +1866,7 @@ function pRegolamento(){
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
     `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).${podioOn() ? ` 🏅 Podio del mese: bonus di ${podioPt(1)}, ${podioPt(2)} e ${podioPt(3)} punti ai primi tre in classifica del mese solare, assegnati dal Supervisor a inizio mese.` : ''}`,
     `<b>Si riscattano:</b> ogni ${sogliaPunti()} punti = ${creditiSoglia()} ${creditiSoglia() === 1 ? 'credito' : 'crediti'} (${eur(creditiSoglia() * 100)}). La classifica non cambia.`,
-    `<b>Ben fatto!</b> riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
+    `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti di oggi, settimana o mese. La pillola in alto mostra la tua posizione del mese.',
     '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
@@ -3779,14 +3777,6 @@ function acAggiorna(){
   if(t) t.innerHTML = !r ? 'Scegli il collega da cui comprare' : !qOk ? 'Indica quanti crediti vuoi comprare (numero intero)' : `Compri <b class="mono green">${q} ${q === 1 ? 'credito' : 'crediti'}</b> da ${esc(nomeBreve(r.value) || nomeM(r.value))} · da pagargli <b class="mono">${eur(q * 100)}</b>`;
   const b = $('ac-invia'); if(b) b.disabled = !(r && qOk);
 }
-A['altro-menu'] = () => {
-  const bf = bfRestanti() > 0;
-  openSheet(`<h3>⋯ Altro</h3>
-    <button class="btn amber block big" id="btn-benfatto" data-act="benfatto" style="margin-bottom:10px" ${bf ? '' : 'disabled'}>👏 Ben fatto!</button>
-    <p class="sub" style="margin:-4px 0 14px" id="bf-stato">${!onP('ptBfOn') && bf ? 'Riconosci un collega (senza punti)' : bf ? bfRestanti() + (bfRestanti() === 1 ? ' gettone disponibile' : ' gettoni disponibili') : 'Disponibile ' + bfCountdown()}</p>
-    <button class="btn block big" id="btn-coming-soon" disabled style="opacity:.55">✨ Coming soon</button>
-    <p class="sub" style="margin:6px 0 0">Novità in arrivo: restate sintonizzati.</p>`);
-};
 A['crediti-menu'] = () => {
   if(!membriAttivi().some(m => m.id !== st.mid)) return toast('Non ci sono altri colleghi', 'err');
   openSheet(`<h3>🎁 Regala o scambia crediti</h3>
