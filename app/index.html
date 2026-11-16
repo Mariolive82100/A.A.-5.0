@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.73.0';
+const VERSION = '1.73.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1850,7 +1850,7 @@ function pRegolamento(){
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🏆 Sfide', [
     'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi tre blocchi: <b>🔥 In corso</b> (📅 <i>Settimana</i> e 🗓️ <i>Mese</i>), <b>🏁 Concluse</b> (🏁 <i>Settimana</i> e 🏆 <i>Mese</i>, il periodo appena trascorso) e <b>⚔️ Lancia una sfida</b> (presto). Toccane una per vedere l\'elenco con i punti in palio e <b>la tua posizione</b>; tocca una sfida per aprire la <b>classifica completa</b>. L\'icona <b>ⓘ</b> accanto al titolo spiega la regola e lo spareggio.',
-    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. <b>Settimanali</b> (da lunedì a domenica, 20 punti): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati). <b>Mensili</b> (mese solare, 30 punti): 🔋 <i>Ricarica Top del Mese</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (più turni di pulizia) · 👏 <i>Collega del Mese</i> (più «Ben fatto» ricevuti) · 🏆 <i>Re dei Punti</i> (più punti totali). Nelle schede 📅 e 🗓️ vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
+    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. <b>Settimanali</b> (da lunedì a domenica, 20 punti): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati). <b>Mensili</b> (mese solare, 30 punti): 🔋 <i>Ricarica Top del Mese</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (più turni di pulizia) · 👏 <i>Collega del Mese</i> (più «Ben fatto» ricevuti). I punti totali del mese li premia già il Podio del mese, se attivo. Nelle schede 📅 e 🗓️ vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
     '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi; nella sfida delle spese si vede solo il numero di acquisti.',
     '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti in palio al vincitore con un tocco, dalla classifica della sfida. Il premio compare nel registro e va nella <b>Tessera Fedeltà</b>, come i bonus del podio; un premio non si può assegnare due volte.',
     '<b>Sfide aperte e concluse:</b> le sfide aperte e quelle concluse stanno in schede separate. <b>Aperte</b>: il periodo che sta correndo, con la tua posizione e il tempo che manca. <b>Concluse</b>: la settimana o il mese appena trascorsi, con il vincitore (o i vincitori ex aequo), il tuo piazzamento e lo stato del premio (✅ <i>Premio assegnato</i> oppure, per chi gestisce le sfide, il tasto 🏆 Assegna). Toccando una sfida concluse si apre la <b>classifica finale</b>, sempre visibile a tutti. Anche dopo una Chiusura Periodo le classifiche restano complete: i conteggi per settimana e per mese vengono conservati nel riepilogo della chiusura. Resta il segno ⚠️ <i>dati parziali</i> solo per i periodi che toccano chiusure fatte prima di questa novità. Quando <b>vinci</b> una sfida, alla prima apertura dell\'app dopo l\'assegnazione del premio compare un\'animazione a tutto schermo con le sfide vinte e i punti (si chiude con un tocco). Il tasto o il gesto <b>Indietro</b> del telefono torna di un livello dentro le Sfide, senza passare dalla Home.',
@@ -1930,9 +1930,7 @@ const SF_FISSE = {
   sfauto_pulizie: {id: 'sfauto_pulizie', nome: '🧹 Mastro Lindo', per: 'mese', pt: 30, tipo: 'pulizie',
     descr: 'Vince chi svolge più turni di pulizia nel mese solare; contano anche i vecchi compiti convalidati.', spareggio: 'A parità di turni vince chi ha ottenuto più punti pulizia. ' + SF_PAREGGIO},
   sfauto_bf: {id: 'sfauto_bf', nome: '👏 Collega del Mese', per: 'mese', pt: 30, tipo: 'benfatto',
-    descr: 'Vince chi riceve più «Ben fatto!» nel mese solare.', spareggio: SF_PAREGGIO},
-  sfauto_punti: {id: 'sfauto_punti', nome: '🏆 Re dei Punti', per: 'mese', pt: 30, tipo: 'punti',
-    descr: 'Vince chi nel mese solare accumula più punti in totale: caffè, snack, compiti, spese e «Ben fatto».', spareggio: SF_PAREGGIO}
+    descr: 'Vince chi riceve più «Ben fatto!» nel mese solare.', spareggio: SF_PAREGGIO}
 };
 /* animazione a tutto schermo quando si vince una sfida: vittorie dai premi in memoria (movimenti aperti + registro delle chiusure),
    «già vista» solo in localStorage; considera i premi degli ultimi 14 giorni. Nessuna lettura o scrittura su Firestore. */
@@ -1993,7 +1991,7 @@ const sfWk = t => { const x = new Date(t); x.setHours(0, 0, 0, 0); x.setDate(x.g
 const sfMs = t => { const x = new Date(t); return 'm' + x.getFullYear() + '-' + pad(x.getMonth() + 1); };
 const sfTc = m => { const e = m.esitoTs; return e && typeof e.toMillis === 'function' ? e.toMillis() : m.t; };
 function sfBuckets(list){
-  const W = {}, M = {}, GM = {}, byId = {}; list.forEach(m => { byId[m.id] = m; });
+  const W = {}, M = {}, byId = {}; list.forEach(m => { byId[m.id] = m; });
   const row = (o, k, mid, n) => { const b = o[k] = o[k] || {}; return mid ? (b[mid] = b[mid] || new Array(n).fill(0)) : new Array(n).fill(0); };
   list.forEach(m => {
     let src = m, sg = 1;
@@ -2007,10 +2005,7 @@ function sfBuckets(list){
     if(src.tipo === 'ben_fatto') row(M, sfMs(t), src.aMid, 7)[6] += sg;
     if(src.tipo === 'ricarica' && src.stato === 'confermata') row(M, sfMs(tc), src.mid, 7)[0] += sg * (src.importo || 0);
     if(src.tipo === 'spesa' && src.stato === 'confermata'){ const r = row(M, sfMs(tc), src.mid, 7); r[1] += sg; r[2] += sg * (src.importo || 0); }
-    const km = sfMs(t); aggMov(GM[km] = GM[km] || nuovoAgg(), src, sg);
   });
-  Object.keys(GM).forEach(k => { const G = GM[k], ids = new Set(); ['ptC', 'ptP', 'ptS', 'ptB'].forEach(f => Object.keys(G[f]).forEach(i => ids.add(i)));
-    ids.forEach(i => { const v = nz(G.ptC, i) + nz(G.ptP, i) + nz(G.ptS, i) + nz(G.ptB, i); if(v) row(M, k, i, 7)[3] += v; }); });
   [W, M].forEach(o => Object.keys(o).forEach(k => { Object.keys(o[k]).forEach(i => { if(o[k][i].every(v => !v)) delete o[k][i]; }); if(!Object.keys(o[k]).length) delete o[k]; }));
   return {w: W, m: M, v: 2};
 }
@@ -3226,7 +3221,7 @@ A['aggiorna'] = async () => {
 };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
-A['go'] = ds => { if(ds.p === 'sfide'){ sfSez = null; sfDet = null; sfTab = 'corso'; } if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['go'] = ds => { if(sfHd > 0){ const n = sfHd; sfHd = 0; try { history.go(-n); } catch(e){} } if(ds.p === 'sfide'){ sfSez = null; sfDet = null; sfTab = 'corso'; } if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
 
 /* --- condivisione dell'app (solo il link, senza codice gruppo) e installazione --- */
@@ -3693,11 +3688,11 @@ A['sv-revoca'] = ds => {
   b.commit().then(() => { closeSheet(); toast(`${m.nome} non è più Supervisor`); }).catch(e => toast(errMsg(e), 'err'));
 };
 /* --- sfide fisse: navigazione e assegnazione del premio (unica azione dell'admin) --- */
-A['sf-apri'] = ds => { if(!SF_PER[ds.s]) return; sfSez = ds.s; sfDet = null; sfTab = 'corso'; window.scrollTo(0, 0); render(); };
+A['sf-apri'] = ds => { if(!SF_PER[ds.s]) return; if(sfHd === 0) sfHPush(); sfSez = ds.s; sfDet = null; sfTab = 'corso'; window.scrollTo(0, 0); render(); };
 A['chiusura-nascondi'] = () => { LS.set('chiusuraNasc_' + st.gid, oggiISO()); render(); };
 A['vittoria-chiudi'] = () => { const e = $('vittoria'); if(e) e.remove(); vitOpen = false; };
-A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; sfDet = ds.id; sfTab = ds.t === 'concluso' ? 'concluso' : 'corso'; window.scrollTo(0, 0); render(); };
-A['sf-back'] = () => { sfTab = 'corso'; if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
+A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; if(sfHd === 1) sfHPush(); sfDet = ds.id; sfTab = ds.t === 'concluso' ? 'concluso' : 'corso'; window.scrollTo(0, 0); render(); };
+A['sf-back'] = () => { if(sfHd > 0){ history.back(); return; } sfTab = 'corso'; if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
 /* premio a fine periodo: un movimento 'bonus_podio' per vincitore con ID deterministico (create-only: nessun doppio accredito) */
 A['sf-assegna'] = ds => {
   const x = SF_FISSE[ds.id]; if(!x || !can('compiti')) return;
@@ -5313,9 +5308,29 @@ function indietro(){
   if(st.page !== 'bar'){ A['go']({p: SALETTA_SUB.includes(st.page) && st.page !== 'saletta' ? 'saletta' : 'bar'}); return true; }
   return false;
 }
+/* Livelli delle Sfide (schede → elenco → classifica): ognuno ha una propria voce di cronologia, creata da un tocco dell'utente.
+   Indietro la toglie in modo naturale e l'app aggiorna la schermata; così più Indietro di fila non consumano la sentinella e non fanno uscire dall'app. */
+let sfHd = 0;
+const sfHPush = () => { if(!backArmata) return; try { history.pushState({armieri: 'sf', d: ++sfHd}, ''); } catch(e){ sfHd--; } };
+const overlayAperto = () => !!(($('infopop') && $('infopop').classList.contains('on')) || $('sheet').classList.contains('on') || $('drawer').classList.contains('on') || $('vittoria'));
+function chiudiOverlay(){
+  if($('vittoria')) A['vittoria-chiudi']();
+  else if($('infopop') && $('infopop').classList.contains('on')) A['info-x']();
+  else if($('sheet').classList.contains('on')) closeSheet();
+  else A['drawer-close']();
+}
 window.addEventListener('popstate', () => {
   if(!backArmata) return;
-  if(history.state && history.state.armieri === 'guard') return;   // avanti/indietro verso la sentinella: niente da fare
+  const hs = history.state;
+  if(hs && (hs.armieri === 'sf' || hs.armieri === 'guard')){
+    const d = hs.armieri === 'sf' ? hs.d : 0;
+    if(sfHd > d){
+      if(overlayAperto()){ chiudiOverlay(); try { for(let k = d + 1; k <= sfHd; k++) history.pushState({armieri: 'sf', d: k}, ''); } catch(e){} return; }   // prima si chiude finestra/menu, il livello resta
+      sfHd = d;
+      if(st.page === 'sfide'){ if(d < 2) sfDet = null; if(d < 1){ sfSez = null; sfTab = 'corso'; } window.scrollTo(0, 0); render(); }
+    }
+    return;   // avanti/indietro verso una voce dell'app: niente altro da fare
+  }
   if(indietro()){ backRiarma(); return; }
   toast('Premi ancora Indietro per uscire');
   clearTimeout(backTimer);
