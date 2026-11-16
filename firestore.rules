@@ -105,6 +105,11 @@ service cloud.firestore {
                       && d.pt >= d.importo * gruppo().get('ptSnackEuro', 10) / 100 - 1)) : d.get('pt', -1) == 0))
           || (d.tipo == 'ricarica' && d.stato == 'attesa' && importoOk(d.importo)
               && d.metodo in ['contanti', 'revolut'])
+          // richiesta di pagamento della quota annuale del fondo: importo = quota del gruppo, nessun credito al collega; la conferma e' di un admin (Approva richieste)
+          || (d.tipo == 'quota' && d.stato == 'attesa' && importoOk(d.importo)
+              && d.metodo in ['contanti', 'revolut'] && d.cred == false
+              && d.importo == gruppo().get('quotaAnnua', 0)
+              && d.anno is string && d.anno.size() == 4)
           // richiesta di riscatto di crediti dal Fondo Gruppo: la paga un admin dalla cassa; il saldo lo controlla l'app
           || (d.tipo == 'riscatto' && d.stato == 'attesa' && importoOk(d.importo)
               && d.metodo in ['contanti', 'revolut'] && !('rif' in d))

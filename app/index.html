@@ -483,7 +483,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.58.0';
+const VERSION = '1.59.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130;
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -766,6 +766,7 @@ function applyMov(S, m, sg){
     // quota annua: l'addebito abbassa il saldo; il pagamento lo riporta su e (se in contanti/Revolut) entra in cassa
     case 'addebito_quota': add(S.saldi, m.mid, -sg*m.importo); S.dovute[m.anno] = S.dovute[m.anno] || {}; add(S.dovute[m.anno], m.mid, sg); break;
     case 'quota':
+      if(m.stato && m.stato !== 'confermata') break;   // richiesta in attesa / rifiutata / annullata: nessun effetto contabile
       S.quote[m.anno] = S.quote[m.anno] || {}; add(S.quote[m.anno], m.mid, sg);
       if(typeof m.cred === 'boolean'){
         // modello prepagato: la quota e' un contributo al fondo; i crediti si accreditano solo se il Supervisor lo sceglie (cred)
@@ -792,7 +793,7 @@ function applyMov(S, m, sg){
     case 'pulizia': (m.mids || []).forEach(x => { add(S.turni, x, sg); add(S.punti, x, sg*ptPulM(m)); if(sg > 0) S.ultimo[x] = Math.max(S.ultimo[x] || 0, m.giorno ? new Date(m.giorno + 'T12:00:00').getTime() : (m.t || 0)); }); break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(S.turni, m.mid, sg); add(S.punti, m.mid, sg*(m.punti || 0)); if(sg > 0) S.ultimo[m.mid] = Math.max(S.ultimo[m.mid] || 0, m.t || 0); } break;   // il «carico» non assegna nulla: i punti arrivano alla conferma
     case 'compito': if(m.stato === 'confermata'){ add(S.turni, m.mid, sg); add(S.punti, m.mid, sg*(m.punti || 0)); if(sg > 0) S.ultimo[m.mid] = Math.max(S.ultimo[m.mid] || 0, m.t || 0); } break;   // i punti arrivano solo alla convalida del Supervisor
-    case 'storno': if(m.orig) applyMov(S, m.orig, -sg); break;
+    case 'storno': if(m.orig) applyMov(S, m.orig.tipo === 'quota' ? {...m.orig, cred: false} : m.orig, -sg); break;   // annullare una quota non toglie mai crediti: ritorna solo l'eventuale importo in cassa
   }
 }
 function applyStat(T, m, sg){
@@ -1333,6 +1334,7 @@ function pBar(d){
   const recenti = d.movs.filter(m => m.uid === st.uid && ['caffe','snack'].includes(m.tipo) && !m.stato && !d.stornati.has(m.id) && Date.now() - m.t < ANNULLA_MIN*60000).reverse();
   const sq = statoQuota(d, st.mid, anno());
   const quotaDa = st.gruppo.quotaAnnua > 0 && st.ready.mv && sq !== 'pagata';
+  const qAtt = d.pendenti.find(m => m.tipo === 'quota' && m.mid === st.mid && String(m.anno) === anno());
   const snDisp = st.prodotti.filter(p => p.id !== PID_CAFFE && p.categoria !== 'fondo' && p.attivo !== false && p.esaurito !== true && giacenza(d, p) > 0);
   const noCaffe = !puoPagare(pc), snVuoto = snDisp.length === 0, noSnack = snVuoto || !snDisp.some(p => puoPagare(p.prezzo));
   const scRic = scambiPerMe(d).length, SC = statoCaffe(d), lvC = SC && SC.attivo ? caffeLivello(SC) : null;
@@ -1340,7 +1342,7 @@ function pBar(d){
   return `
   ${can('sistema') ? bannerBackup() : ''}
   ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
-  ${quotaDa ? `<div class="banner red" id="banner-quota">${ic('alert')}<div>⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}). Versala a un Supervisor: la registrerà lui.</div></div>` : ''}
+  ${quotaDa ? (qAtt ? `<div class="banner amber" id="banner-quota">${ic('clock')}<div class="grow">⏳ <b>Quota saletta</b> (${eur(qAtt.importo)}): richiesta inviata, in attesa di conferma.</div><button class="btn sm ghost" id="btn-annulla-quota" data-act="annulla-richiesta" data-id="${qAtt.id}">Annulla</button></div>` : `<div class="banner red" id="banner-quota">${ic('alert')}<div class="grow">⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}).</div><button class="btn sm amber" id="btn-paga-quota" data-act="paga-quota">Paga quota</button></div>`) : ''}
   <div class="card" style="text-align:center">
     <small class="mut">Il tuo saldo</small>
     <div class="mono ${s < 0 ? 'red' : 'green'}" id="home-saldo" style="font-size:30px;font-weight:800;line-height:1.15;margin:2px 0 10px">${eurS(s)}</div>
@@ -1372,7 +1374,7 @@ function pBar(d){
 }
 
 /* ---------- richieste, notifiche, crediti ---------- */
-const testoAttesa = m => m.tipo === 'ricarica' ? (m.fondo ? 'Quota fondo ' : 'Ricarica ') + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : m.tipo === 'riscatto' ? 'Riscatto ' + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : 'Spesa ' + eur(m.importo) + ' · ' + esc(m.descr || '');
+const testoAttesa = m => m.tipo === 'quota' ? 'Quota fondo ' + esc(m.anno) + ' ' + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : m.tipo === 'ricarica' ? (m.fondo ? 'Quota fondo ' : 'Ricarica ') + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : m.tipo === 'riscatto' ? 'Riscatto ' + eur(m.importo) + ' · ' + (FONTI[m.metodo] || m.metodo) : 'Spesa ' + eur(m.importo) + ' · ' + esc(m.descr || '');
 function richiesteUtente(d){
   const mie = d.pendenti.filter(m => m.mid === st.mid && m.tipo !== 'compito');
   return mie.length ? `<div class="card"><h3>${ic('clock','s')} In attesa</h3><div class="list">${mie.map(m => `
@@ -1424,6 +1426,8 @@ function inboxAdmin(d){
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), (m.fonte === 'denaro' || m.fonte === 'misto') ? bt('paga-spesa', m.id, 'green', 'Convalida e Paga') : bt('esito', m.id, 'green', 'Convalida', 'confermata')]);
     else if(m.tipo === 'ricarica') card(m.t, 'Versamento', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `${m.fondo ? 'Quota fondo' : 'Ricarica crediti'} · ${esc(FONTI[m.metodo] || m.metodo || '')}`,
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma incasso', 'confermata')]);
+    else if(m.tipo === 'quota') card(m.t, 'Quota fondo', 'amber', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `Quota ${esc(m.anno)} · ${esc(FONTI[m.metodo] || m.metodo || '')} · entra in cassa, il saldo del collega non cambia`,
+      [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('esito', m.id, 'green', 'Conferma incasso', 'confermata')]);
     else if(m.tipo === 'riscatto') card(m.t, 'Riscatto', 'green', `${esc(nomeM(m.mid))} · ${eur(m.importo)}`, `chiede al Fondo Gruppo · preferisce ${esc(FONTI[m.metodo] || m.metodo || '')} · saldo ${eurS(saldo(m.mid))}`,
       [bt('esito', m.id, 'ghost', 'Rifiuta', 'rifiutata'), bt('riscatto-paga', m.id, 'green', 'Paga e conferma')]);
     else if(m.tipo === 'compito') card(m.fattoTs || m.t, 'Compito', 'violet', `${esc(m.nome || 'Compito')} · ${esc(nomeM(m.mid))}`, `Segnala di aver svolto il compito · +${m.punti || 0} punti alla convalida`,
@@ -1465,7 +1469,7 @@ function storicoRichieste(d){
   const me = st.mid, adm = st.isAdmin, N = st.storicoN || 30;
   const src = (adm && st.arcMov ? st.arcMov : []).concat(d.movs);
   const st_ = new Set(src.filter(m => m.tipo === 'storno').map(m => m.rif));
-  const list = src.filter(m => ['spesa', 'ricarica', 'riscatto', 'scambio'].includes(m.tipo) && ['confermata', 'rifiutata', 'annullata'].includes(m.stato) && (adm || [m.mid, m.dest, m.daMid, m.aMid].includes(me)))
+  const list = src.filter(m => ['spesa', 'ricarica', 'riscatto', 'scambio', 'quota'].includes(m.tipo) && ['confermata', 'rifiutata', 'annullata'].includes(m.stato) && (adm || [m.mid, m.dest, m.daMid, m.aMid].includes(me)))
     .map(m => ({m, t: tms(m.esitoTs) || m.t || 0})).sort((a, b) => b.t - a.t);
   const righe = list.slice(0, N).map(({m, t}) => { const x = descMov(m);
     const pill = m.stato === 'confermata' ? (st_.has(m.id) ? '<span class="pill red">stornata</span>' : '<span class="pill green">accettata</span>') : m.stato === 'rifiutata' ? '<span class="pill red">rifiutata</span>' : '<span class="pill mut">annullata</span>';
@@ -1483,6 +1487,7 @@ function notifiche(d){
     const t = tms(m.esitoTs) || m.t || 0, ok = m.stato === 'confermata';
     if(m.tipo === 'spesa' && m.mid === me && m.esitoDa && (ok || m.stato === 'rifiutata')) out.push({t, e: ok ? '✅' : '❌', x: `La tua spesa «${esc(m.descr || '')}» (${eur(m.importo)}) è stata ${ok ? 'approvata' : 'rifiutata'}`});
     else if(m.tipo === 'ricarica' && m.mid === me && m.esitoDa && (ok || m.stato === 'rifiutata')) out.push({t, e: ok ? '✅' : '❌', x: `Il tuo pagamento di ${eur(m.importo)} è stato ${ok ? 'approvato' : 'rifiutato'}`});
+    else if(m.tipo === 'quota' && m.mid === me && m.esitoDa && (ok || m.stato === 'rifiutata')) out.push({t, e: ok ? '✅' : '❌', x: `La tua quota fondo ${esc(m.anno)} (${eur(m.importo)}) è stata ${ok ? 'confermata' : 'rifiutata'}`});
     else if(m.tipo === 'accredito' && m.mid === me) out.push({t, e: '🎁', x: `Accredito ricevuto: ${eur(m.importo)} di crediti${m.causale ? ' · ' + esc(m.causale) : ''}`});
     else if(m.tipo === 'conversione' && m.mid === me) out.push({t, e: '🔄', x: `Hai convertito ${m.punti} Punti Pulizia in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
@@ -1620,7 +1625,10 @@ function descMov(m){
     case 'uscita': return {ic:'💸', t: `Uscita: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: -m.importo, cassa: true};
     case 'entrata': return {ic:'📥', t: `Entrata: ${esc(m.causale || '')} · ${FONTI[m.fonte]}`, a: m.importo, cassa: true};
     case 'giroconto': return {ic:'🔁', t: `Giroconto ${FONTI[m.da]} → ${FONTI[m.a]}`, a: 0, neutro: m.importo, cassa: true};
-    case 'quota': return typeof m.cred === 'boolean'
+    case 'quota':
+      if(m.stato === 'attesa') return {ic:'⏳', t: `Quota ${esc(m.anno)} di ${n} in attesa di conferma · ${METODI_QUOTA[m.metodo] || m.metodo}`, a: 0};
+      if(m.stato === 'rifiutata' || m.stato === 'annullata') return {ic:'🛡️', t: `Quota ${esc(m.anno)} di ${n} ${m.stato === 'rifiutata' ? 'rifiutata' : 'annullata'}`, a: 0};
+      return typeof m.cred === 'boolean'
       ? {ic:'🛡️', t: `Quota ${esc(m.anno)} pagata da ${n} · ${METODI_QUOTA[m.metodo] || m.metodo} · ${m.cred ? 'accreditata anche come crediti' : 'solo contributo al fondo'}`, a: m.cred ? m.importo : 0, cassa: ['contanti','revolut'].includes(m.metodo)}
       : {ic:'🛡️', t: `Quota ${esc(m.anno)} pagata da ${n} · ${METODI_QUOTA[m.metodo] || m.metodo}`, a: ['contanti','revolut','esterno'].includes(m.metodo) ? m.importo : 0, cassa: ['contanti','revolut'].includes(m.metodo)};
     case 'addebito_quota': return {ic:'🧾', t: `Quota fondo ${esc(m.anno)} addebitata a ${n}`, a: -m.importo};
@@ -1714,7 +1722,7 @@ function cassaRange(r){
   const pass = (m, sg) => {
     switch(m.tipo){
       case 'ricarica': if(m.stato === 'confermata') inc(m.metodo, sg * m.importo); break;
-      case 'quota': inc(m.metodo, sg * m.importo); break;
+      case 'quota': if(!m.stato || m.stato === 'confermata') inc(m.metodo, sg * m.importo); break;
       case 'entrata': inc(m.fonte, sg * m.importo); break;
       case 'caffe_pagato': inc(m.metodo, sg * m.importo); break;
       case 'spesa': if(m.stato === 'confermata') R.spese += sg * m.importo; break;
@@ -1834,7 +1842,7 @@ function pRegolamento(){
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
     `${eur(g.quotaAnnua)} di contributo al fondo, <b>separato dal saldo</b>: non crea debiti né blocca i consumi.`,
-    'La registra il Creatore o un Supervisor con il permesso «Quote e Saldi Soci» (☰ → Quote annuali) dopo il versamento; fino ad allora in Home compare un avviso.']) : ''}
+    'Fino al pagamento in Home compare un avviso con il pulsante «Paga quota»: scegli contanti o Revolut e invia la richiesta; quando un Supervisor conferma di aver ricevuto i soldi la quota risulta pagata e l\'importo entra in cassa. Il tuo saldo non cambia.', 'Il Creatore o un Supervisor con «Quote e Saldi Soci» può anche registrarla direttamente (☰ → Quote annuali) o annullarla: l\'annullamento non toglie mai crediti a nessuno.']) : ''}
   ${sez('🗂️ Chiusure e backup', [
     'Il Creatore o un Supervisor con «Strumenti di Sistema» chiude i periodi: i dati vanno nell\'Archivio (visibile a chi gestisce) e i saldi ripartono. L\'app mostra chi ha eseguito l\'ultima chiusura e chiede una doppia conferma se è stata fatta meno di 15 giorni fa.',
     'Backup (.json e .csv) almeno ogni 7 giorni.'])}`;
@@ -2055,7 +2063,7 @@ function aggMov(G, m, sg){
     case 'compito': if(m.stato === 'confermata'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
-    case 'quota': if(m.metodo === 'contanti' || m.metodo === 'revolut') t.quote += sg*m.importo; break;
+    case 'quota': if((!m.stato || m.stato === 'confermata') && (m.metodo === 'contanti' || m.metodo === 'revolut')) t.quote += sg*m.importo; break;
     case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
     case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)*fx(m)); break;
     case 'punti_adj': add(m.kind === 'caffe' ? G.ptC : G.ptP, m.mid, sg*m.punti*fx(m)); break;
@@ -2642,7 +2650,7 @@ function pInventario(d){
 }
 
 /* ---------- QUOTE ---------- */
-const quotaMov = (d, mid, a) => d.movs.find(x => x.tipo === 'quota' && x.mid === mid && String(x.anno) === String(a) && !d.stornati.has(x.id) && x.stato !== 'annullata');
+const quotaMov = (d, mid, a) => d.movs.find(x => x.tipo === 'quota' && x.mid === mid && String(x.anno) === String(a) && !d.stornati.has(x.id) && (!x.stato || x.stato === 'confermata'));
 /* vecchi addebiti di quota (modello a debito) mai pagati: danno ancora un saldo ridotto */
 function quoteMigra(d){
   const out = [];
@@ -2656,7 +2664,7 @@ function quoteMigra(d){
 }
 function pQuote(d){
   const a = anno();
-  const list = membriAttivi().map(m => ({...m, sq: statoQuota(d, m.id, a), qm: quotaMov(d, m.id, a)}))
+  const list = membriAttivi().map(m => ({...m, sq: statoQuota(d, m.id, a), qm: quotaMov(d, m.id, a), qa: d.pendenti.some(x => x.tipo === 'quota' && x.mid === m.id && String(x.anno) === a)}))
     .sort((x,y) => (x.sq === 'pagata') - (y.sq === 'pagata') || x.nome.localeCompare(y.nome));
   const pagati = list.filter(m => m.sq === 'pagata').length, mig = quoteMigra(d);
   const dovuti = (st.gruppo.quotaAnnua || 0) * (list.length - pagati);
@@ -2669,7 +2677,7 @@ function pQuote(d){
   ${mig.length ? `<div class="banner amber">${ic('alert')}<div class="grow">${mig.length} ${mig.length === 1 ? 'collega ha' : 'colleghi hanno'} ancora un addebito di quota del vecchio modello non pagato (${eur(mig.reduce((t, x) => t + x.imp, 0))} in meno nei saldi).</div><button class="btn sm amber" id="btn-quota-migra" data-act="quota-migra">Azzera addebiti quota pregressi</button></div>` : ''}
   <div class="card">${cercaBox('quote-lista')}<div class="list" id="quote-lista">${list.map(m => `<div class="li" data-q="${qMem(m)}">
     <div class="av">${esc(m.nome.slice(0,1))}</div><div class="grow"><div class="t">${esc(nomeM(m.id))}</div><div class="d mono">saldo ${eurS(saldo(m.id))}${m.sq === 'pagata' && m.qm && typeof m.qm.cred === 'boolean' ? ' · ' + (m.qm.cred ? 'accreditata come crediti' : 'solo fondo') : ''}</div></div>
-    <span class="pill ${m.sq === 'pagata' ? 'green' : 'red'}">${m.sq === 'pagata' ? 'pagata' : 'da pagare'}</span>
+    <span class="pill ${m.sq === 'pagata' ? 'green' : m.qa ? 'amber' : 'red'}">${m.sq === 'pagata' ? 'pagata' : m.qa ? 'in attesa' : 'da pagare'}</span>
     ${can('soci') ? `<button class="tgl ${m.sq === 'pagata' ? 'on' : ''}" role="switch" aria-checked="${m.sq === 'pagata'}" aria-label="Quota pagata: ${esc(nomeM(m.id))}" data-act="quota-toggle" data-id="${m.id}"></button>` : ''}</div>`).join('')}</div>${cercaVuoto('quote-lista')}</div>`;
 }
 
@@ -2931,7 +2939,7 @@ A['info'] = () => { A['drawer-close'](); openSheet(`<h3>${ic('info')} Info</h3>
   <div class="card" style="margin:0 0 10px"><div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Il tuo ruolo</span><b>${ruolo()}</b></div>
     <div class="between" style="font-size:13px;margin-bottom:6px"><span class="tx2">Prezzo caffè</span><b class="mono">${eur(st.gruppo.prezzoCaffe || 0)}</b></div>
     <div class="between" style="font-size:13px"><span class="tx2">Quota fondo annuale</span><b class="mono">${eur(st.gruppo.quotaAnnua || 0)}</b></div></div>
-  ${infoBtn(`Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo e la registra un Supervisor. Ricariche e pagamenti li conferma un Supervisor. Saldi e movimenti degli altri sono visibili solo ail Creatore e i Supervisor.`, 'Come funziona')}
+  ${infoBtn(`Il saldo è prepagato: si consuma solo con crediti sufficienti. La quota annuale del fondo è separata dal saldo: la richiedi dalla Home e un Supervisor la conferma. Ricariche e pagamenti li conferma un Supervisor. Saldi e movimenti degli altri sono visibili solo ail Creatore e i Supervisor.`, 'Come funziona')}
   <button class="btn block" data-act="sheet-close">Chiudi</button>`); };
 /* forza l'aggiornamento: svuota cache e service worker, rilegge i file dalla rete e ricarica (dati e accesso restano) */
 A['aggiorna'] = async () => {
@@ -3761,6 +3769,7 @@ A['conferma-storno'] = ds => {
 A['esito'] = ds => {
   const mv = derived().movs.find(x => x.id === ds.id);
   if(mv && mv.tipo === 'compito' && !cpPuoConv(mv)) return toast('Non puoi convalidare questo compito', 'err');
+  if(mv && mv.tipo === 'quota' && ds.v === 'confermata' && statoQuota(derived(), mv.mid, String(mv.anno)) === 'pagata') return toast('Quota già registrata per questo collega', 'err');
   if(mv && mv.tipo === 'spesa' && mv.fonte === 'misto' && ds.v === 'confermata') return A['paga-spesa'](ds);   // la spesa mista si convalida scegliendo il canale della quota in denaro
   C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesaE(mv.importo)} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
@@ -3947,6 +3956,28 @@ A['quota-importo'] = () => {
   G().update({quotaAnnua: qa}).then(() => toast('Quota annuale aggiornata')).catch(e => toast(errMsg(e), 'err'));
 };
 A['quota-toggle'] = ds => { statoQuota(derived(), ds.id, anno()) === 'pagata' ? A['quota-annulla'](ds) : A['quota'](ds); };
+const quotaInAttesa = (d, mid) => d.pendenti.some(m => m.tipo === 'quota' && m.mid === mid && String(m.anno) === anno());
+A['paga-quota'] = () => {
+  const q = st.gruppo.quotaAnnua || 0, d = derived(), subito = can('soci');
+  if(!(q > 0)) return toast('Nessuna quota da pagare', 'err');
+  if(statoQuota(d, st.mid, anno()) === 'pagata') return toast('La tua quota risulta già pagata');
+  if(quotaInAttesa(d, st.mid)) return toast('Hai già una richiesta in attesa');
+  openSheet(`<h3>${ic('banknote')} Paga la quota fondo ${anno()}</h3>
+    <p class="sub"><b class="mono">${eur(q)}</b> · contributo al fondo, separato dai tuoi crediti: il tuo saldo non cambia. ${subito ? 'Hai il permesso «Quote e Saldi Soci»: viene registrata subito.' : 'Un Supervisor conferma di aver ricevuto i soldi.'}</p>
+    <label class="f"><span>Come versi i soldi?</span>${segOpts('qp-met', [['contanti', '💶 Contanti in cassetta'], ['revolut', '📱 Revolut']], 'contanti', revOff())}</label>
+    <button class="btn amber block big" id="btn-paga-quota-ok" data-act="conferma-paga-quota">${subito ? 'Registra il pagamento' : 'Invia la richiesta'}</button>`);
+};
+A['conferma-paga-quota'] = () => {
+  const q = st.gruppo.quotaAnnua || 0, d = derived(), a = anno(), subito = can('soci');
+  if(!(q > 0 && q <= 50000)) return toast('Quota non valida', 'err');
+  if(statoQuota(d, st.mid, a) === 'pagata'){ closeSheet(); return toast('Quota già pagata'); }
+  if(quotaInAttesa(d, st.mid)){ closeSheet(); return toast('Hai già una richiesta in attesa'); }
+  const met = revolutOn() ? (radio('qp-met') || 'contanti') : 'contanti';
+  const base = `qp_${a}_${st.mid}`, id = d.movs.some(x => x.id === base) ? base + '_' + Date.now().toString(36) : base;
+  addMov({tipo:'quota', mid: st.mid, anno: a, metodo: met, importo: q, cred: false, stato: subito ? 'confermata' : 'attesa', ...(subito ? {esitoDa: myName()} : {})}, id);
+  closeSheet();
+  toast(subito ? 'Quota registrata' : `Richiesta inviata: ${eur(q)} in attesa di conferma`);
+};
 A['quota'] = ds => {
   const q = st.gruppo.quotaAnnua;
   openSheet(`<h3>${ic('users')} Quota ${anno()} di ${esc(nomeM(ds.id))}</h3><p class="sub">${eur(q)} · saldo attuale ${eurS(saldo(ds.id))}</p>
@@ -3966,6 +3997,7 @@ function quotaAggiorna(){
 A['conferma-quota'] = ds => {
   const d = derived(), a = anno();
   if(statoQuota(d, ds.id, a) === 'pagata'){ closeSheet(); return toast('Quota già registrata'); }
+  if(quotaInAttesa(d, ds.id)){ closeSheet(); return toast('C\'è una richiesta in attesa: confermala da Notifiche', 'err'); }
   const base = `qp_${a}_${ds.id}`, id = d.movs.some(x => x.id === base) ? base + '_' + Date.now().toString(36) : base;
   addMov({tipo:'quota', mid: ds.id, anno: a, metodo: radio('q-met') || 'contanti', importo: st.gruppo.quotaAnnua, cred: radio('q-cred') === 'si'}, id);
   closeSheet(); toast('Quota registrata');
@@ -4766,7 +4798,7 @@ function riepRange(r){
       case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ R.caffe += sg * (m.qta || 0); R.caffeE += sg * (m.importo || 0); const p = per(m.mid); p.n += sg * (m.qta || 0); p.e += sg * (m.importo || 0); } break;
       case 'snack': if(m.stato !== 'annullata'){ R.snack += sg * (m.qta || 0); R.snackE += sg * (m.importo || 0); const p = per(m.mid); p.n += sg * (m.qta || 0); p.e += sg * (m.importo || 0); } break;
       case 'ricarica': if(m.stato === 'confermata'){ if(m.metodo === 'revolut') R.inR += sg * m.importo; else R.inC += sg * m.importo; } break;
-      case 'quota': if(m.metodo === 'revolut') R.inR += sg * m.importo; else if(m.metodo === 'contanti') R.inC += sg * m.importo; break;
+      case 'quota': if(!m.stato || m.stato === 'confermata'){ if(m.metodo === 'revolut') R.inR += sg * m.importo; else if(m.metodo === 'contanti') R.inC += sg * m.importo; } break;
       case 'spesa': if(m.stato === 'confermata') R.spese += sg * m.importo; break;
       case 'storno': if(m.orig) pass(m.orig, -sg); break;
     }
