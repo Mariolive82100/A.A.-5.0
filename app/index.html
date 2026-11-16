@@ -234,6 +234,18 @@ button.avv{cursor:pointer}
 .avv.violet{--avc:rgba(167,139,250,.8);--avb:rgba(167,139,250,.14);--avt:#ddd6fe;--avg:167,139,250}
 @keyframes avv-respiro{0%,100%{opacity:.82;box-shadow:0 0 0 0 rgba(var(--avg),0)}50%{opacity:1;box-shadow:0 0 18px 2px rgba(var(--avg),.36)}}
 @media (prefers-reduced-motion:reduce){.avv{animation:none}}
+#vittoria{position:fixed;inset:0;z-index:9999;background:rgba(8,10,20,.88);display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;animation:vitIn .35s ease both}
+#vittoria .vit-box{position:relative;z-index:2;max-width:340px;width:100%;text-align:center;background:var(--card,#1a1d2e);border:1px solid var(--line2,rgba(255,255,255,.15));border-radius:22px;padding:26px 20px 20px;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:vitPop .6s cubic-bezier(.2,1.4,.4,1) both}
+#vittoria .vit-medal{font-size:76px;line-height:1;animation:vitBounce 1.4s ease-in-out infinite}
+#vittoria h2{margin:8px 0 12px;font-size:26px}
+#vittoria .vit-r{padding:9px 0;border-top:1px solid var(--line,rgba(255,255,255,.1));display:flex;flex-direction:column;gap:2px}
+#vittoria .vit-r span{font-size:12.5px;opacity:.75}#vittoria .vit-r i{font-style:normal;font-weight:800;color:var(--amber,#f5a524)}
+#vittoria .vit-c{position:absolute;top:-6vh;width:9px;height:14px;border-radius:2px;opacity:.95;animation:vitFall linear infinite;z-index:1}
+@keyframes vitIn{from{opacity:0}to{opacity:1}}
+@keyframes vitPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes vitBounce{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-10px) rotate(6deg)}}
+@keyframes vitFall{to{transform:translateY(112vh) rotate(720deg)}}
+@media (prefers-reduced-motion:reduce){#vittoria,#vittoria .vit-box,#vittoria .vit-medal{animation:none}#vittoria .vit-c{display:none}}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
 th.s{cursor:pointer}th.r,td.r{text-align:right}th.c,td.c{text-align:center}
@@ -484,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.71.0';
+const VERSION = '1.72.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1032,6 +1044,7 @@ function doRender(){
 
   let d = derived();
   assicuraQuote(d); d = derived();
+  vittoriaCheck();
   // header
   const s = d.S.saldi[st.mid] || 0;
 
@@ -1840,7 +1853,7 @@ function pRegolamento(){
     'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. <b>Settimanali</b> (da lunedì a domenica): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati) · 🎯 <i>Mastro Lindo</i> (più turni di pulizia) · 👏 <i>Collega della Settimana</i> (più «Ben fatto» ricevuti). <b>Mensili</b> (mese solare): 🔋 <i>Ricarica Top del Mese</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🏆 <i>Collega del Mese</i> (più punti totali). In caso di parità vincono tutti i primi (ex aequo).',
     '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi; nella sfida delle spese si vede solo il numero di acquisti.',
     '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti in palio al vincitore con un tocco, dalla classifica della sfida. Il premio compare nel registro e va nella <b>Tessera Fedeltà</b>, come i bonus del podio; un premio non si può assegnare due volte.',
-    '<b>Sfide aperte e concluse:</b> in ogni categoria le sfide sono divise in due gruppi. <b>🔥 Sfide aperte</b>: il periodo che sta correndo, con la tua posizione e il tempo che manca. <b>🏁 Sfide concluse</b>: la settimana o il mese appena trascorsi, con il vincitore (o i vincitori ex aequo), il tuo piazzamento e lo stato del premio (✅ <i>Premio assegnato</i> oppure, per chi gestisce le sfide, il tasto 🏆 Assegna). Toccando una sfida concluse si apre la <b>classifica finale</b>, sempre visibile a tutti. Anche dopo una Chiusura Periodo le classifiche restano complete: i conteggi per settimana e per mese vengono conservati nel riepilogo della chiusura. Resta il segno ⚠️ <i>dati parziali</i> solo per i periodi che toccano chiusure fatte prima di questa novità. Il tasto o il gesto <b>Indietro</b> del telefono torna di un livello dentro le Sfide, senza passare dalla Home.',
+    '<b>Sfide aperte e concluse:</b> in ogni categoria le sfide sono divise in due gruppi. <b>🔥 Sfide aperte</b>: il periodo che sta correndo, con la tua posizione e il tempo che manca. <b>🏁 Sfide concluse</b>: la settimana o il mese appena trascorsi, con il vincitore (o i vincitori ex aequo), il tuo piazzamento e lo stato del premio (✅ <i>Premio assegnato</i> oppure, per chi gestisce le sfide, il tasto 🏆 Assegna). Toccando una sfida concluse si apre la <b>classifica finale</b>, sempre visibile a tutti. Anche dopo una Chiusura Periodo le classifiche restano complete: i conteggi per settimana e per mese vengono conservati nel riepilogo della chiusura. Resta il segno ⚠️ <i>dati parziali</i> solo per i periodi che toccano chiusure fatte prima di questa novità. Quando <b>vinci</b> una sfida, alla prima apertura dell\'app dopo l\'assegnazione del premio compare un\'animazione a tutto schermo con le sfide vinte e i punti (si chiude con un tocco). Il tasto o il gesto <b>Indietro</b> del telefono torna di un livello dentro le Sfide, senza passare dalla Home.',
 
     '<b>Albo d\'onore:</b> i vecchi titoli (Re della Caffeina, Mastro Lindo, Superstar della Spesa, Collega) sono diventati vere sfide settimanali e mensili; l\'Albo non esiste più come riquadro a parte.',
     '<b>⚔️ Lancia una sfida</b>: i duelli 1 contro 1 tra colleghi arriveranno presto (coming soon).',
@@ -1920,6 +1933,31 @@ const SF_FISSE = {
   sfauto_punti: {id: 'sfauto_punti', nome: '🏆 Collega del Mese', per: 'mese', pt: 30, tipo: 'punti',
     descr: 'Vince chi nel mese solare accumula più punti in totale: caffè, snack, compiti, spese e «Ben fatto».', spareggio: SF_PAREGGIO}
 };
+/* animazione a tutto schermo quando si vince una sfida: vittorie dai premi in memoria (movimenti aperti + registro delle chiusure),
+   «già vista» solo in localStorage; considera i premi degli ultimi 14 giorni. Nessuna lettura o scrittura su Firestore. */
+let vitOpen = false;
+function vittoriaCheck(){
+  if(vitOpen || !st.mid || !st.ready.mv || !st.ready.m || $('sheet').classList.contains('on')) return;
+  const chiave = 'vinte_' + st.gid + '_' + st.mid, viste = LS.get(chiave, []), aw = sfAssegnati(), nuove = [];
+  Object.keys(aw).forEach(k => {
+    if(!aw[k].includes(st.mid) || viste.includes(k)) return;
+    const q = k.split('|'), x = SF_FISSE[q[0]]; if(!x) return;
+    const p = sfPerDaKey(q[1]); if(p.fine < Date.now() - 14 * 864e5) return;
+    nuove.push({k, x, p, n: aw[k].length});
+  });
+  if(!nuove.length) return;
+  vitOpen = true; LS.set(chiave, viste.concat(nuove.map(v => v.k)).slice(-60));
+  const tot = nuove.reduce((a, v) => a + v.x.pt, 0), col = ['#f5a524', '#7c3aed', '#10b981', '#38bdf8', '#f472b6', '#facc15'];
+  const conf = Array.from({length: 40}, (_, i) => `<i class="vit-c" style="left:${Math.round(Math.random() * 100)}%;background:${col[i % col.length]};animation-duration:${(2.6 + Math.random() * 2.4).toFixed(2)}s;animation-delay:${(Math.random() * 2.5).toFixed(2)}s"></i>`).join('');
+  const el = document.createElement('div');
+  el.id = 'vittoria'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Hai vinto una sfida');
+  el.innerHTML = `${conf}<div class="vit-box"><div class="vit-medal" aria-hidden="true">🏆</div><h2>${nuove.length === 1 ? 'Hai vinto una sfida!' : 'Hai vinto ' + nuove.length + ' sfide!'}</h2>
+    ${nuove.map(v => `<div class="vit-r"><b>${esc(v.x.nome)}</b><span>${esc(v.p.label)}${v.n > 1 ? ' · ex aequo' : ''}</span><i>+${v.x.pt} punti</i></div>`).join('')}
+    <p class="hint" style="margin:10px 0 14px">${tot} ${tot === 1 ? 'punto' : 'punti'} nella tua Tessera Fedeltà</p>
+    <button class="btn amber block" id="btn-vittoria-ok" data-act="vittoria-chiudi">Fantastico!</button></div>`;
+  document.body.appendChild(el);
+  try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){}
+}
 let sfSez = null;   // sezione aperta: null = panoramica, 'sett' | 'mese'
 let sfDet = null;   // sfida aperta nel dettaglio (classifica completa): null = elenco
 const sfLista = per => Object.values(SF_FISSE).filter(x => !per || x.per === per);
@@ -3643,6 +3681,7 @@ A['sv-revoca'] = ds => {
 /* --- sfide fisse: navigazione e assegnazione del premio (unica azione dell'admin) --- */
 A['sf-apri'] = ds => { if(ds.s !== 'sett' && ds.s !== 'mese') return; sfSez = ds.s; sfDet = null; sfTab = 'corso'; window.scrollTo(0, 0); render(); };
 A['chiusura-nascondi'] = () => { LS.set('chiusuraNasc_' + st.gid, oggiISO()); render(); };
+A['vittoria-chiudi'] = () => { const e = $('vittoria'); if(e) e.remove(); vitOpen = false; };
 A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; sfDet = ds.id; sfTab = ds.t === 'concluso' ? 'concluso' : 'corso'; window.scrollTo(0, 0); render(); };
 A['sf-back'] = () => { sfTab = 'corso'; if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
 /* premio a fine periodo: un movimento 'bonus_podio' per vincitore con ID deterministico (create-only: nessun doppio accredito) */
@@ -5250,6 +5289,7 @@ function backArma(){
 }
 /* true se l'Indietro e' stato assorbito dall'app (qualcosa da chiudere o una pagina da cui tornare) */
 function indietro(){
+  if($('vittoria')){ A['vittoria-chiudi'](); return true; }
   if($('infopop') && $('infopop').classList.contains('on')){ A['info-x'](); return true; }
   if($('sheet').classList.contains('on')){ closeSheet(); return true; }
   if($('drawer').classList.contains('on')){ A['drawer-close'](); return true; }
