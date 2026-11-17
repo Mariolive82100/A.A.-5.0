@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.76.0';
+const VERSION = '1.76.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -3750,37 +3750,47 @@ function sfDatiImg(x){
   return {conc, p, aw, valori: x.tipo !== 'ricarica', righe: R.map(r => ({pos: r.pos, nome: plain(sfNome(r.id)), txt: (r.txt || '') + (r.sub ? ' · ' + r.sub : ''), pt: pOn ? sfPtRiga(x, r, conc, aw) : null}))};
 }
 function disegnaSfida(x, D){
-  const W = 1080, P = 56, F = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', M = 'ui-monospace, Menlo, Consolas, monospace';
+  const W = 1080, P = 56, F = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   const MAXR = 24, righe = D.righe.slice(0, MAXR), altri = D.righe.length - righe.length;
-  const hh = 290, th = 70, rh = 62, legenda = righe.some(r => r.pt);
-  const Ht = hh + th + Math.max(1, righe.length) * rh + (altri > 0 ? rh : 0) + (legenda ? 50 : 0) + 120;
+  const hh = 290, th = 70, rh = D.valori ? 104 : 66, legenda = righe.some(r => r.pt);
+  const Ht = hh + th + Math.max(1, righe.length) * rh + (altri > 0 ? 66 : 0) + (legenda ? 56 : 0) + 130;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = Ht;
   const g = cv.getContext('2d');
+  /* testo che sta sempre nella larghezza data: riduce il corpo, poi accorcia con «…» */
+  const fit = (t, w, px, wt, min) => {
+    let s = px; g.font = `${wt} ${s}px ${F}`;
+    while(g.measureText(t).width > w && s > min){ s -= 1; g.font = `${wt} ${s}px ${F}`; }
+    if(g.measureText(t).width > w){ while(t.length > 1 && g.measureText(t + '…').width > w) t = t.slice(0, -1); t += '…'; }
+    return t;
+  };
   const grad = g.createLinearGradient(0, 0, 0, Ht); grad.addColorStop(0, '#171a24'); grad.addColorStop(1, '#0d0f16');
   g.fillStyle = grad; g.fillRect(0, 0, W, Ht); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-  g.fillStyle = '#f5a524'; g.font = `800 48px ${F}`; g.fillText(x.nome, P, 100, W - 2 * P);
-  g.fillStyle = '#e8eaf0'; g.font = `600 32px ${F}`; g.fillText((D.conc ? 'Classifica finale · ' : 'Classifica in corso · ') + D.p.label, P, 150, W - 2 * P);
-  const prem = D.conc && D.aw && D.aw.length ? `✅ Premio assegnato: ${D.aw.map(id => plain(sfNome(id))).join(', ')} (+${x.pt} pt)` : D.conc ? `⏳ Premio da assegnare: +${x.pt} pt` : `+${x.pt} punti in palio`;
-  g.fillStyle = D.conc && D.aw && D.aw.length ? '#34d399' : '#aab0c2'; g.font = `500 30px ${F}`; g.fillText(prem.length > 60 ? prem.slice(0, 59) + '…' : prem, P, 200, W - 2 * P);
+  g.fillStyle = '#f5a524'; g.fillText(fit(x.nome, W - 2 * P, 52, 800, 30), P, 100);
+  g.fillStyle = '#e8eaf0'; g.fillText(fit((D.conc ? 'Classifica finale · ' : 'Classifica in corso · ') + D.p.label, W - 2 * P, 32, 600, 22), P, 150);
+  const win = D.conc && D.aw && D.aw.length;
+  const prem = win ? `✅ Premio assegnato: ${D.aw.map(id => plain(sfNome(id))).join(', ')} (+${x.pt} pt)` : D.conc ? `⏳ Premio da assegnare: +${x.pt} pt` : `+${x.pt} punti in palio`;
+  g.fillStyle = win ? '#34d399' : '#aab0c2'; g.fillText(fit(prem, W - 2 * P, 30, 500, 20), P, 200);
   g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, 226, W - 2 * P, 2);
   let y = hh + 10;
   g.fillStyle = '#f5a524'; g.font = `700 26px ${F}`;
-  g.fillText('#', P, y); g.fillText('COLLEGA', P + 100, y);
-  g.textAlign = 'right'; if(D.valori) g.fillText('RISULTATO', W - P - 300, y); g.fillText('PUNTI', W - P, y); g.textAlign = 'left';
+  g.fillText('#', P, y); g.fillText('COLLEGA', P + 96, y);
+  g.textAlign = 'right'; if(legenda) g.fillText('PUNTI', W - P, y); g.textAlign = 'left';
   g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, y + 14, W - 2 * P, 2); y += 14;
-  if(!righe.length){ y += rh; g.fillStyle = '#7b8194'; g.font = `500 30px ${F}`; g.fillText('Nessuno in classifica per ora', P, y - 18); }
+  if(!righe.length){ y += rh; g.fillStyle = '#7b8194'; g.font = `500 30px ${F}`; g.fillText('Nessuno in classifica per ora', P, y - 22); }
+  const XN = P + 96;
   righe.forEach((r, i) => {
     y += rh;
-    if(i % 2 === 0){ g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(P - 12, y - rh + 8, W - 2 * P + 24, rh - 4); }
-    g.fillStyle = '#e8eaf0'; g.font = `600 32px ${F}`; g.fillText(r.pos <= 3 ? sfMed(r.pos) : String(r.pos), P, y - 18);
-    g.font = `500 32px ${F}`; g.fillText(r.nome.length > 20 ? r.nome.slice(0, 19) + '…' : r.nome, P + 100, y - 18);
-    g.textAlign = 'right';
-    if(D.valori){ g.font = `600 28px ${M}`; g.fillStyle = '#e8eaf0'; g.fillText(r.txt.length > 22 ? r.txt.slice(0, 21) + '…' : r.txt, W - P - 300, y - 18); }
-    if(r.pt){ g.font = `700 28px ${F}`; g.fillStyle = r.pt.k === 'ok' ? '#34d399' : r.pt.k === 'da' ? '#fbbf24' : '#7dd3fc'; g.fillText((r.pt.k === 'ok' ? '✅ ' : r.pt.k === 'da' ? '⏳ ' : '') + '+' + x.pt + ' pt', W - P, y - 18); }
-    g.textAlign = 'left';
+    const top = y - rh + 6, base1 = D.valori ? top + 44 : top + 42;
+    if(i % 2 === 0){ g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(P - 12, top, W - 2 * P + 24, rh - 6); }
+    g.fillStyle = '#e8eaf0'; g.font = `700 34px ${F}`; g.fillText(r.pos <= 3 ? sfMed(r.pos) : String(r.pos), P, base1);
+    let wp = 0;
+    if(r.pt){ const tp = (r.pt.k === 'ok' ? '✅ ' : r.pt.k === 'da' ? '⏳ ' : '') + '+' + x.pt + ' pt'; g.font = `700 30px ${F}`; wp = g.measureText(tp).width + 24;
+      g.textAlign = 'right'; g.fillStyle = r.pt.k === 'ok' ? '#34d399' : r.pt.k === 'da' ? '#fbbf24' : '#7dd3fc'; g.fillText(tp, W - P, base1); g.textAlign = 'left'; }
+    g.fillStyle = '#f2f4f8'; g.fillText(fit(r.nome, W - P - XN - wp, 36, 600, 22), XN, base1);
+    if(D.valori && r.txt){ g.fillStyle = '#aab0c2'; g.fillText(fit(r.txt, W - P - XN, 28, 500, 18), XN, base1 + 38); }
   });
-  if(altri > 0){ y += rh; g.fillStyle = '#7b8194'; g.font = `500 26px ${F}`; g.fillText(`…e altri ${altri} ${altri === 1 ? 'collega' : 'colleghi'}`, P, y - 18); }
-  if(legenda){ y += 50; g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText(D.conc ? '✅ punti assegnati  ·  ⏳ punti da assegnare' : 'I punti vanno a chi è in testa a fine periodo', P, y - 14); }
+  if(altri > 0){ y += 66; g.fillStyle = '#7b8194'; g.font = `500 26px ${F}`; g.fillText(`…e altri ${altri} ${altri === 1 ? 'collega' : 'colleghi'}`, P, y - 22); }
+  if(legenda){ y += 56; g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText(D.conc ? '✅ punti assegnati  ·  ⏳ punti da assegnare' : 'I punti vanno a chi è in testa a fine periodo', P, y - 18); }
   if(!D.valori){ g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText('🔒 Per privacy si vede solo l\'ordine, non gli importi', P, Ht - 84); }
   g.fillStyle = '#586079'; g.font = `500 24px ${F}`; g.fillText('Generato da Armieri 5.0', P, Ht - 42);
   return cv;
