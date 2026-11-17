@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.75.1';
+const VERSION = '1.76.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1853,6 +1853,7 @@ function pRegolamento(){
     'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi tre blocchi: <b>🔥 In corso</b> (📅 <i>Settimana</i> e 🗓️ <i>Mese</i>), <b>🏁 Concluse</b> (🏁 <i>Settimana</i> e 🏆 <i>Mese</i>, il periodo appena trascorso) e <b>⚔️ Lancia una sfida</b> (presto). Toccane una per vedere l\'elenco con i punti in palio e <b>la tua posizione</b>; tocca una sfida per aprire la <b>classifica completa</b>. L\'icona <b>ⓘ</b> accanto al titolo spiega la regola e lo spareggio.',
     'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. <b>Settimanali</b> (da lunedì a domenica, 20 punti): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati). <b>Mensili</b> (mese solare, 30 punti): 🔋 <i>Ricarica Top del Mese</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (più turni di pulizia) · 👏 <i>Collega del Mese</i> (più «Ben fatto» ricevuti) · 💪 <i>Indefesso</i> (più «Lavoro compiuto» registrati, 40 punti). I punti totali del mese li premia già il Podio del mese, se attivo. Nelle schede 📅 e 🗓️ vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
     '<b>🛩️ Lavoro compiuto e 💪 Indefesso:</b> in Home il pulsante «Lavoro compiuto» registra un lavoro o intervento svolto per la saletta (nota facoltativa, massimo 5 al giorno). Ogni lavoro vale +1 nella sfida mensile <b>Indefesso</b>, che premia con <b>40 punti</b> (Tessera Fedeltà) chi ne ha di più nel mese solare (ex aequo: tutti). Il Creatore o un Supervisor con «Sfide e Regole» verifica le segnalazioni dalla classifica della sfida e può <b>stornare</b> quelle che non risultano, finché il premio del periodo non è stato assegnato; poi assegna il premio come per le altre sfide. Le segnalazioni compaiono nel registro e restano nella classifica anche dopo la Chiusura Periodo.',
+    '<b>Punti e condivisione:</b> nella classifica di ogni sfida, accanto a chi è in testa (o ha vinto) vedi i punti: <i>in palio</i> finché il periodo è aperto, <i>da assegnare</i> a periodo concluso finché chi gestisce le sfide non assegna il premio, <i>assegnati</i> dopo l\'assegnazione. Con il pulsante <b>📤 Condividi</b> in alto a destra puoi condividere la classifica come immagine (si apre il menu di condivisione del telefono; se non è disponibile l\'immagine viene scaricata). Nella sfida delle ricariche l\'immagine mostra, come la schermata, solo l\'ordine.',
     '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi; nella sfida delle spese si vede solo il numero di acquisti.',
     '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti in palio al vincitore con un tocco, dalla classifica della sfida. Il premio compare nel registro e va nella <b>Tessera Fedeltà</b>, come i bonus del podio; un premio non si può assegnare due volte.',
     '<b>Sfide aperte e concluse:</b> le sfide aperte e quelle concluse stanno in schede separate. <b>Aperte</b>: il periodo che sta correndo, con la tua posizione e il tempo che manca. <b>Concluse</b>: la settimana o il mese appena trascorsi, con il vincitore (o i vincitori ex aequo), il tuo piazzamento e lo stato del premio (✅ <i>Premio assegnato</i> oppure, per chi gestisce le sfide, il tasto 🏆 Assegna). Toccando una sfida concluse si apre la <b>classifica finale</b>, sempre visibile a tutti. Anche dopo una Chiusura Periodo le classifiche restano complete: i conteggi per settimana e per mese vengono conservati nel riepilogo della chiusura. Resta il segno ⚠️ <i>dati parziali</i> solo per i periodi che toccano chiusure fatte prima di questa novità. Quando <b>vinci</b> una sfida, alla prima apertura dell\'app dopo l\'assegnazione del premio compare un\'animazione a tutto schermo con le sfide vinte e i punti (si chiude con un tocco). Il tasto o il gesto <b>Indietro</b> del telefono torna di un livello dentro le Sfide, senza passare dalla Home.',
@@ -2089,6 +2090,12 @@ function sfDaAssegnare(x){
 }
 const sfNome = id => esc(nomeBreve(id) || nomeM(id));
 const sfMed = pos => ['🥇', '🥈', '🥉'][pos - 1] || '🏅';
+/* punti della sfida per una riga di classifica: assegnati (premio dato), da assegnare (periodo concluso) o in palio (periodo aperto) */
+function sfPtRiga(x, r, conc, aw){
+  if(conc && aw && aw.includes(r.id)) return {k: 'ok', t: '+' + x.pt + ' pt assegnati', c: 'green'};
+  if(r.pos !== 1 || (conc && aw && aw.length)) return null;
+  return conc ? {k: 'da', t: '+' + x.pt + ' pt da assegnare', c: 'amber'} : {k: 'palio', t: '+' + x.pt + ' pt in palio', c: 'sky'};
+}
 /* premi già assegnati (ultimi 10, raggruppati per sfida e periodo): movimenti aperti + registro delle chiusure (aw) */
 function sfPremi(){
   const aw = sfAssegnati(), out = [];
@@ -2134,7 +2141,7 @@ function sfCardConc(x){
 let sfTab = 'corso';   // scheda della classifica: 'corso' | 'concluso'
 function sfDettaglio(x){
   const conc = sfTab === 'concluso', p = conc ? sfPrec(x) : sfPeriodo(x.per, new Date()), R = sfClassifica(x.tipo, p), fuori = membriAttivi().filter(m => !R.some(r => r.id === m.id));
-  const primi = R.filter(r => r.pos === 1).length, valori = x.tipo !== 'ricarica', parz = sfParziale(x.tipo, p);
+  const primi = R.filter(r => r.pos === 1).length, valori = x.tipo !== 'ricarica', parz = sfParziale(x.tipo, p), pOn = ptMaster();
   const stato = r => conc ? (r.pos === 1 ? (primi > 1 ? '🏆 Vincitore (ex aequo)' : '🏆 Vincitore') : r.pos <= 3 ? '🎖️ Sul podio' : 'Partecipante')
     : r.pos === 1 ? (primi > 1 ? '🥇 In testa (ex aequo)' : '🥇 In testa') : r.pos <= 3 ? '🎖️ Sul podio' : 'In gara';
   const assegnati = sfPremi().filter(e => e.sfida === x.id), aw = conc ? sfAssegnati()[x.id + '|' + p.key] : null, ass = conc ? sfDaAssegnare(x).find(e => e.p.key === p.key) : null;
@@ -2146,11 +2153,12 @@ function sfDettaglio(x){
   const verifica = lv ? `<div class="card" id="sf-verifica"><h3>🧾 Segnalazioni da verificare${lv.length ? ` <span class="pill violet">${lv.length}</span>` : ''}</h3>
     <p class="hint" style="margin:0 0 8px">Se un lavoro non risulta, stornalo prima di assegnare il premio: la classifica si aggiorna subito.</p>
     ${lv.length ? `<div class="list">${lv.map(m => `<div class="li"><div class="av">🛩️</div><div class="grow"><div class="t" style="font-size:13.5px;white-space:normal"><b>${sfNome(m.mid)}</b>${m.nota ? ' · «' + esc(m.nota) + '»' : ''}</div><div class="d">${quando(m.t)}</div></div><button class="btn sm ghost" id="btn-lv-storno-${m.id}" data-act="storno" data-id="${m.id}">↩️ Storna</button></div>`).join('')}</div>` : '<div class="empty">Nessuna segnalazione in questo periodo.</div>'}</div>` : '';
-  return `<button class="btn link" style="padding:0;margin:0 0 8px" id="sf-back" data-act="sf-back">← ${SF_PER[sfSez][0]}</button>
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px"><button class="btn link" style="padding:0;margin:0" id="sf-back" data-act="sf-back">← ${SF_PER[sfSez][0]}</button>
+    <button class="btn sm ghost" id="btn-sf-img" data-act="sf-img" title="Condividi la classifica come immagine" aria-label="Condividi la classifica come immagine">📤 Condividi</button></div>
   <h2>${esc(x.nome)} ${sfInfo(x)}</h2><p class="sub" style="margin-bottom:8px">+${x.pt} pt in palio · ${conc ? 'classifica finale' : '⏳ chiude tra ' + sfRimanente(p.fine)} · ${esc(p.label)}</p>
   <div class="card" id="sf-dett">
     ${R.length ? `<table><thead><tr><th>#</th><th>Collega</th>${valori ? '<th class="c">Risultato</th>' : ''}<th>Stato</th></tr></thead><tbody>
-      ${R.map(r => `<tr><td class="mono">${r.pos <= 3 ? sfMed(r.pos) : r.pos}</td><td><b>${sfNome(r.id)}</b>${r.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td>${valori ? `<td class="c mono">${esc(r.txt)}${r.sub ? `<small class="mut"> · ${esc(r.sub)}</small>` : ''}</td>` : ''}<td style="font-size:12.5px">${stato(r)}</td></tr>`).join('')}</tbody></table>`
+      ${R.map(r => `<tr><td class="mono">${r.pos <= 3 ? sfMed(r.pos) : r.pos}</td><td><b>${sfNome(r.id)}</b>${r.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</td>${valori ? `<td class="c mono">${esc(r.txt)}${r.sub ? `<small class="mut"> · ${esc(r.sub)}</small>` : ''}</td>` : ''}<td style="font-size:12.5px">${stato(r)}${(pt => pt ? `<br><span class="pill ${pt.c}" style="margin-top:3px">${pt.t}</span>` : '')(pOn ? sfPtRiga(x, r, conc, aw) : null)}</td></tr>`).join('')}</tbody></table>`
       : '<div class="empty" id="sf-dett-vuoto">Nessuno in classifica per ora.</div>'}
     ${fuori.length && R.length ? `<p class="hint" style="margin:8px 0 0;font-size:12px">Non ${conc ? 'in classifica' : 'ancora in classifica'}: ${fuori.map(m => sfNome(m.id)).join(', ')}.</p>` : ''}
     ${valori ? '' : '<p class="hint" style="margin:8px 0 0;font-size:12px">🔒 Per privacy si vede solo l\'ordine, non gli importi.</p>'}
@@ -3735,6 +3743,56 @@ A['sf-apri'] = ds => { if(!SF_PER[ds.s]) return; if(sfHd === 0) sfHPush(); sfSez
 A['chiusura-nascondi'] = () => { LS.set('chiusuraNasc_' + st.gid, oggiISO()); render(); };
 A['vittoria-chiudi'] = () => { const e = $('vittoria'); if(e) e.remove(); vitOpen = false; };
 A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; if(sfHd === 1) sfHPush(); sfDet = ds.id; sfTab = ds.t === 'concluso' ? 'concluso' : 'corso'; window.scrollTo(0, 0); render(); };
+/* Classifica di una sfida come immagine PNG (canvas), condivisibile */
+function sfDatiImg(x){
+  const conc = sfTab === 'concluso', p = conc ? sfPrec(x) : sfPeriodo(x.per, new Date()), R = sfClassifica(x.tipo, p);
+  const aw = conc ? sfAssegnati()[x.id + '|' + p.key] : null, pOn = ptMaster();
+  return {conc, p, aw, valori: x.tipo !== 'ricarica', righe: R.map(r => ({pos: r.pos, nome: plain(sfNome(r.id)), txt: (r.txt || '') + (r.sub ? ' · ' + r.sub : ''), pt: pOn ? sfPtRiga(x, r, conc, aw) : null}))};
+}
+function disegnaSfida(x, D){
+  const W = 1080, P = 56, F = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', M = 'ui-monospace, Menlo, Consolas, monospace';
+  const MAXR = 24, righe = D.righe.slice(0, MAXR), altri = D.righe.length - righe.length;
+  const hh = 290, th = 70, rh = 62, legenda = righe.some(r => r.pt);
+  const Ht = hh + th + Math.max(1, righe.length) * rh + (altri > 0 ? rh : 0) + (legenda ? 50 : 0) + 120;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = Ht;
+  const g = cv.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, Ht); grad.addColorStop(0, '#171a24'); grad.addColorStop(1, '#0d0f16');
+  g.fillStyle = grad; g.fillRect(0, 0, W, Ht); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillStyle = '#f5a524'; g.font = `800 48px ${F}`; g.fillText(x.nome, P, 100, W - 2 * P);
+  g.fillStyle = '#e8eaf0'; g.font = `600 32px ${F}`; g.fillText((D.conc ? 'Classifica finale · ' : 'Classifica in corso · ') + D.p.label, P, 150, W - 2 * P);
+  const prem = D.conc && D.aw && D.aw.length ? `✅ Premio assegnato: ${D.aw.map(id => plain(sfNome(id))).join(', ')} (+${x.pt} pt)` : D.conc ? `⏳ Premio da assegnare: +${x.pt} pt` : `+${x.pt} punti in palio`;
+  g.fillStyle = D.conc && D.aw && D.aw.length ? '#34d399' : '#aab0c2'; g.font = `500 30px ${F}`; g.fillText(prem.length > 60 ? prem.slice(0, 59) + '…' : prem, P, 200, W - 2 * P);
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, 226, W - 2 * P, 2);
+  let y = hh + 10;
+  g.fillStyle = '#f5a524'; g.font = `700 26px ${F}`;
+  g.fillText('#', P, y); g.fillText('COLLEGA', P + 100, y);
+  g.textAlign = 'right'; if(D.valori) g.fillText('RISULTATO', W - P - 300, y); g.fillText('PUNTI', W - P, y); g.textAlign = 'left';
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, y + 14, W - 2 * P, 2); y += 14;
+  if(!righe.length){ y += rh; g.fillStyle = '#7b8194'; g.font = `500 30px ${F}`; g.fillText('Nessuno in classifica per ora', P, y - 18); }
+  righe.forEach((r, i) => {
+    y += rh;
+    if(i % 2 === 0){ g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(P - 12, y - rh + 8, W - 2 * P + 24, rh - 4); }
+    g.fillStyle = '#e8eaf0'; g.font = `600 32px ${F}`; g.fillText(r.pos <= 3 ? sfMed(r.pos) : String(r.pos), P, y - 18);
+    g.font = `500 32px ${F}`; g.fillText(r.nome.length > 20 ? r.nome.slice(0, 19) + '…' : r.nome, P + 100, y - 18);
+    g.textAlign = 'right';
+    if(D.valori){ g.font = `600 28px ${M}`; g.fillStyle = '#e8eaf0'; g.fillText(r.txt.length > 22 ? r.txt.slice(0, 21) + '…' : r.txt, W - P - 300, y - 18); }
+    if(r.pt){ g.font = `700 28px ${F}`; g.fillStyle = r.pt.k === 'ok' ? '#34d399' : r.pt.k === 'da' ? '#fbbf24' : '#7dd3fc'; g.fillText((r.pt.k === 'ok' ? '✅ ' : r.pt.k === 'da' ? '⏳ ' : '') + '+' + x.pt + ' pt', W - P, y - 18); }
+    g.textAlign = 'left';
+  });
+  if(altri > 0){ y += rh; g.fillStyle = '#7b8194'; g.font = `500 26px ${F}`; g.fillText(`…e altri ${altri} ${altri === 1 ? 'collega' : 'colleghi'}`, P, y - 18); }
+  if(legenda){ y += 50; g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText(D.conc ? '✅ punti assegnati  ·  ⏳ punti da assegnare' : 'I punti vanno a chi è in testa a fine periodo', P, y - 14); }
+  if(!D.valori){ g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText('🔒 Per privacy si vede solo l\'ordine, non gli importi', P, Ht - 84); }
+  g.fillStyle = '#586079'; g.font = `500 24px ${F}`; g.fillText('Generato da Armieri 5.0', P, Ht - 42);
+  return cv;
+}
+A['sf-img'] = async () => {
+  const x = sfDet && SF_FISSE[sfDet]; if(!x) return;
+  const D = sfDatiImg(x), cv = disegnaSfida(x, D);
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  if(!blob) return toast('Impossibile creare l\'immagine', 'err');
+  const testo = `${x.nome} — ${D.conc ? 'classifica finale' : 'classifica in corso'} · ${D.p.label}`;
+  await condividiBlob(blob, `sfida_${x.id.replace('sfauto_', '')}_${oggiISO()}.png`, x.nome, testo, 'Immagine scaricata: allegala al messaggio');
+};
 A['sf-back'] = () => { if(sfHd > 0){ history.back(); return; } sfTab = 'corso'; if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
 /* premio a fine periodo: un movimento 'bonus_podio' per vincitore con ID deterministico (create-only: nessun doppio accredito) */
 A['sf-assegna'] = ds => {
