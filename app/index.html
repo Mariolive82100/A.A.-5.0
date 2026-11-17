@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.76.2';
+const VERSION = '1.76.3';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -5280,7 +5280,7 @@ function ruotaSvg(ids, nome){
 function pRuota(d){
   const r = ruotaSt(), nome = id => nomeBreve(id) || nomeM(id), pool = ruotaPool();
   const ids = r.gira || r.vinc || r.conf ? r.ids : pool;
-  const anim = r.gira ? `--from:${r.from}deg;--to:${r.ang}deg;animation:ruota-spin 4.2s cubic-bezier(.12,.6,.1,1) ${(-(Date.now() - r.t0) / 1000).toFixed(2)}s forwards` : `transform:rotate(${r.ang}deg)`;
+  const anim = r.gira ? `--from:${r.from}deg;--to:${r.ang}deg;animation:ruota-spin 9.2s cubic-bezier(.12,.6,.1,1) ${(-(Date.now() - r.t0) / 1000).toFixed(2)}s forwards` : `transform:rotate(${r.ang}deg)`;
   const ruota = ids.length >= 2 ? `<div class="ruota-box"><div class="ruota-pt"></div><svg viewBox="0 0 300 300" id="ruota-svg" style="${anim}" role="img" aria-label="Ruota con ${ids.length} colleghi">${ruotaSvg(ids, nome)}</svg></div>`
     : (r.vinc || r.conf || r.fine ? '' : '<div class="empty">Servono almeno 2 colleghi attivi per girare la ruota.</div>');
   const verifica = r.vinc && !r.conf && !r.gira ? `<div class="card" id="ruota-verifica" style="text-align:center;border-color:var(--amber)"><div class="mut" style="font-size:12.5px">È uscito</div><div id="ruota-uscito" style="font-size:28px;font-weight:800;margin:6px 0">🎉 ${esc(nome(r.vinc))}</div><p class="tx2" style="font-size:13.5px;margin:0 0 10px">Verifica di persona: tocca a lui solo se è presente.</p>
@@ -5296,9 +5296,9 @@ function pRuota(d){
 function ruotaParti(ids){
   const r = ruotaSt(), n = ids.length, A_ = 360 / n, k = rndInt(n), jit = (rndInt(1000) / 1000 - 0.5) * 0.7 * A_;
   r.ids = ids; r.win = ids[k]; r.vinc = null; r.conf = null; r.fine = false; r.gira = true; r.from = r.ang; r.t0 = Date.now();
-  r.ang = (r.from - (r.from % 360)) + 1800 + ((360 - ((k + 0.5) * A_ + jit)) % 360 + 360) % 360;
+  r.ang = (r.from - (r.from % 360)) + 3960 + ((360 - ((k + 0.5) * A_ + jit)) % 360 + 360) % 360;
   render();
-  setTimeout(() => { r.gira = false; r.vinc = r.win; try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){} render(); }, 4300);
+  setTimeout(() => { r.gira = false; r.vinc = r.win; try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){} render(); }, 9300);
 }
 A['ruota-gira'] = () => {
   const r = ruotaSt(); if(r.gira) return;
