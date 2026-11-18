@@ -1,0 +1,39 @@
+/* ---------- desktop / tablet orizzontale: sidebar fissa e contenuti a piu' colonne (il mobile resta invariato) ---------- */
+@media (min-width:1000px){
+  body:has(nav.dock:not(.hidden)){padding-left:232px}
+  nav.dock{left:0;right:auto;top:0;bottom:0;width:232px;border-top:0;border-right:1px solid var(--line);padding:20px 12px;overflow-y:auto}
+  nav.dock .dk{flex-direction:column;gap:6px}
+  nav.dock .dk button{flex:none;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;padding:13px 14px;font-size:14px;text-align:left;border-radius:14px}
+  nav.dock .dk button:first-child{border:1px solid rgba(245,165,36,.45);background:linear-gradient(135deg,rgba(245,165,36,.22),rgba(124,58,237,.16));color:var(--tx);font-weight:800;margin-bottom:6px}
+  nav.dock .dk button.on{background:var(--card2);color:var(--amber)}
+  nav.dock .dk button:hover{background:var(--card2)}
+  body:has(nav.dock:not(.hidden)) .sheet{left:232px}
+  body:has(nav.dock:not(.hidden)) #fab-menu{left:calc(50% + 116px)}
+  header{padding-left:22px;padding-right:26px;gap:14px}
+  header.hasprize{padding-bottom:10px}
+  .prizepill{position:static;flex:none;padding:5px 12px;border:1px solid rgba(251,191,36,.4);border-radius:99px;background:rgba(251,191,36,.10)}
+  main,main.wide{max-width:1260px;padding:22px 30px 48px}
+  .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;align-items:start}
+  .rp-grid>#card-compiti{grid-column:1/-1}
+  main[data-p="bar"] .home .grid{grid-template-columns:repeat(4,1fr)}
+  main[data-p="bar"] .gbtn{min-height:190px}
+  main[data-p="bar"]>*{max-width:1100px;margin-left:auto;margin-right:auto}
+  table{width:100%}
+  /* pagine "da lista o modulo": colonna centrale piu' stretta (niente card sproporzionate); le pagine ricche restano larghe */
+  main[data-p="spesa"],main[data-p="compiti"],main[data-p="gioco"],main[data-p="ruota"],main[data-p="perle"],main[data-p="impostazioni"],main[data-p="regolamento"],main[data-p="notifiche"],main[data-p="crediti"]{max-width:860px}
+  main[data-p="saletta"]{max-width:980px}
+  main[data-p="saletta"] .grid2{grid-template-columns:repeat(3,1fr)}
+  /* Classifica: filtri a tutta larghezza, sotto due colonne (sinistra: la mia scheda; destra: podio completo) */
+  .cl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 18px;align-items:start}
+  .cl-grid>.clg-h{grid-column:1;grid-row:1}
+  .cl-grid>.clg-p{grid-column:2;grid-row:1}
+  /* Cassa e registro: cruscotto a tutta larghezza con i 4 indicatori su una riga */
+  #cassa-dash .grid2{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #cassa-dash .cd-wide{grid-column:auto}
+  /* premio podio accanto alla posizione, al centro dell'header */
+  #hdr-rank{margin:0 0 0 auto}
+  .prizepill{margin:0 auto 0 0}
+  #hdr-update{margin-left:0!important}
+}
+@media (min-width:1280px){ #cassa-dash .grid2{grid-template-columns:repeat(5,minmax(0,1fr))} }
+@media (min-width:1500px){ main,main.wide{max-width:1360px} }
