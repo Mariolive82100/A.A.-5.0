@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.77.3';
+const VERSION = '1.77.4';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2459,7 +2459,7 @@ const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi pri
 
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
-const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Compiti'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
+const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Sfide'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
 const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
 /* posizione del collegato nella classifica punti del mese corrente (stessa regola e stesso ordine della pagina Classifica; tutto in memoria) */
 function posMese(d){
@@ -2503,7 +2503,7 @@ function clConteggi(d, r){
 function clTitoli(d, r, pc0){
   const C = clConteggi(d, r), pc = pc0 || clPerKey();
   const bfNome = pc === 'sempre' ? 'Collega di Sempre' : pc === 'mese' ? 'Collega del Mese' : pc === 'settimana' ? 'Collega della Settimana' : 'Collega del Giorno';
-  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '🎯', 'Mastro Lindo', 'compiti'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
+  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '🎯', 'Mastro Lindo', 'turni'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
   const att = membriAttivi();
   return def.map(([k, e, nome, u]) => {
     const vals = att.map(m => ({id: m.id, v: Math.max(0, nz(C[k], m.id))})), max = Math.max(0, ...vals.map(x => x.v));
@@ -2623,11 +2623,11 @@ function cardOnesta(d){
 /* totali aggregati della sala per il tipo di punti scelto */
 function clSala(righe, key, G){
   const tot = k => righe.reduce((a, x) => a + x[k], 0), nn = o => Math.max(0, sumo(o));
-  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti compiti', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
+  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti sfide', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
   const det = {
     tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
-    p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'compito svolto' : 'compiti svolti'}</p>`,
+    p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno svolto' : 'turni svolti'}</p>`,
     s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
     b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
   return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
@@ -2666,7 +2666,7 @@ function clClassifica(d, R, T, c){
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti compiti']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
+  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti sfide']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
   const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
   const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
@@ -2677,7 +2677,7 @@ function clClassifica(d, R, T, c){
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un Supervisor. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
+    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Sfide: i punti delle sfide (per esempio Mastro Lindo), assegnati dal Creatore o dagli admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
   return {podio: podioCard};
@@ -5536,12 +5536,16 @@ async function cardImmagine(c){
 }
 A['card-share'] = async (ds, el) => {
   const c = el && el.closest('.card'); if(!c) return;
+  const zeri = [...c.querySelectorAll('.rk.z')];   // nella sola immagine condivisa: solo chi ha punteggio maggiore di 0 (nell'app restano tutti)
+  zeri.forEach(e => { e.style.display = 'none'; });
   const {titolo, corpo} = cardTesto(c), testo = `☕ ${st.gruppo.nome || 'Saletta'} — Armieri 5.0\n\n${corpo}`;
   try {
     const blob = await cardImmagine(c);
+    zeri.forEach(e => { e.style.display = ''; });
     const nome = 'armieri_' + (titolo || 'scheda').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) + '_' + oggiISO() + '.png';
     await condividiBlob(blob, nome, titolo || 'Armieri 5.0', `☕ ${st.gruppo.nome || 'Saletta'} — ${titolo || 'Armieri 5.0'}`, 'Immagine scaricata: allegala al messaggio');
   } catch(e){   // se il browser non riesce a disegnare la scheda, si ripiega sul testo
+    zeri.forEach(x => { x.style.display = ''; });
     if(navigator.share){ navigator.share({title: titolo || 'Armieri 5.0', text: testo}).catch(() => {}); return; }
     try { navigator.clipboard.writeText(testo).then(() => toast('Immagine non disponibile: scheda copiata come testo')).catch(() => toast('Condivisione non disponibile', 'err')); } catch(e2){ toast('Condivisione non disponibile', 'err'); }
   }
