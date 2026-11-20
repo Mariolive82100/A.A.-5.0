@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.78.1';
+const VERSION = '1.78.2';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2407,11 +2407,13 @@ function classSett(d, prev){
   righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
   return {key: settKey(ini), label, righe};
 }
+const PREMI_DAL = '2026-11-16';   // lunedì della prima settimana con i premi in crediti: si riscatta dal lunedì successivo
 /* premio della settimana scorsa per il collegato: sul podio con almeno 1 punto e premio impostato; «fatto» se già riscattato */
 function premioSett(d){
   if(!st.mid || !ptMaster() || !st.ready.mv || !st.ready.m) return null;
   if(Date.now() < lunediDi(new Date()).getTime() + 60000) return null;   // il premio si riscatta solo a settimana scaduta: dal lunedì alle 00:01
   const P = classSett(d, true), i = P.righe.findIndex(x => x.id === st.mid);
+  if(P.key < PREMI_DAL) return null;   // le settimane precedenti all'introduzione dei premi non danno diritto a nulla
   if(i < 0 || i > 2 || P.righe[i].tot <= 0) return null;
   const importo = premioPos(i + 1); if(importo <= 0) return null;
   const id = `pp_${P.key}_${st.mid}`;
