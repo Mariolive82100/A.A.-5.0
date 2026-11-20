@@ -2,7 +2,7 @@
 // su /beta/ la cache ha un nome diverso, cosi' beta e versione ufficiale (stessa origine) non si cancellano a vicenda
 const BETA = self.location.pathname.includes('/beta/');
 const FAM = BETA ? 'armieri-beta-v' : 'armieri-v';
-const CACHE = FAM + '1.77.0';
+const CACHE = FAM + '1.78.2';
 const FILES = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'css/stile.css', 'css/desktop.css',
   'js/00-base.js', 'js/10-firebase.js', 'js/20-dati.js', 'js/30-ui-base.js', 'js/40-ingresso.js', 'js/41-bar-crediti.js', 'js/42-registro-feed.js', 'js/43-regolamento.js', 'js/44-sfide.js', 'js/45-eventi-statistiche.js', 'js/46-spesa-cassa-quote.js', 'js/47-admin-impostazioni.js', 'js/50-azioni-base.js', 'js/51-azioni-gestione.js', 'js/52-azioni-pin-backup.js', 'js/60-eventi-dom.js', 'js/61-bacheca-ruota.js', 'js/62-navigazione.js', 'js/99-avvio.js'];

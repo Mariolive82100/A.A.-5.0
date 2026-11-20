@@ -42,6 +42,7 @@ function applyMov(S, m, sg){
     case 'regalo': add(S.saldi, m.daMid, -sg*m.importo); add(S.saldi, m.aMid, sg*m.importo); break;
     case 'ben_fatto': S.pbf = S.pbf || {}; add(S.pbf, m.aMid, sg*(m.pt ?? 2)*fx(m)); break;   // punti al destinatario; chi lo invia non perde nulla
     case 'bonus_podio': S.pbf = S.pbf || {}; add(S.pbf, m.mid, sg*(m.punti || 0)); break;   // bonus podio: solo Tessera Fedeltà, fuori dalla classifica a punti
+    case 'premio_podio': add(S.saldi, m.mid, sg*m.importo); break;   // premio del podio settimanale: crediti sul saldo del vincitore
     case 'riscatto_punti': S.pRisc = S.pRisc || {}; add(S.pRisc, m.mid, sg*m.punti*fx(m)); add(S.saldi, m.mid, sg*m.importo); break;
     case 'riscatto': if(m.stato === 'confermata' || !m.stato){ add(S.saldi, m.mid, -sg*m.importo); add(S.cassa, m.metodo, -sg*m.importo); } break;
     case 'rettifica': add(S.saldi, m.mid, sg*m.importo); break;
@@ -137,9 +138,9 @@ const ptCaffeE = () => onP('ptCaffeOn') ? ptCaffe() : 0;
 /* snack: punti proporzionali al prezzo (punti per ogni 1,00 €, arrotondati all'intero), calcolati dal prezzo senza impostarli articolo per articolo */
 const ptSnackEuro = () => Math.min(100, cfgD('ptSnackEuro', 10));
 const ptSnackP = prezzo => onP('ptCaffeOn') ? Math.max(0, Math.round((Number(prezzo) || 0) / 100 * ptSnackEuro())) : 0;
-/* podio del mese: bonus ai primi 3 (attivabile dal Supervisor); il bonus entra nella Tessera Fedeltà ma non nella classifica a punti */
-const podioOn = () => ptMaster() && !!(st.gruppo && st.gruppo.podioOn === true);
-const podioPt = i => Math.min(1000, cfgN('podio' + i, [0, 50, 30, 20][i]));
+/* premi del podio settimanale, in crediti: li imposta solo il Creatore nel documento del gruppo (premiPodio = 3 importi in centesimi: 1°, 2°, 3°) */
+const premiPodio = () => { const v = st.gruppo && st.gruppo.premiPodio; return [0, 1, 2].map(i => Array.isArray(v) && Number.isInteger(v[i]) && v[i] > 0 ? Math.min(50000, v[i]) : 0); };
+const premioPos = pos => premiPodio()[pos - 1] || 0;
 /* punti spesa (importo in centesimi → euro): proporzionali all'importo (rapporto punti/€ × importo, arrotondati all'intero, con tetto per singola spesa); il rimborso in denaro/crediti resta al 100% */
 const cfgD = (k, def) => { const v = st.gruppo && st.gruppo[k]; return typeof v === 'number' && isFinite(v) && v >= 0 ? v : def; };
 const ptSpesaEuro = () => Math.min(100, cfgD('ptSpesaEuro', 10)), ptSpesaMax = () => Math.min(1000, cfgN('ptSpesaMax', 500));

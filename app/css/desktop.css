@@ -31,7 +31,6 @@
   #cassa-dash .grid2{grid-template-columns:repeat(3,minmax(0,1fr))}
   #cassa-dash .cd-wide{grid-column:auto}
   /* premio podio accanto alla posizione, al centro dell'header */
-  #hdr-rank{margin:0 0 0 auto}
   .prizepill{margin:0 auto 0 0}
   #hdr-update{margin-left:0!important}
 }

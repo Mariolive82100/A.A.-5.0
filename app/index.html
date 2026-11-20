@@ -26,8 +26,7 @@
     <b id="hdr-name"><svg class="i s"><use href="#i-coffee"/></svg>Armieri 5.0</b>
     <small><span class="dot" id="syncdot"></span><span id="hdr-sub"></span></small>
   </div>
-  <button class="rankpill hidden" id="hdr-rank" data-act="go" data-p="classifiche" aria-label="La tua posizione in classifica nel mese"></button>
-  <button class="prizepill hidden" id="hdr-prize" data-act="go" data-p="classifiche" aria-label="Premi del Podio del Mese"></button>
+  <button class="prizepill hidden" id="hdr-prize" data-act="go" data-p="classifiche" aria-label="Premi del podio settimanale"></button>
   <button class="onpill hidden" id="hdr-onesta" data-act="go" data-p="onesta" aria-label="Tasso di Onestà"></button>
   <button class="iconbtn hidden" id="hdr-search" data-act="qs-apri" aria-label="Cerca impostazione o socio" title="Cerca impostazione o socio"><svg class="i"><use href="#i-search"/></svg></button>
   <button class="iconbtn" id="hdr-update" style="margin-left:auto" data-act="aggiorna" aria-label="Aggiorna all'ultima versione" title="Aggiorna all'ultima versione"><svg class="i"><use href="#i-repeat"/></svg></button>
@@ -101,7 +100,7 @@
 <script>
 'use strict';
 const BETA = /\/beta(\/|$)/.test(location.pathname);
-const VERSION = '1.77.0' + (BETA ? '-beta' : '');
+const VERSION = '1.78.2' + (BETA ? '-beta' : '');
 if(BETA){
   document.title += ' BETA';
   const b = document.createElement('div'); b.id = 'beta-badge'; b.textContent = 'BETA'; b.setAttribute('aria-hidden', 'true');

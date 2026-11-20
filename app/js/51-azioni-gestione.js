@@ -76,6 +76,48 @@ A['sf-assegna'] = ds => {
   e.win.forEach(r => addMov({tipo: 'bonus_podio', mid: r.id, pos: 1, sfida: x.id, periodo: e.p.key, periodoTxt: e.p.label, titolo: x.nome.slice(0, 60), punti: x.pt}, `sfi_${x.id}_${e.p.key}_${r.id}`, true, er => toast('Premio non assegnato (' + errMsg(er) + ')', 'err')));
   toast('🏆 Premio assegnato: ' + e.win.map(r => nomeBreve(r.id) || nomeM(r.id)).join(', ') + ' (+' + x.pt + ' pt)');
 };
+/* --- punti extra durante una sfida: l'admin (Creatore o «Sfide e Regole») dà punti a mano a uno o più colleghi, nella Tessera Fedeltà.
+   Movimento 'bonus_podio' con extra:1 e perExtra (senza il campo 'periodo': non conta come premio assegnato). ID automatico, quindi si possono dare più volte. --- */
+const MAX_PT_EXTRA = 100;
+A['sf-extra'] = ds => {
+  const x = SF_FISSE[ds.id]; if(!x || !can('compiti') || !ptMaster()) return;
+  const col = membriAttivi().filter(m => m.id !== st.mid).sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
+  if(!col.length) return toast('Non ci sono altri colleghi', 'err');
+  openSheet(`<h3>🎯 Punti extra</h3>
+    <p class="sub">Sfida <b>${esc(x.nome)}</b> · ${esc(sfPeriodo(x.per, new Date()).label)}. I punti vanno subito nei punti accumulati dei colleghi scelti${x.tipo === 'pulizie' ? ' e contano nella graduatoria della sfida' : ''}.</p>
+    ${cercaBox('sx-lista')}<div id="sx-lista" style="max-height:32vh;overflow:auto;margin:6px 0 10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="sx-c" value="${m.id}" data-chg="sx-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('sx-lista')}</div>
+    <div data-chg="sx-upd" style="margin-bottom:8px">${segOpts('sx-modo', [['tot', 'Montante da dividere'], ['cad', 'Punti a ciascuno']], x.tipo === 'pulizie' ? 'tot' : 'cad')}</div>
+    <label class="f"><span id="sx-lbl">Punti</span><input class="in mono" id="sx-q" inputmode="numeric" maxlength="3" value="10" data-chg="sx-upd"></label>
+    <div id="sx-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
+    <label class="f"><span>Motivo (facoltativo)</span><input class="in" id="sx-msg" maxlength="60" placeholder="Es. Pulizie fatte da solo, bonus sfida"></label>
+    <button class="btn amber block big" id="sx-invia" data-act="sx-invia" data-id="${x.id}" disabled>Assegna i punti</button>`);
+  sxAggiorna();
+};
+/* anteprima dei punti: «montante» = totale diviso per difetto tra i colleghi scelti; «a ciascuno» = stesso valore per tutti */
+function sxCalcola(){
+  const n = document.querySelectorAll('#sheet input.sx-c:checked').length, raw = val('sx-q'), tot = radio('sx-modo') !== 'cad';
+  const q = /^\d{1,3}$/.test(raw) ? +raw : 0, per = tot ? (n ? Math.floor(q / n) : 0) : q;
+  return {n, q, tot, per, ok: n > 0 && q >= 1 && per >= 1 && per <= MAX_PT_EXTRA};
+}
+function sxAggiorna(){
+  if(!$('sx-q')) return;
+  const c = sxCalcola(), l = $('sx-lbl'), t = $('sx-tot'), b = $('sx-invia');
+  if(l) l.textContent = c.tot ? 'Punti totali da dividere tra i colleghi scelti' : `Punti per ogni collega (da 1 a ${MAX_PT_EXTRA})`;
+  if(t) t.innerHTML = !c.n ? 'Seleziona almeno un collega' : !c.q ? 'Indica i punti (numero intero)'
+    : c.tot ? (c.per < 1 ? `<b class="red">${c.q} pt non bastano per ${c.n} colleghi</b>` : c.per > MAX_PT_EXTRA ? `<b class="red">Massimo ${MAX_PT_EXTRA} pt a collega</b>` : `${c.q} pt ÷ ${c.n} = <b class="mono green">${c.per} pt a collega</b>${c.q - c.per * c.n ? ` <small class="mut">(${c.q - c.per * c.n} avanzano)</small>` : ''}`)
+    : (c.per > MAX_PT_EXTRA ? `<b class="red">Massimo ${MAX_PT_EXTRA} pt a collega</b>` : `${c.n} × ${c.per} = <b class="mono green">${c.n * c.per} pt totali</b>`);
+  if(b) b.disabled = !c.ok;
+}
+A['sx-invia'] = ds => {
+  const x = SF_FISSE[ds.id]; if(!x || !can('compiti') || !ptMaster()) return;
+  const ids = [...document.querySelectorAll('#sheet input.sx-c:checked')].map(e => e.value).filter(v => v !== st.mid && membro(v));
+  if(!ids.length) return toast('Seleziona almeno un collega', 'err');
+  const c = sxCalcola(); if(!c.ok || c.n !== ids.length) return toast(`Punti non validi: da 1 a ${MAX_PT_EXTRA} per collega`, 'err');
+  const n = c.per, msg = val('sx-msg').trim().slice(0, 60), p = sfPeriodo(x.per, new Date());
+  ids.forEach(mid => addMov({tipo: 'bonus_podio', mid, sfida: x.id, extra: 1, perExtra: p.key, periodoTxt: p.label, titolo: x.nome.slice(0, 60), punti: n, ...(c.tot ? {monte: c.q, nPart: ids.length} : {}), ...(msg ? {causale: msg} : {})},
+    null, true, er => toast('Punti non assegnati (' + errMsg(er) + ')', 'err')));
+  closeSheet(); toast(`🎯 +${n} pt a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
+};
 /* --- regala crediti (immediato, senza approvazione) --- */
 function rgAggiorna(){
   if(!$('rg-q')) return;
@@ -160,31 +202,6 @@ A['rg-invia'] = () => {
 };
 
 /* --- canale Revolut: il Supervisor lo sospende / riattiva (campo revolutAttivo nel documento del gruppo) --- */
-/* --- podio del mese: bonus ai primi 3 del mese precedente, assegnati dal Supervisor con un tocco (ID unico: nessun doppio accredito) --- */
-function podioDaAssegnare(){
-  if(!can('compiti') || !podioOn() || !st.gid) return null;
-  const o = new Date(), pv = new Date(o.getFullYear(), o.getMonth() - 1, 1), mese = `${pv.getFullYear()}-${pad(pv.getMonth() + 1)}`;
-  if(LS.get('podio_' + st.gid + '_' + mese)) return null;
-  if(tuttiMov().some(m => m.tipo === 'bonus_podio' && m.mese === mese)) return null;
-  return {mese, nome: pv.toLocaleDateString('it-IT', {month: 'long', year: 'numeric'}), da: pv.getTime(), a: new Date(o.getFullYear(), o.getMonth(), 1).getTime() - 1};
-}
-A['podio-apri'] = () => {
-  const pm = podioDaAssegnare(); if(!pm) return;
-  const G = aggConChiusi(derived(), {da: pm.da, a: pm.a, label: pm.nome}, 'cl').G;
-  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}))
-    .filter(x => x.tot > 0).sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).slice(0, 3);
-  st.podioProp = {mese: pm.mese, righe};
-  openSheet(`<h3>🏅 Podio di ${esc(pm.nome)}</h3>
-    ${righe.length ? `<div class="list" id="podio-lista">${righe.map((x, i) => `<div class="li"><div class="av">${['🥇', '🥈', '🥉'][i]}</div><div class="grow"><div class="t">${esc(x.nome)}</div><div class="d">${x.tot} punti nel mese</div></div><span class="pill amber">+${podioPt(i + 1)}</span></div>`).join('')}</div>
-      <p class="hint">I bonus vanno nella Tessera Fedeltà dei vincitori e non entrano nella classifica a punti.</p>
-      <div class="grid2"><button class="btn" data-act="sheet-close">Più tardi</button><button class="btn amber" id="btn-podio-assegna" data-act="podio-assegna">Assegna i bonus</button></div>`
-    : `<div class="empty">Nessun punto nel mese: niente da assegnare.</div><button class="btn block" id="btn-podio-chiudi" data-act="podio-assegna">Chiudi senza assegnare</button>`}`);
-};
-A['podio-assegna'] = () => {
-  const pr = st.podioProp, pm = podioDaAssegnare(); if(!can('compiti') || !pr || !pm || pr.mese !== pm.mese) return closeSheet();
-  pr.righe.forEach((x, i) => { const pt = podioPt(i + 1); if(pt > 0) addMov({tipo: 'bonus_podio', mid: x.id, pos: i + 1, mese: pr.mese, punti: pt}, `pod_${pr.mese}_${i + 1}`, true, er => toast('Bonus non assegnato (' + errMsg(er) + ')', 'err')); });
-  LS.set('podio_' + st.gid + '_' + pr.mese, '1'); st.podioProp = null; closeSheet(); toast('🏅 Bonus podio assegnati'); render();
-};
 A['revolut-toggle'] = () => {
   if(!can('cassa')) return;
   const on = !revolutOn();
@@ -209,7 +226,7 @@ A['carica-archivio'] = async () => {
 /* rimborso misto: testo con la ripartizione (null se il movimento non e' misto) */
 const spesaMista = m => (m && Number.isInteger(m.quotaDenaro) && Number.isInteger(m.quotaCrediti) && m.quotaDenaro > 0 && m.quotaCrediti > 0) ? `Totale ${eur(m.importo)} → ${eur(m.quotaDenaro)} in denaro reale + ${eur(m.quotaCrediti)} in crediti` : null;
 function compactMov(m){
-  return clean({tipo:m.tipo, cp:m.cp, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, quotaDenaro:m.quotaDenaro, quotaCrediti:m.quotaCrediti, mese:m.mese, pos:m.pos, nPart:m.nPart, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id, nota:m.nota});
+  return clean({tipo:m.tipo, cp:m.cp, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, quotaDenaro:m.quotaDenaro, quotaCrediti:m.quotaCrediti, mese:m.mese, pos:m.pos, nPart:m.nPart, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, sfida:m.sfida, titolo:m.titolo, periodoTxt:m.periodoTxt, extra:m.extra, perExtra:m.perExtra, monte:m.monte, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id, nota:m.nota});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -562,28 +579,29 @@ A['conferma-ricarica-per'] = () => {
   closeSheet(); toast(`Ricarica di ${eur(imp)} per ${nomeM(mid)}`);
 };
 /* --- punti caffè, punti (admin), spesa admin, prezzo caffè --- */
-/* --- Punti Collega Modello: punti di tutte le categorie, riscatto a soglia --- */
-A['tessera'] = () => {
+/* --- Premio del podio settimanale: lo riscatta il collega sul podio della settimana scorsa, una volta sola (ID fisso = create-only) --- */
+function vitPremio(ps){
+  if(vitOpen) return; vitOpen = true;
+  const col = ['#f5a524', '#7c3aed', '#10b981', '#38bdf8', '#f472b6', '#facc15'];
+  const conf = Array.from({length: 40}, (_, i) => `<i class="vit-c" style="left:${Math.round(Math.random() * 100)}%;background:${col[i % col.length]};animation-duration:${(2.6 + Math.random() * 2.4).toFixed(2)}s;animation-delay:${(Math.random() * 2.5).toFixed(2)}s"></i>`).join('');
+  const tit = ['Sei il campione della settimana!', 'Argento: ottimo secondo posto!', 'Bronzo: sei salito sul podio!'][ps.pos - 1];
+  const el = document.createElement('div');
+  el.id = 'vittoria'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Premio del podio riscattato');
+  el.innerHTML = `${conf}<div class="vit-box"><div class="vit-medal cup${ps.pos}" aria-hidden="true">🏆</div><div class="vit-pos" aria-hidden="true">${ps.medal}</div><h2>${tit}</h2>
+    <div class="vit-r"><b>${ps.pos}° posto in classifica</b><span>${esc(ps.label)}</span><i>+${eur(ps.importo)} di crediti</i></div>
+    <p class="hint" style="margin:10px 0 14px">I crediti sono già sul tuo saldo.</p>
+    <button class="btn amber block" id="btn-vittoria-ok" data-act="vittoria-chiudi">Evviva!</button></div>`;
+  document.body.appendChild(el);
+  try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){}
+}
+A['riscatta-premio'] = () => {
   if(!ptMaster()) return toast('Sistema punti disattivato dal Supervisor', 'err');
-  const d = derived(), r = sogliaPunti(), cr = creditiSoglia(), pt = ptDisp(d, st.mid), ok = pt >= r, me = st.mid;
-  const usati = ptUsati(d, me);
-  openSheet(`<h3>⭐ Punti Collega Modello</h3>
-    <div class="stat" style="margin-bottom:10px"><small>Punti posseduti</small><b class="mono ${ok ? 'green' : 'amber'}">${pt} / ${r}</b></div>
-    <p class="tx2" style="font-size:14px;margin:0 0 12px">☕ ${nz(d.S.pcaf, me)} · 🎯 ${nz(d.S.punti, me)} · 🧾 ${nz(d.S.pspesa, me)} · 👏 ${nz(d.S.pbf, me)}${usati ? ` · già usati −${usati}` : ''}</p>
-    <button class="btn green block big" id="btn-riscatta-punti" data-act="riscatta-punti" ${ok ? '' : 'disabled'}>🎉 Riscatta punti</button>
-    <div id="regola-punti" style="margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:14px">
-      <b style="font-size:16px;display:block;margin-bottom:6px">Regolamento Punti Collega Modello: come maturare punti</b>
-      ${[['☕', 'Ogni caffè', ptCaffe()], ['🍫', 'Ogni 1,00 € di snack', nDec(ptSnackEuro())], ['👏', 'Ogni «Ben fatto» ricevuto', ptBenFatto()], ['🧾', `Ogni € speso (max ${ptSpesaMax()} a spesa)`, ptSpesaEuro()]].map(([e, l, n]) => `<div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>${e} ${l}</span><b class="mono amber" style="font-size:18px;white-space:nowrap">+${n} ${n === 1 ? 'punto' : 'punti'}</b></div>`).join('')}
-      <div class="between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:15.5px;line-height:1.3"><span>🎯 Ogni compito di oggi convalidato</span><b class="mono amber" style="font-size:15px;white-space:nowrap">punti indicati</b></div>
-      <div style="margin-top:12px;padding:12px;border-radius:12px;background:rgba(52,211,153,.12);text-align:center;font-size:16.5px;font-weight:800;line-height:1.35" class="green">Ogni ${r} punti = ${cr} ${cr === 1 ? 'credito' : 'crediti'} (${eur(cr * 100)})</div>
-      <p class="tx2" style="font-size:14px;line-height:1.5;margin:10px 0 0">Riscattare i punti non cambia la tua posizione in classifica.</p></div>`);
-};
-A['riscatta-punti'] = () => {
-  if(!ptMaster()) return toast('Sistema punti disattivato dal Supervisor', 'err');
-  const d = derived(), r = sogliaPunti(), cr = creditiSoglia();
-  if(ptDisp(d, st.mid) < r) return toast(`Servono ${r} punti`, 'err');
-  addMov({tipo:'riscatto_punti', mid: st.mid, importo: cr * 100, punti: r});
-  closeSheet(); toast(`🎉 +${eur(cr * 100)} di crediti`);
+  const ps = premioSett(derived());
+  if(!ps || ps.fatto) return toast('Nessun premio da riscattare', 'err');
+  const marca = ps.id + '_' + st.gid; LS.set(marca, 1);
+  addMov({tipo: 'premio_podio', mid: st.mid, pos: ps.pos, sett: ps.key, settTxt: ps.label, importo: ps.importo}, ps.id, true,
+    er => { LS.del(marca); if($('vittoria')) A['vittoria-chiudi'](); toast('Premio non riscattato (' + errMsg(er) + ')', 'err'); });
+  vitPremio(ps);
 };
 /* --- Ben fatto: riconoscimento a un collega, con gettone periodico (controllo lato app sui movimenti già in memoria) --- */
 function bfInizioPeriodo(){
@@ -633,23 +651,28 @@ A['bf-invia'] = () => {
 };
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), d = id => Math.round(Number(val(id).replace(',', '.')) * 100) / 100;
-  const v = {sogliaPunti: n('rp-soglia'), creditiSoglia: n('rp-crediti'), ptCaffe: n('rp-caffe'), ptBenFatto: n('rp-bf'), ptSpesaMax: n('rp-spmax'), bfN: n('rp-bfn'),
-    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), podio1: n('rp-pod1'), podio2: n('rp-pod2'), podio3: n('rp-pod3'), resaKg: n('rp-resa')};
+  const v = {ptCaffe: n('rp-caffe'), ptBenFatto: n('rp-bf'), ptSpesaMax: n('rp-spmax'), bfN: n('rp-bfn'),
+    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), resaKg: n('rp-resa')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi, inD = x => isFinite(x) && x >= 0 && x <= 100;
-  const ok = inR(v.resaKg, 1, 500) && inR(v.sogliaPunti, 1, 1000) && inR(v.creditiSoglia, 1, 100) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inR(v.bfN, 1, 20) && inR(v.podio1, 0, 1000) && inR(v.podio2, 0, 1000) && inR(v.podio3, 0, 1000);
+  const ok = inR(v.resaKg, 1, 500) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inR(v.bfN, 1, 20);
   if(!ok) return toast('Valori non validi', 'err');
-  const sw = {ptOn: !!($('rp-on') && $('rp-on').checked), podioOn: !!($('rp-podio-on') && $('rp-podio-on').checked)};
+  const sw = {ptOn: !!($('rp-on') && $('rp-on').checked)};
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
   G().set({...v, ...sw, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
 /* valori consigliati: una sola scrittura, solo su richiesta del Supervisor; nulla viene sovrascritto in automatico */
-const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptBenFatto: 20, sogliaPunti: 500, creditiSoglia: 5, podioOn: true, podio1: 50, podio2: 30, podio3: 20};
+const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptBenFatto: 20};
+A['salva-premi-podio'] = () => {
+  if(!sonoCreatore()) return toast('Solo il Creatore può impostare i premi', 'err');
+  const v = [1, 2, 3].map(i => Math.round(Number(val('rp-premio' + i).replace(',', '.')) * 100));
+  if(!v.every(x => Number.isInteger(x) && x >= 0 && x <= 50000)) return toast('Importi non validi (da 0 a 500 €)', 'err');
+  G().set({premiPodio: v}, {merge: true}).then(() => toast('Premi del podio salvati')).catch(e => toast(errMsg(e), 'err'));
+};
 A['rp-consigliati'] = () => {
   if(!can('compiti')) return;
-  if(!confirm('Applicare i valori consigliati?\n\nCaffè 10 punti · snack 10 punti per 1,00 € · rimborsi 10 punti per € (tetto 500) · «Ben fatto» 20 · podio 50/30/20 · riscatto 500 punti = 5,00 €.\nVale per gli eventi futuri: quelli passati non cambiano.')) return;
-  const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptBenFatto: 'rp-bf', sogliaPunti: 'rp-soglia', creditiSoglia: 'rp-crediti', podio1: 'rp-pod1', podio2: 'rp-pod2', podio3: 'rp-pod3'}, prima = {};
+  if(!confirm('Applicare i valori consigliati?\n\nCaffè 10 punti · snack 10 punti per 1,00 € · rimborsi 10 punti per € (tetto 500) · «Ben fatto» 20.\nVale per gli eventi futuri: quelli passati non cambiano.')) return;
+  const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptBenFatto: 'rp-bf'}, prima = {};
   Object.keys(ids).forEach(k => { const e = $(ids[k]); if(e){ prima[ids[k]] = e.value; e.value = nDec(RP_CONSIGLIATI[k]); } });
-  const po = $('rp-podio-on'); if(po) po.checked = true;
   G().set(RP_CONSIGLIATI, {merge: true}).then(() => toast('Valori consigliati applicati')).catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
 };
 /* passaggio alla scala punti ×10: una sola scrittura sul documento del gruppo (scalaDa + valori espliciti); i movimenti vecchi si rivalutano in memoria */

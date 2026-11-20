@@ -22,8 +22,6 @@ function avvisiHome(){
   auto.forEach((x, i) => { h += `<div class="avv" id="avviso-evento-${i}" data-tipo="${esc(x.tipo)}" data-g="${x.g}" style="${x.st}" role="status">${x.t}</div>`; });
   const nc = nCpConv();   // promemoria al Supervisor: compiti svolti da convalidare
   if(nc) h += `<button class="avv violet" id="avviso-conv" data-act="go" data-p="notifiche"><div class="avv-t">🛡️ ${nc === 1 ? '1 compito da convalidare' : nc + ' compiti da convalidare'}</div><div class="avv-m"><b>Apri le Notifiche →</b></div></button>`;
-  const pm = podioDaAssegnare();   // admin: a inizio mese, bonus podio del mese precedente da assegnare con un tocco
-  if(pm) h += `<button class="avv amber" id="avviso-podio" data-act="podio-apri"><div class="avv-t">🏅 Podio del mese</div><div class="avv-m"><b>Assegna i bonus di ${esc(pm.nome)}</b><br><span style="font-size:12.5px">Prima convalida le ultime richieste e i compiti di fine mese.</span></div></button>`;
   return h;
 }
 

@@ -44,9 +44,7 @@ function pBar(d){
       <button class="btn amber block" id="btn-ricarica" data-act="ricarica-saldo">➕ Ricarica</button>
       <button class="btn green block" id="btn-riscatta" data-act="riscatta-menu">💰 Riscatta o rimborso</button>
     </div>
-        ${!ptMaster() ? '' : (() => { const r = sogliaPunti(), pt = ptDisp(d, st.mid), pct = Math.min(100, Math.round(pt / r * 100)), ok = pt >= r;
-      return `<button id="tessera-punti" class="tessera ${ok ? 'ok' : ''}" data-act="tessera" aria-label="Punti Collega Modello: ${pt} punti su ${r}"><div class="between" style="font-size:13px;margin-bottom:8px"><b>⭐ Punti Collega Modello</b><span class="mono ${ok ? 'green' : 'amber'}"><b>${pt}</b> / ${r} punti</span></div>
-      <div class="bar"><i style="width:${pct}%"></i></div>${ok ? '<div class="tess-ok">🎉 Riscatta punti</div>' : ''}</button>`; })()}
+        ${!ptMaster() ? '' : homeSett(d)}
     ${d.pendenti.filter(m => m.mid === st.mid && m.tipo === 'riscatto').map(m => `<div class="between" style="margin-top:8px;font-size:12.5px"><span class="tx2">Riscatto in attesa di pagamento: <b class="mono">${eur(m.importo)}</b></span><button class="btn link" style="padding:0" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}
   </div>
   ${avvisiHome()}

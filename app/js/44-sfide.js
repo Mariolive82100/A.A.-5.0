@@ -37,7 +37,7 @@ const SF_FISSE = {
   sfauto_spese: {id: 'sfauto_spese', nome: '🧾 Superstar della Spesa', per: 'mese', pt: 30, tipo: 'spese',
     descr: 'Vince chi nel mese solare registra più spese per il fondo, contando solo quelle convalidate.', spareggio: 'A parità di spese vince chi ha speso di più in totale (l\'importo non viene mostrato). ' + SF_PAREGGIO},
   sfauto_pulizie: {id: 'sfauto_pulizie', nome: '🧹 Mastro Lindo', per: 'mese', pt: 30, tipo: 'pulizie',
-    descr: 'Vince chi svolge più turni di pulizia nel mese solare; contano anche i vecchi compiti convalidati.', spareggio: 'A parità di turni vince chi ha ottenuto più punti pulizia. ' + SF_PAREGGIO},
+    descr: 'Vince chi ottiene più punti pulizia nel mese solare. I punti li assegna solo il Creatore o un admin con «Sfide e Regole» (🎯 Punti extra); contano anche i vecchi turni e compiti convalidati.', spareggio: 'A parità di punti vince chi ha più turni di pulizia. ' + SF_PAREGGIO},
   sfauto_bf: {id: 'sfauto_bf', nome: '👏 Collega del Mese', per: 'mese', pt: 30, tipo: 'benfatto',
     descr: 'Vince chi riceve più «Ben fatto!» nel mese solare.', spareggio: SF_PAREGGIO},
   sfauto_lavoro: {id: 'sfauto_lavoro', nome: '💪 Indefesso', per: 'mese', pt: 40, tipo: 'lavoro',
@@ -63,7 +63,7 @@ function vittoriaCheck(){
   el.id = 'vittoria'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Hai vinto una sfida');
   el.innerHTML = `${conf}<div class="vit-box"><div class="vit-medal" aria-hidden="true">🏆</div><h2>${nuove.length === 1 ? 'Hai vinto una sfida!' : 'Hai vinto ' + nuove.length + ' sfide!'}</h2>
     ${nuove.map(v => `<div class="vit-r"><b>${esc(v.x.nome)}</b><span>${esc(v.p.label)}${v.n > 1 ? ' · ex aequo' : ''}</span><i>+${v.x.pt} punti</i></div>`).join('')}
-    <p class="hint" style="margin:10px 0 14px">${tot} ${tot === 1 ? 'punto' : 'punti'} nella tua Tessera Fedeltà</p>
+    <p class="hint" style="margin:10px 0 14px">${tot} ${tot === 1 ? 'punto' : 'punti'} nei tuoi punti accumulati</p>
     <button class="btn amber block" id="btn-vittoria-ok" data-act="vittoria-chiudi">Fantastico!</button></div>`;
   document.body.appendChild(el);
   try { if(navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e){}
@@ -113,6 +113,7 @@ function sfBuckets(list){
     if((src.tipo === 'caffe' || src.tipo === 'caffe_pagato') && src.stato !== 'annullata') row(W, wk, src.mid, 3)[2] += sg * (src.qta || 0);
     if(src.tipo === 'pulizia') (src.mids || []).forEach(x => { const r = row(M, sfMs(t), x, 7); r[4] += sg; r[5] += sg * ptPulM(src); });
     else if((src.tipo === 'compito' && src.stato === 'confermata') || (src.tipo === 'obiettivo' && src.fase === 'fatto')){ const r = row(M, sfMs(t), src.mid, 7); r[4] += sg; r[5] += sg * (src.punti || 0); }
+    if(src.tipo === 'bonus_podio' && src.extra && src.sfida === 'sfauto_pulizie'){ const r = row(M, src.perExtra && src.perExtra[0] === 'm' ? src.perExtra : sfMs(t), src.mid, 8); r[7] = (r[7] || 0) + sg * (src.punti || 0); }   // Mastro Lindo: punti pulizia dati dall'admin
     if(src.tipo === 'ben_fatto') row(M, sfMs(t), src.aMid, 7)[6] += sg;
     if(src.tipo === 'lavoro') row(M, sfMs(t), src.mid, 7)[3] += sg;   // Indefesso: lavori compiuti (si somma col segno: lo storno toglie 1 nel mese dell'originale)
     if(src.tipo === 'ricarica' && src.stato === 'confermata') row(M, sfMs(tc), src.mid, 7)[0] += sg * (src.importo || 0);
@@ -162,14 +163,14 @@ function sfClassifica(tipo, p){
   Object.keys(rows).forEach(id => {
     if(!att.has(id)) return;
     const a = rows[id], g = i => a[i] || 0;
-    const [v, v2] = tipo === 'giro' ? [g(0), g(1)] : tipo === 'caffe' ? [g(2), 0] : tipo === 'pulizie' ? [g(4), g(5)] : tipo === 'benfatto' ? [g(6), 0]
+    const [v, v2] = tipo === 'giro' ? [g(0), g(1)] : tipo === 'caffe' ? [g(2), 0] : tipo === 'pulizie' ? [g(5) + g(7), g(4)] : tipo === 'benfatto' ? [g(6), 0]
       : tipo === 'ricarica' ? [g(0), 0] : tipo === 'spese' ? [g(1), g(2)] : [g(3), 0];
     if(v > 0) righe.push({id, v, v2});
   });
   righe.forEach(r => {
-    r.txt = tipo === 'giro' ? sfPlur(r.v, 'giro', 'giri') : tipo === 'caffe' ? sfPlur(r.v, 'caffè', 'caffè') : tipo === 'pulizie' ? sfPlur(r.v, 'turno', 'turni')
+    r.txt = tipo === 'giro' ? sfPlur(r.v, 'giro', 'giri') : tipo === 'caffe' ? sfPlur(r.v, 'caffè', 'caffè') : tipo === 'pulizie' ? r.v + ' pt'
       : tipo === 'benfatto' ? sfPlur(r.v, 'Ben fatto', 'Ben fatto') : tipo === 'lavoro' ? sfPlur(r.v, 'lavoro', 'lavori') : tipo === 'spese' ? sfPlur(r.v, 'spesa', 'spese') : tipo === 'punti' ? r.v + ' pt' : '';
-    r.sub = tipo === 'giro' ? r.v2 + ' caffè offerti' : '';
+    r.sub = tipo === 'giro' ? r.v2 + ' caffè offerti' : tipo === 'pulizie' && r.v2 > 0 ? sfPlur(r.v2, 'turno', 'turni') : '';
   });
   righe.sort((a, b) => b.v - a.v || b.v2 - a.v2 || (nomeBreve(a.id) || '').localeCompare(nomeBreve(b.id) || ''));
   righe.forEach(r => { r.pos = 1 + righe.filter(x => x.v > r.v || (x.v === r.v && x.v2 > r.v2)).length; });
@@ -212,7 +213,7 @@ function sfPremi(){
   return out.sort((a, b) => b.t - a.t).slice(0, 10);
 }
 /* spiegazione della sfida (icona ⓘ): regola, spareggio e premio */
-const sfInfo = x => infoBtn(`<b>${esc(x.nome)}</b><br>${esc(x.descr)}<br><br><b>Spareggio:</b> ${esc(x.spareggio)}<br><br><b>Premio:</b> +${x.pt} punti nella Tessera Fedeltà, assegnati dall'admin a periodo concluso.`);
+const sfInfo = x => infoBtn(`<b>${esc(x.nome)}</b><br>${esc(x.descr)}<br><br><b>Spareggio:</b> ${esc(x.spareggio)}<br><br><b>Premio:</b> +${x.pt} punti accumulati, assegnati dall'admin a periodo concluso.`);
 /* riquadro dell'admin per assegnare il premio di un periodo concluso (solo questa azione resta all'admin) */
 function sfBoxE(x, e){
   return `<div class="banner amber" style="margin:8px 0 0;flex-wrap:wrap;gap:8px"><div class="grow">🏁 <b>${esc(e.p.label)}</b> conclusa<br><span style="font-size:12.5px">${e.win.length === 1 ? 'Vincitore' : 'Pari merito'}: ${e.win.map(r => '<b>' + sfNome(r.id) + '</b>').join(', ')} · +${x.pt} pt${e.parziale ? ' · ⚠️ dati parziali (chiusura precedente senza dettaglio)' : ''}</span></div><button class="btn sm amber" id="btn-sf-ass-${x.id}-${e.p.key}" data-act="sf-assegna" data-id="${x.id}" data-k="${e.p.key}">🏆 Assegna</button></div>`;
@@ -256,6 +257,12 @@ function sfDettaglio(x){
     : ass ? sfBoxE(x, ass) : '<p class="hint" id="sf-premio-attesa" style="margin:10px 0 0">⏳ Premio in attesa di assegnazione da parte di chi gestisce le sfide.</p>';
   const dd = derived(), awP = sfAssegnati()[x.id + '|' + p.key];
   const lv = x.tipo === 'lavoro' && can('compiti') && !(awP && awP.length) ? dd.movs.filter(m => m.tipo === 'lavoro' && !m._pending && m.t >= p.da && m.t <= p.a && !dd.stornati.has(m.id)).sort((a, b) => b.t - a.t).slice(0, 30) : null;
+  const exPuo = !conc && st.isAdmin && can('compiti') && pOn, exStorna = sonoCreatore() || can('cassa');
+  const exL = dd.movs.filter(m => m.tipo === 'bonus_podio' && m.extra && m.sfida === x.id && m.perExtra === p.key && !dd.stornati.has(m.id)).sort((a, b) => b.t - a.t).slice(0, 30);
+  const extra = exPuo || exL.length ? `<div class="card" id="sf-extra"><h3>🎯 Punti extra${exL.length ? ` <span class="pill violet">${exL.length}</span>` : ''}</h3>
+    <p class="hint" style="margin:0 0 8px">${x.tipo === 'pulizie' ? 'In questa sfida i punti li assegna solo chi gestisce le sfide: contano nella graduatoria e vanno nei punti accumulati.' : 'Punti assegnati a mano da chi gestisce le sfide, in aggiunta al premio finale. Vanno nella Tessera Fedeltà.'}</p>
+    ${exL.length ? `<div class="list">${exL.map(m => `<div class="li"><div class="av">🎯</div><div class="grow"><div class="t" style="font-size:13.5px;white-space:normal"><b>${sfNome(m.mid)}</b> · +${m.punti || 0} pt${m.causale ? ' · «' + esc(m.causale) + '»' : ''}</div><div class="d">${quando(m.t)}</div></div>${exPuo && exStorna && !m._pending ? `<button class="btn sm ghost" id="btn-sx-storno-${m.id}" data-act="storno" data-id="${m.id}">↩️ Storna</button>` : ''}</div>`).join('')}</div>` : '<div class="empty">Nessun punto extra in questo periodo.</div>'}
+    ${exPuo ? `<button class="btn amber block" id="btn-sx-apri" data-act="sf-extra" data-id="${x.id}" style="margin-top:10px">➕ Dai punti extra</button>` : ''}</div>` : '';
   const verifica = lv ? `<div class="card" id="sf-verifica"><h3>🧾 Segnalazioni da verificare${lv.length ? ` <span class="pill violet">${lv.length}</span>` : ''}</h3>
     <p class="hint" style="margin:0 0 8px">Se un lavoro non risulta, stornalo prima di assegnare il premio: la classifica si aggiorna subito.</p>
     ${lv.length ? `<div class="list">${lv.map(m => `<div class="li"><div class="av">🛩️</div><div class="grow"><div class="t" style="font-size:13.5px;white-space:normal"><b>${sfNome(m.mid)}</b>${m.nota ? ' · «' + esc(m.nota) + '»' : ''}</div><div class="d">${quando(m.t)}</div></div><button class="btn sm ghost" id="btn-lv-storno-${m.id}" data-act="storno" data-id="${m.id}">↩️ Storna</button></div>`).join('')}</div>` : '<div class="empty">Nessuna segnalazione in questo periodo.</div>'}</div>` : '';
@@ -270,6 +277,7 @@ function sfDettaglio(x){
     ${valori ? '' : '<p class="hint" style="margin:8px 0 0;font-size:12px">🔒 Per privacy si vede solo l\'ordine, non gli importi.</p>'}
     ${parz ? '<p class="hint" id="sf-parziale" style="margin:8px 0 0;font-size:12px">⚠️ Dati parziali: il periodo comprende una chiusura fatta prima che le sfide venissero salvate per settimana e mese.</p>' : ''}
     ${esito}${conc ? sfBox(x, p.key) : ''}</div>
+  ${extra}
   ${verifica}
   ${assegnati.length ? `<div class="card" id="sf-dett-premi"><h3>🏅 Premi già assegnati</h3>${assegnati.map(e => `<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px">${esc(e.periodoTxt || e.periodo || '')}: <b>${e.mids.map(sfNome).join(', ')}</b> · +${e.punti || 0} pt${e.mids.length > 1 ? ' <span class="pill sky">ex aequo</span>' : ''}</div>`).join('')}</div>` : ''}`;
 }

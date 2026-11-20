@@ -183,6 +183,14 @@ main.wide{max-width:980px}
 .tessera{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px;text-align:left;background:transparent;color:inherit;cursor:pointer}
 .tessera.ok{border-color:var(--green);background:rgba(52,211,153,.10)}
 .tessera.ok .bar i{background:var(--green)}
+.sett-main{display:block;width:100%;text-align:left;background:transparent;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
+.sett-ok{margin-top:10px;font-size:13px;font-weight:700;color:var(--green)}
+.btn.premio-btn{margin-top:12px;background:linear-gradient(135deg,#f59e0b,#ef4444 55%,#a855f7);color:#fff;border:0;font-weight:800;animation:premioPulse 1.8s ease-in-out infinite}
+@keyframes premioPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(245,165,36,.5)}50%{transform:scale(1.025);box-shadow:0 0 18px 3px rgba(245,165,36,.45)}}
+@media (prefers-reduced-motion:reduce){.btn.premio-btn{animation:none}}
+#vittoria .vit-medal.cup2{filter:grayscale(1) brightness(1.4)}
+#vittoria .vit-medal.cup3{filter:sepia(1) saturate(2.4) hue-rotate(-20deg) brightness(.82)}
+#vittoria .vit-pos{font-size:40px;line-height:1;margin-top:4px}
 .tess-ok{margin-top:8px;font-weight:800;color:var(--green);font-size:13.5px;text-align:center}
 .sala{background:linear-gradient(135deg,rgba(245,165,36,.16),rgba(245,165,36,.05));border:1px solid rgba(245,165,36,.35);border-radius:14px;padding:12px 14px;margin:0 0 12px}
 .sala-l{font-size:13px;font-weight:700;color:var(--tx2)}.sala-v{font-size:34px;font-weight:800;color:var(--amber);line-height:1}

@@ -92,12 +92,16 @@ async function cardImmagine(c){
 }
 A['card-share'] = async (ds, el) => {
   const c = el && el.closest('.card'); if(!c) return;
+  const zeri = [...c.querySelectorAll('.rk.z')];   // nella sola immagine condivisa: solo chi ha punteggio maggiore di 0 (nell'app restano tutti)
+  zeri.forEach(e => { e.style.display = 'none'; });
   const {titolo, corpo} = cardTesto(c), testo = `☕ ${st.gruppo.nome || 'Saletta'} — Armieri 5.0\n\n${corpo}`;
   try {
     const blob = await cardImmagine(c);
+    zeri.forEach(e => { e.style.display = ''; });
     const nome = 'armieri_' + (titolo || 'scheda').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) + '_' + oggiISO() + '.png';
     await condividiBlob(blob, nome, titolo || 'Armieri 5.0', `☕ ${st.gruppo.nome || 'Saletta'} — ${titolo || 'Armieri 5.0'}`, 'Immagine scaricata: allegala al messaggio');
   } catch(e){   // se il browser non riesce a disegnare la scheda, si ripiega sul testo
+    zeri.forEach(x => { x.style.display = ''; });
     if(navigator.share){ navigator.share({title: titolo || 'Armieri 5.0', text: testo}).catch(() => {}); return; }
     try { navigator.clipboard.writeText(testo).then(() => toast('Immagine non disponibile: scheda copiata come testo')).catch(() => toast('Condivisione non disponibile', 'err')); } catch(e2){ toast('Condivisione non disponibile', 'err'); }
   }

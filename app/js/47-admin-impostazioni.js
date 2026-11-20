@@ -12,7 +12,7 @@ const RP_SW = [['rp-on-caffe', 'ptCaffeOn', '☕🍫 Punti caffè e snack'], ['r
 const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
     ${infoBtn(`Un cambio vale per gli eventi futuri: quelli già registrati mantengono il loro valore (i punti sono congelati nei movimenti).`, 'Come funziona')}
     <label class="check"><input type="checkbox" id="rp-on" data-chg="rp-sw" ${ptMaster() ? 'checked' : ''}><b style="flex:1;font-size:14px">⭐ Sistema Punti e Gamification attivo</b></label>
-    <p class="hint" style="margin:4px 0 8px">Se spento, nessun accredito di punti e Tessera Fedeltà nascosta. I punti già maturati restano.</p>
+    <p class="hint" style="margin:4px 0 8px">Se spento, nessun accredito di punti e premi del podio nascosti. I punti già maturati restano.</p>
     <div id="rp-sw-lista">${RP_SW.map(([id, k, l]) => `<label class="check"><input type="checkbox" id="${id}" ${flagOn(k) ? 'checked' : ''} ${ptMaster() ? '' : 'disabled'}><b style="flex:1;font-size:14px">${l}</b></label>`).join('')}</div>
     <button class="btn sm block ghost" id="btn-rp-consigliati" data-act="rp-consigliati" style="margin:8px 0">✨ Applica valori consigliati</button>
   </div>
@@ -42,26 +42,19 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
   </div>
-  <div class="card" id="rp-c"><h3>C · Podio del mese</h3>
-    <label class="check"><input type="checkbox" id="rp-podio-on" ${podioOn() || (st.gruppo && st.gruppo.podioOn === true) ? 'checked' : ''}><b style="flex:1;font-size:14px">🏅 Bonus ai primi tre del mese solare</b></label>
+  <div class="card" id="rp-c"><h3>C · Premi del podio settimanale</h3>
+    ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Crediti che vincono i primi tre della classifica settimanale (da lunedì a domenica). Li imposta solo il Creatore. Metti 0 per nessun premio. Chi è sul podio li riscatta da solo, in Home, a settimana chiusa.</p>
     <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      <label class="f"><span>🥇 1°</span><input class="in mono" id="rp-pod1" inputmode="numeric" value="${podioPt(1)}"></label>
-      <label class="f"><span>🥈 2°</span><input class="in mono" id="rp-pod2" inputmode="numeric" value="${podioPt(2)}"></label>
-      <label class="f"><span>🥉 3°</span><input class="in mono" id="rp-pod3" inputmode="numeric" value="${podioPt(3)}"></label>
+      ${[1, 2, 3].map(i => `<label class="f"><span>${['🥇 1°', '🥈 2°', '🥉 3°'][i - 1]} (€)</span><input class="in mono" id="rp-premio${i}" inputmode="decimal" value="${(premioPos(i) / 100).toFixed(2).replace('.', ',')}"></label>`).join('')}
     </div>
-    <p class="hint" style="margin:-4px 0 8px;font-size:12px">A inizio mese ti compare un avviso in Home: con un tocco assegni i bonus ai primi tre del mese precedente. Entrano nella Tessera Fedeltà, non nella classifica.</p>
-  </div>
-  <div class="card" id="rp-d"><h3>D · Riscatto Tessera Fedeltà</h3>
-    <div class="grid2">
-      <label class="f"><span>Soglia riscatto (punti)</span><input class="in mono" id="rp-soglia" inputmode="numeric" value="${sogliaPunti()}"></label>
-      <label class="f"><span>Premio in crediti (€)</span><input class="in mono" id="rp-crediti" inputmode="numeric" value="${creditiSoglia()}"></label>
-    </div>
+    <button class="btn amber block" id="btn-salva-premi" data-act="salva-premi-podio" style="margin-top:8px">Salva i premi</button>`
+    : `<p class="hint" style="margin:0">I premi li imposta solo il Creatore. Attuali: ${premiPodio().some(x => x > 0) ? [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : 'nessun premio impostato'}.</p>`}
   </div>
   </div>
   <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti" style="margin-bottom:12px">Salva le regole</button>
 `;
 function pRegole(){
-  return `<h2>${ic('sparkles')} ⚙️ Regole punti &amp; premi ${infoBtn(`Tutto in un posto: consumi e spese, obiettivi e collaborazione, podio del mese e riscatto della Tessera Fedeltà`)}</h2>${cardRegolePunti()}`;
+  return `<h2>${ic('sparkles')} ⚙️ Regole punti &amp; premi ${infoBtn(`Tutto in un posto: consumi e spese, obiettivi e collaborazione, premi del podio settimanale (impostati dal Creatore)`)}</h2>${cardRegolePunti()}`;
 }
 function pBackup(d){
   return `<h2>${ic('download')} Backup & Ripristino</h2><p class="sub">Copia dei dati fuori dall'app.</p>

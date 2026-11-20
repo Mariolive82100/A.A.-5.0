@@ -41,6 +41,7 @@ function notifiche(d){
     else if(m.tipo === 'conversione_caffe' && m.mid === me) out.push({t, e: '☕', x: `Hai riscattato ${m.punti} Punti Caffè in ${eur(m.importo)} di crediti`});
     else if(m.tipo === 'riscatto' && m.mid === me && (ok || m.stato === 'rifiutata' || !m.stato)) out.push({t, e: m.stato === 'rifiutata' ? '❌' : '🏦', x: m.stato === 'rifiutata' ? `La tua richiesta di riscatto di ${eur(m.importo)} è stata rifiutata` : `Il Fondo Gruppo ti ha liquidato ${eur(m.importo)}`});
     else if(m.tipo === 'ben_fatto' && m.aMid === me) out.push({t, e: '👏', x: `${esc(nomeM(m.daMid))} ti dice «Ben fatto!»: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`});
+    else if(m.tipo === 'premio_podio' && m.mid === me) out.push({t, e: ['🥇', '🥈', '🥉'][(m.pos || 1) - 1] || '🏆', x: `Premio del podio (${m.pos || '?'}° posto${m.settTxt ? ', ' + esc(m.settTxt) : ''}): +${eur(m.importo)} di crediti`});
     else if(m.tipo === 'riscatto_punti' && m.mid === me) out.push({t, e: '⭐', x: `Hai riscattato ${m.punti * fx(m)} punti: +${eur(m.importo)} di crediti`});
     else if(m.tipo === 'regalo' && m.aMid === me) out.push({t, e: m.trasf ? '🤝' : '🎁', x: `${esc(nomeM(m.daMid))} ti ha ${m.trasf ? 'ceduto' : 'regalato'} ${eur(m.importo)} di crediti${m.msg ? ' · «' + esc(m.msg) + '»' : ''}`});
     else if(m.tipo === 'compito' && m.mid === me){
@@ -167,8 +168,10 @@ function descMov(m){
     case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = true;
       return {ic: m.trasf ? '🤝' : '🎁', t: `${esc(nomeM(m.daMid))} ${m.trasf ? 'ha ceduto (scambio)' : 'ha regalato'} ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
     case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`, a: 0};
-    case 'bonus_podio': if(m.sfida) return {ic:'🏆', t: `Sfida «${esc(m.titolo || 'Sfida')}»${m.periodoTxt ? ' (' + esc(m.periodoTxt) + ')' : ''}: ${n} vince, +${m.punti || 0} punti`, a: 0};
+    case 'bonus_podio': if(m.sfida && m.extra) return {ic:'🎯', t: `Sfida «${esc(m.titolo || 'Sfida')}»${m.periodoTxt ? ' (' + esc(m.periodoTxt) + ')' : ''}: ${n} riceve +${m.punti || 0} punti extra${m.monte ? ' (quota di ' + m.monte + ' pt tra ' + (m.nPart || '?') + ')' : ''}${m.causale ? ' · ' + esc(m.causale) : ''}`, a: 0};
+      if(m.sfida) return {ic:'🏆', t: `Sfida «${esc(m.titolo || 'Sfida')}»${m.periodoTxt ? ' (' + esc(m.periodoTxt) + ')' : ''}: ${n} vince, +${m.punti || 0} punti`, a: 0};
       return {ic:['🥇','🥈','🥉'][(m.pos || 1) - 1] || '🏅', t: `Podio del mese ${esc(m.mese || '')}: ${n} (${m.pos || '?'}° posto, +${m.punti || 0} punti)`, a: 0};
+    case 'premio_podio': return {ic: ['🥇', '🥈', '🥉'][(m.pos || 1) - 1] || '🏆', t: `Premio del podio: ${n} (${m.pos || '?'}° posto${m.settTxt ? ', ' + esc(m.settTxt) : ''})`, a: m.importo};
     case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti * fx(m)} Punti Collega Modello`, a: m.importo};
     case 'riscatto': return {ic:'🏦', t: `Riscatto di ${n} · ${m.stato === 'attesa' ? 'richiesto al Fondo' : 'pagato dalla cassa'} (${FONTI[m.metodo] || m.metodo})`, a: -m.importo, cassa: true};
     case 'spesa': { const mx = spesaMista(m); return {ic:'🧾', t: `Spesa di ${n}: ${esc(m.descr || '')} · ${mx ? 'rimborso misto (' + mx + ')' : m.fonte === 'denaro' ? 'rimborso in denaro' : m.fonte === 'tasca' ? 'rimborso in crediti' : 'pagata da ' + (FONTI[m.fonte] || m.fonte)}`, ...(mx ? {a: m.quotaCrediti} : m.fonte === 'tasca' ? {a: m.importo} : {a: 0, neutro: m.importo}), cassa: mx ? true : m.fonte !== 'tasca'}; }

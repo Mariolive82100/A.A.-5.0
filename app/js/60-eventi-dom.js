@@ -25,6 +25,7 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
   if(el && el.dataset.chg === 'ac-upd') acAggiorna();
+  if(el && el.dataset.chg === 'sx-upd') sxAggiorna();
   if(el && el.dataset.chg === 'bf-upd') bfAggiorna();
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
@@ -34,6 +35,7 @@ document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="ac-upd"]')) acAggiorna();
+  if(e.target.closest && e.target.closest('[data-chg="sx-upd"]')) sxAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="bf-upd"]')) bfAggiorna();
   if(e.target && e.target.dataset && e.target.dataset.cerca) cercaApplica(e.target);
   if(e.target && e.target.id === 'feed-q'){   // filtra la sola lista, senza ricostruire la pagina (la tastiera resta aperta)

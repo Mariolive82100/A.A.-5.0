@@ -179,7 +179,7 @@ const QS_VOCI = [
   {e:'👥', t:'Gestione Soci', s:'Elenco soci, saldi, archivia, espelli', perm:'soci', p:'membri', k:'soci socio colleghi collega saldo saldi punti archivia espelli nickname gestione'},
   {e:'🔐', t:'Gestione PIN', s:'Reset PIN, PIN temporaneo', perm:'soci', p:'pin', k:'pin reset temporaneo codice password sblocco'},
   {e:'🛡️', t:'Gestione Supervisor', s:'Nomina, permessi e ruoli', perm:'creatore', p:'supervisor', k:'supervisor permessi permesso ruoli ruolo nomina revoca creatore admin amministratore'},
-  {e:'⚙️', t:'Regole punti e premi', s:'Punteggi, tessera, soglia, podio', perm:'compiti', p:'regole', k:'punti tessera fedelta ben fatto soglia podio premi regole punteggi scala credito conversione'},
+  {e:'⚙️', t:'Regole punti e premi', s:'Punteggi e premi del podio', perm:'compiti', p:'regole', k:'punti premi podio crediti ben fatto soglia tessera fedelta regole punteggi scala credito conversione'},
   {e:'🏆', t:'Premi delle sfide', s:'Sfide · assegna i premi a periodo concluso', perm:'compiti', p:'sfide', a:'sf-panoramica', k:'sfide sfida premi premio assegna benefattore caffeina lindo spesa ricarica incarichi sospeso compiti briefing'},
   {e:'💾', t:'Backup e ripristino', s:'Esporta i dati, ripristina', perm:'sistema', p:'backup', k:'backup esporta esportazione ripristino ripristina scarica dati salvataggio'},
   {e:'📦', t:'Chiusura periodo', s:'Chiusura, estratti, archivio', perm:'sistema', p:'chiusura', k:'chiusura periodo estratti estratto archivio chiudere'},

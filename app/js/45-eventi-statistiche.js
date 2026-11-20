@@ -152,6 +152,7 @@ function aggMov(G, m, sg){
     case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
     case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)*fx(m)); break;
     case 'punti_adj': add(m.kind === 'caffe' ? G.ptC : G.ptP, m.mid, sg*m.punti*fx(m)); break;
+    case 'bonus_podio': if(m.extra && m.sfida === 'sfauto_pulizie') add(G.ptP, m.mid, sg*(m.punti || 0)); break;   // Mastro Lindo: i punti dell'admin contano nella classifica punti del mese e nel Podio
     case 'riscatto': if(m.stato === 'confermata' || !m.stato) t.riscatti += sg*m.importo; break;
     case 'entrata': t.entrate += sg*m.importo; break;
     case 'uscita': t.uscite += sg*m.importo; break;
@@ -160,26 +161,57 @@ function aggMov(G, m, sg){
   }
 }
 function aggrega(list){ const G = nuovoAgg(); list.forEach(m => aggMov(G, m)); return G; }
-let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''}, _aggHd = {d: null, k: ''}, _aggOn = {d: null, k: ''}, _aggSf = {d: null, k: ''};
+let _aggC = {d: null, k: ''}, _aggCl = {d: null, k: ''}, _aggHd = {d: null, k: ''}, _aggOn = {d: null, k: ''}, _aggSf = {d: null, k: ''}, _aggPw = {d: null, k: ''};
 function aggRange(d, r, slot){
   const k = [r.da, r.a, st.arcMov ? st.arcMov.length : -1, new Date().toDateString()].join('|');
-  const c = slot === 'cl' ? _aggCl : slot === 'hd' ? _aggHd : slot === 'on' ? _aggOn : slot === 'sf' ? _aggSf : _aggC;
+  const c = slot === 'cl' ? _aggCl : slot === 'hd' ? _aggHd : slot === 'on' ? _aggOn : slot === 'sf' ? _aggSf : slot === 'pw' ? _aggPw : _aggC;
   if(c.d === d && c.k === k) return c;
   const tutti = (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a);
   const n = {d, k, r, tutti, G: aggrega(tutti)};
-  if(slot === 'cl') _aggCl = n; else if(slot === 'hd') _aggHd = n; else if(slot === 'on') _aggOn = n; else if(slot === 'sf') _aggSf = n; else _aggC = n;
+  if(slot === 'cl') _aggCl = n; else if(slot === 'hd') _aggHd = n; else if(slot === 'on') _aggOn = n; else if(slot === 'sf') _aggSf = n; else if(slot === 'pw') _aggPw = n; else _aggC = n;
   return n;
 }
 function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
-/* periodo della classifica punti: "sempre" = cumulato (null), minimo "questo mese" */
-function clPerKey(){ return ['oggi', 'settimana', 'mese', 'sempre'].includes(st.clP) ? st.clP : 'oggi'; }
+/* periodo della classifica punti: settimana in corso (da lunedì) o "sempre" = cumulato */
+function clPerKey(){ return st.clP === 'sempre' ? 'sempre' : 'settimana'; }
 function clRange(){
   const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = clPerKey();
   const ini = dt => { dt.setHours(0, 0, 0, 0); return dt.getTime(); };
-  if(p === 'settimana'){ const dow = (o.getDay() + 6) % 7; return {da: ini(new Date(y, m, o.getDate() - dow)), a: Infinity, label: 'Questa settimana'}; }
   if(p === 'sempre') return {da: 0, a: Infinity, label: 'Classifica generale di sempre'};
-  if(p === 'mese') return {da: new Date(y, m, 1).getTime(), a: Infinity, label: 'Podio del mese (mese solare corrente)'};
-  return {da: ini(new Date(y, m, o.getDate())), a: Infinity, label: 'Oggi'};
+  const dow = (o.getDay() + 6) % 7; return {da: ini(new Date(y, m, o.getDate() - dow)), a: Infinity, label: 'Questa settimana'};
+}
+/* classifica della settimana (da lunedì a domenica): corrente o scorsa, tutto in memoria dai movimenti già caricati */
+const lunediDi = dt => { const x = new Date(dt); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
+const settKey = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+function classSett(d, prev){
+  const lun = lunediDi(new Date()), ini = new Date(lun); if(prev) ini.setDate(ini.getDate() - 7);
+  const dom = new Date(ini); dom.setDate(dom.getDate() + 6);
+  const dm = x => `${pad(x.getDate())}/${pad(x.getMonth() + 1)}`, label = `Settimana dal ${dm(ini)} al ${dm(dom)}`;
+  const G = aggConChiusi(d, {da: ini.getTime(), a: prev ? lun.getTime() - 1 : Infinity, label}, prev ? 'pw' : 'hd').G;
+  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}));
+  righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
+  return {key: settKey(ini), label, righe};
+}
+const PREMI_DAL = '2026-11-16';   // lunedì della prima settimana con i premi in crediti: si riscatta dal lunedì successivo
+/* premio della settimana scorsa per il collegato: sul podio con almeno 1 punto e premio impostato; «fatto» se già riscattato */
+function premioSett(d){
+  if(!st.mid || !ptMaster() || !st.ready.mv || !st.ready.m) return null;
+  if(Date.now() < lunediDi(new Date()).getTime() + 60000) return null;   // il premio si riscatta solo a settimana scaduta: dal lunedì alle 00:01
+  const P = classSett(d, true), i = P.righe.findIndex(x => x.id === st.mid);
+  if(P.key < PREMI_DAL) return null;   // le settimane precedenti all'introduzione dei premi non danno diritto a nulla
+  if(i < 0 || i > 2 || P.righe[i].tot <= 0) return null;
+  const importo = premioPos(i + 1); if(importo <= 0) return null;
+  const id = `pp_${P.key}_${st.mid}`;
+  return {pos: i + 1, key: P.key, id, importo, label: P.label, medal: ['🥇', '🥈', '🥉'][i], fatto: !!LS.get(id + '_' + st.gid) || tuttiMov().some(m => m.id === id)};
+}
+/* scheda della Home: punti della settimana con la posizione; a settimana chiusa, se sono sul podio, il pulsante «Riscatta premio» */
+function homeSett(d){
+  const C = classSett(d, false), i = C.righe.findIndex(x => x.id === st.mid); if(i < 0) return '';
+  const me = C.righe[i], ps = premioSett(d);
+  const pos = me.tot <= 0 ? '🏁 In gara' : `${i < 3 ? ['🥇', '🥈', '🥉'][i] + ' ' : ''}${i + 1}° su ${C.righe.length}`;
+  const bott = !ps ? '' : ps.fatto ? `<div class="sett-ok" id="sett-premio-ok">✅ Premio della settimana scorsa riscattato: ${ps.medal} +${eur(ps.importo)}</div>`
+    : `<button class="btn premio-btn block big" id="btn-riscatta-premio" data-act="riscatta-premio">🏆 Riscatta premio · ${ps.medal} ${eur(ps.importo)}</button>`;
+  return `<div class="tessera sett" id="home-sett"><button type="button" class="sett-main" id="sett-vai" data-act="go" data-p="classifiche" aria-label="Punti della settimana: ${me.tot}, posizione: ${pos}"><div class="between" style="font-size:13px"><b>📅 Questa settimana</b><span class="pill ${i < 3 && me.tot > 0 ? 'amber' : 'mut'}">${pos}</span></div><div style="margin-top:6px"><b class="mono amber" style="font-size:28px;line-height:1.1">${me.tot}</b> <small class="mut">punti</small></div></button>${bott}</div>`;
 }
 /* storico dei periodi chiusi: i colleghi lo leggono dal proprio estratto, il Supervisor lo ricava dalle chiusure (nessuna lettura in più) */
 function riepDaChiusura(c){
@@ -251,31 +283,15 @@ const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi pri
 
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
-const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Compiti'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
+const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Sfide'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
 const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
-/* posizione del collegato nella classifica punti del mese corrente (stessa regola e stesso ordine della pagina Classifica; tutto in memoria) */
-function posMese(d){
-  const o = new Date(), M = aggConChiusi(d, {da: new Date(o.getFullYear(), o.getMonth(), 1).getTime(), a: Infinity, label: 'Mese corrente'}, 'hd'), G = M.G;
-  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}));
-  righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
-  const i = righe.findIndex(x => x.id === st.mid);
-  return i < 0 ? null : {pos: i + 1, n: righe.length, tot: righe[i].tot};
-}
 function aggiornaPillola(d, av){
-  const el = $('hdr-rank'), hd = $('hdr'); if(!el || !hd) return;
-  let x = null;
-  if(!av && st.mid && ptMaster()){ try { x = posMese(d); } catch(e){ x = null; } }
-  /* premi del Podio del Mese, sempre sott'occhio accanto alla posizione (nascosti se il podio e' spento dal Supervisor) */
-  const pz = $('hdr-prize'), premi = (!av && st.mid && podioOn()) ? [1, 2, 3].filter(i => podioPt(i) > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} +${podioPt(i)} pt`) : [];
-  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio a fine mese'; } }
+  const hd = $('hdr'); if(!hd) return;
+  /* premi in crediti del podio settimanale, sempre sott'occhio (nascosti se nessun premio e' impostato o se i punti sono disattivati) */
+  const pz = $('hdr-prize'), pr = premiPodio(), premi = (!av && st.mid && ptMaster()) ? [1, 2, 3].filter(i => pr[i - 1] > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} ${eur(pr[i - 1])}`) : [];
+  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio ogni settimana'; } }
   const op = $('hdr-onesta'), iO = (op && !av && st.mid && st.page === 'bar') ? onestaIndici(d) : null;
   if(op){ op.classList.toggle('hidden', !iO); hd.classList.toggle('hasonesta', !!iO); if(iO){ op.className = 'onpill ' + (iO.g == null ? 'mut' : onCls(iO.g)); op.innerHTML = '🛡️ ' + onPill(iO.g); op.title = 'Tasso di Onestà (caffè + snack e bibite)'; } }
-  hd.classList.toggle('hasrank', !!x); el.classList.toggle('hidden', !x);
-  if(!x) return;
-  const med = {1: '🥇 ', 2: '🥈 ', 3: '🥉 '}[x.pos] || '';
-  el.className = 'rankpill ' + (x.tot <= 0 ? 'idle' : ({1: 'g1', 2: 'g2', 3: 'g3'}[x.pos] || ''));
-  el.innerHTML = x.tot <= 0 ? '🏁 In gara' : `${med}${x.pos}°<span class="rk-t"> in classifica</span>`;
-  el.setAttribute('aria-label', x.tot <= 0 ? 'Nessun punto ancora questo mese' : `Sei ${x.pos}° su ${x.n} nella classifica del mese`);
 }
 function clRighe(d){
   const r = clRange(), M = aggConChiusi(d, r, 'cl'), G = M.G;
@@ -294,8 +310,8 @@ function clConteggi(d, r){
 }
 function clTitoli(d, r, pc0){
   const C = clConteggi(d, r), pc = pc0 || clPerKey();
-  const bfNome = pc === 'sempre' ? 'Collega di Sempre' : pc === 'mese' ? 'Collega del Mese' : pc === 'settimana' ? 'Collega della Settimana' : 'Collega del Giorno';
-  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '🎯', 'Mastro Lindo', 'compiti'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
+  const bfNome = pc === 'sempre' ? 'Collega di Sempre' : 'Collega della Settimana';
+  const def = [['caffe', '☕', 'Re della Caffeina', 'caffè'], ['turni', '🎯', 'Mastro Lindo', 'turni'], ['speseN', '🧾', 'Superstar della Spesa', 'acquisti'], ['bf', '👏', bfNome, '«Ben fatto»']];
   const att = membriAttivi();
   return def.map(([k, e, nome, u]) => {
     const vals = att.map(m => ({id: m.id, v: Math.max(0, nz(C[k], m.id))})), max = Math.max(0, ...vals.map(x => x.v));
@@ -415,11 +431,11 @@ function cardOnesta(d){
 /* totali aggregati della sala per il tipo di punti scelto */
 function clSala(righe, key, G){
   const tot = k => righe.reduce((a, x) => a + x[k], 0), nn = o => Math.max(0, sumo(o));
-  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti compiti', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
+  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti sfide', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
   const det = {
     tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
-    p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'compito svolto' : 'compiti svolti'}</p>`,
+    p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno svolto' : 'turni svolti'}</p>`,
     s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
     b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
   return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
@@ -458,7 +474,7 @@ function clClassifica(d, R, T, c){
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti compiti']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
+  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti sfide']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
   const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
   const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
@@ -469,7 +485,7 @@ function clClassifica(d, R, T, c){
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Compiti: i punti indicati su ogni compito di oggi, dopo la convalida di un Supervisor. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
+    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Sfide: i punti delle sfide (per esempio Mastro Lindo), assegnati dal Creatore o dagli admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
   return {podio: podioCard};
@@ -530,7 +546,8 @@ function pClassificaPunti(d){
   const chip = (act, cur, v, l) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
   const filtri = `<div class="card" id="cl-filtri">
     <div class="chips" id="cl-amb">${chip('cl-amb', amb, 'saletta', '👥 Saletta')}${chip('cl-amb', amb, 'io', '👤 Io')}</div>
-    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'oggi', 'Oggi')}${chip('cl-per', per, 'settimana', 'Questa settimana')}${chip('cl-per', per, 'mese', '📅 Podio del mese')}${chip('cl-per', per, 'sempre', '🏆 Di sempre')}</div>
+    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'settimana', '📅 Questa settimana')}${chip('cl-per', per, 'sempre', '🏆 Di sempre')}</div>
+    ${per === 'settimana' && premiPodio().some(x => x > 0) ? `<p class="hint" id="cl-premi" style="margin:8px 0 0">In palio a fine settimana: ${[1, 2, 3].filter(i => premioPos(i) > 0).map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ')}</p>` : ''}
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
   if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
@@ -539,7 +556,7 @@ function pClassificaPunti(d){
   return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
-A['cl-per'] = ds => { st.clP = ['oggi', 'settimana', 'mese', 'sempre'].includes(ds.v) ? ds.v : 'oggi'; st.scSel = null; render(); };
+A['cl-per'] = ds => { st.clP = ds.v === 'sempre' ? 'sempre' : 'settimana'; st.scSel = null; render(); };
 A['cl-chip'] = ds => { st.clSort = {k: CL_KEYS.includes(ds.k) ? ds.k : 'tot', dir: -1}; render(); };
 A['carica-arc-mov'] = () => { if(!st.arcLoading && !st.arcMov) caricaArcMov(); };
 
