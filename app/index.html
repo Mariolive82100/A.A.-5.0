@@ -496,7 +496,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.77.1';
+const VERSION = '1.77.2';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1656,7 +1656,7 @@ function descMov(m){
     case 'regalo': { const msg = m.msg ? ` · «${esc(m.msg)}»` : '', io = true;
       return {ic: m.trasf ? '🤝' : '🎁', t: `${esc(nomeM(m.daMid))} ${m.trasf ? 'ha ceduto (scambio)' : 'ha regalato'} ${eur(m.importo)} a ${esc(nomeM(m.aMid))}${msg}`, ...(io && m.daMid === st.mid ? {a: -m.importo} : io && m.aMid === st.mid ? {a: m.importo} : {a: 0, neutro: m.importo})}; }
     case 'ben_fatto': return {ic:'👏', t: `${esc(nomeM(m.daMid))} dice «Ben fatto!» a ${esc(nomeM(m.aMid))}: «${esc(m.msg || '')}» ${(m.pt ?? 2) ? `(+${(m.pt ?? 2) * fx(m)} punti)` : ''}`, a: 0};
-    case 'bonus_podio': if(m.sfida && m.extra) return {ic:'🎯', t: `Sfida «${esc(m.titolo || 'Sfida')}»${m.periodoTxt ? ' (' + esc(m.periodoTxt) + ')' : ''}: ${n} riceve +${m.punti || 0} punti extra${m.causale ? ' · ' + esc(m.causale) : ''}`, a: 0};
+    case 'bonus_podio': if(m.sfida && m.extra) return {ic:'🎯', t: `Sfida «${esc(m.titolo || 'Sfida')}»${m.periodoTxt ? ' (' + esc(m.periodoTxt) + ')' : ''}: ${n} riceve +${m.punti || 0} punti extra${m.monte ? ' (quota di ' + m.monte + ' pt tra ' + (m.nPart || '?') + ')' : ''}${m.causale ? ' · ' + esc(m.causale) : ''}`, a: 0};
       if(m.sfida) return {ic:'🏆', t: `Sfida «${esc(m.titolo || 'Sfida')}»${m.periodoTxt ? ' (' + esc(m.periodoTxt) + ')' : ''}: ${n} vince, +${m.punti || 0} punti`, a: 0};
       return {ic:['🥇','🥈','🥉'][(m.pos || 1) - 1] || '🏅', t: `Podio del mese ${esc(m.mese || '')}: ${n} (${m.pos || '?'}° posto, +${m.punti || 0} punti)`, a: 0};
     case 'riscatto_punti': return {ic:'⭐', t: `${n} riscatta ${m.punti * fx(m)} Punti Collega Modello`, a: m.importo};
@@ -1857,7 +1857,7 @@ function pRegolamento(){
     '<b>Punti e condivisione:</b> nella classifica di ogni sfida, accanto a chi è in testa (o ha vinto) vedi i punti: <i>in palio</i> finché il periodo è aperto, <i>da assegnare</i> a periodo concluso finché chi gestisce le sfide non assegna il premio, <i>assegnati</i> dopo l\'assegnazione. Con il pulsante <b>📤 Condividi</b> in alto a destra puoi condividere la classifica come immagine, con i nomi abbreviati (nome e iniziale del cognome, es. «Mario R.») per leggerla meglio (si apre il menu di condivisione del telefono; se non è disponibile l\'immagine viene scaricata). Nella sfida delle ricariche l\'immagine mostra, come la schermata, solo l\'ordine.',
     '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi; nella sfida delle spese si vede solo il numero di acquisti.',
     '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti in palio al vincitore con un tocco, dalla classifica della sfida. Il premio compare nel registro e va nella <b>Tessera Fedeltà</b>, come i bonus del podio; un premio non si può assegnare due volte.',
-    '<b>🎯 Punti extra:</b> mentre una sfida è in corso, il Creatore o un Supervisor con «Sfide e Regole» può dare punti a mano a uno o più colleghi (da 1 a 100 per collega, con un motivo facoltativo) dal riquadro «Punti extra» nella classifica della sfida. Si sommano al premio finale, vanno nella <b>Tessera Fedeltà</b>, compaiono nel registro e nel Feed e non contano come premio della sfida (tranne in <i>Mastro Lindo</i>, dove sono proprio i punti della graduatoria). Non si può darsi punti da soli. Per annullarli serve lo storno (Creatore o Supervisor con «Cassa e Storni»).',
+    '<b>🎯 Punti extra:</b> mentre una sfida è in corso, il Creatore o un Supervisor con «Sfide e Regole» può dare punti a mano a uno o più colleghi (da 1 a 100 per collega, con un motivo facoltativo; se in più colleghi hanno fatto lo stesso lavoro scegli «Montante da dividere»: il totale si divide in parti uguali per difetto, gli eventuali avanzi non vengono assegnati) dal riquadro «Punti extra» nella classifica della sfida. Si sommano al premio finale, vanno nella <b>Tessera Fedeltà</b>, compaiono nel registro e nel Feed e non contano come premio della sfida (tranne in <i>Mastro Lindo</i>, dove sono proprio i punti della graduatoria). Non si può darsi punti da soli. Per annullarli serve lo storno (Creatore o Supervisor con «Cassa e Storni»).',
     '<b>Sfide aperte e concluse:</b> le sfide aperte e quelle concluse stanno in schede separate. <b>Aperte</b>: il periodo che sta correndo, con la tua posizione e il tempo che manca. <b>Concluse</b>: la settimana o il mese appena trascorsi, con il vincitore (o i vincitori ex aequo), il tuo piazzamento e lo stato del premio (✅ <i>Premio assegnato</i> oppure, per chi gestisce le sfide, il tasto 🏆 Assegna). Toccando una sfida concluse si apre la <b>classifica finale</b>, sempre visibile a tutti. Anche dopo una Chiusura Periodo le classifiche restano complete: i conteggi per settimana e per mese vengono conservati nel riepilogo della chiusura. Resta il segno ⚠️ <i>dati parziali</i> solo per i periodi che toccano chiusure fatte prima di questa novità. Quando <b>vinci</b> una sfida, alla prima apertura dell\'app dopo l\'assegnazione del premio compare un\'animazione a tutto schermo con le sfide vinte e i punti (si chiude con un tocco). Il tasto o il gesto <b>Indietro</b> del telefono torna di un livello dentro le Sfide, senza passare dalla Home.',
 
     '<b>Albo d\'onore:</b> i vecchi titoli (Re della Caffeina, Mastro Lindo, Superstar della Spesa, Collega del Mese) sono diventati vere sfide settimanali e mensili; l\'Albo non esiste più come riquadro a parte.',
@@ -3835,18 +3835,36 @@ A['sf-extra'] = ds => {
   if(!col.length) return toast('Non ci sono altri colleghi', 'err');
   openSheet(`<h3>🎯 Punti extra</h3>
     <p class="sub">Sfida <b>${esc(x.nome)}</b> · ${esc(sfPeriodo(x.per, new Date()).label)}. I punti vanno subito nella Tessera Fedeltà dei colleghi scelti${x.tipo === 'pulizie' ? ' e contano nella graduatoria della sfida' : ''}.</p>
-    ${cercaBox('sx-lista')}<div id="sx-lista" style="max-height:32vh;overflow:auto;margin:6px 0 10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="sx-c" value="${m.id}"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('sx-lista')}</div>
-    <label class="f"><span>Punti per ogni collega (da 1 a ${MAX_PT_EXTRA})</span><input class="in mono" id="sx-q" inputmode="numeric" maxlength="3" value="5"></label>
-    <label class="f"><span>Motivo (facoltativo)</span><input class="in" id="sx-msg" maxlength="60" placeholder="Es. Ottimo lavoro, bonus sfida"></label>
-    <button class="btn amber block big" id="sx-invia" data-act="sx-invia" data-id="${x.id}">Assegna i punti</button>`);
+    ${cercaBox('sx-lista')}<div id="sx-lista" style="max-height:32vh;overflow:auto;margin:6px 0 10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="sx-c" value="${m.id}" data-chg="sx-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('sx-lista')}</div>
+    <div data-chg="sx-upd" style="margin-bottom:8px">${segOpts('sx-modo', [['tot', 'Montante da dividere'], ['cad', 'Punti a ciascuno']], x.tipo === 'pulizie' ? 'tot' : 'cad')}</div>
+    <label class="f"><span id="sx-lbl">Punti</span><input class="in mono" id="sx-q" inputmode="numeric" maxlength="3" value="10" data-chg="sx-upd"></label>
+    <div id="sx-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
+    <label class="f"><span>Motivo (facoltativo)</span><input class="in" id="sx-msg" maxlength="60" placeholder="Es. Pulizie fatte da solo, bonus sfida"></label>
+    <button class="btn amber block big" id="sx-invia" data-act="sx-invia" data-id="${x.id}" disabled>Assegna i punti</button>`);
+  sxAggiorna();
 };
+/* anteprima dei punti: «montante» = totale diviso per difetto tra i colleghi scelti; «a ciascuno» = stesso valore per tutti */
+function sxCalcola(){
+  const n = document.querySelectorAll('#sheet input.sx-c:checked').length, raw = val('sx-q'), tot = radio('sx-modo') !== 'cad';
+  const q = /^\d{1,3}$/.test(raw) ? +raw : 0, per = tot ? (n ? Math.floor(q / n) : 0) : q;
+  return {n, q, tot, per, ok: n > 0 && q >= 1 && per >= 1 && per <= MAX_PT_EXTRA};
+}
+function sxAggiorna(){
+  if(!$('sx-q')) return;
+  const c = sxCalcola(), l = $('sx-lbl'), t = $('sx-tot'), b = $('sx-invia');
+  if(l) l.textContent = c.tot ? 'Punti totali da dividere tra i colleghi scelti' : `Punti per ogni collega (da 1 a ${MAX_PT_EXTRA})`;
+  if(t) t.innerHTML = !c.n ? 'Seleziona almeno un collega' : !c.q ? 'Indica i punti (numero intero)'
+    : c.tot ? (c.per < 1 ? `<b class="red">${c.q} pt non bastano per ${c.n} colleghi</b>` : c.per > MAX_PT_EXTRA ? `<b class="red">Massimo ${MAX_PT_EXTRA} pt a collega</b>` : `${c.q} pt ÷ ${c.n} = <b class="mono green">${c.per} pt a collega</b>${c.q - c.per * c.n ? ` <small class="mut">(${c.q - c.per * c.n} avanzano)</small>` : ''}`)
+    : (c.per > MAX_PT_EXTRA ? `<b class="red">Massimo ${MAX_PT_EXTRA} pt a collega</b>` : `${c.n} × ${c.per} = <b class="mono green">${c.n * c.per} pt totali</b>`);
+  if(b) b.disabled = !c.ok;
+}
 A['sx-invia'] = ds => {
   const x = SF_FISSE[ds.id]; if(!x || !can('compiti') || !ptMaster()) return;
   const ids = [...document.querySelectorAll('#sheet input.sx-c:checked')].map(e => e.value).filter(v => v !== st.mid && membro(v));
-  const raw = val('sx-q'); if(!/^\d{1,3}$/.test(raw) || +raw < 1 || +raw > MAX_PT_EXTRA) return toast(`Punti non validi: da 1 a ${MAX_PT_EXTRA} per collega`, 'err');
   if(!ids.length) return toast('Seleziona almeno un collega', 'err');
-  const n = +raw, msg = val('sx-msg').trim().slice(0, 60), p = sfPeriodo(x.per, new Date());
-  ids.forEach(mid => addMov({tipo: 'bonus_podio', mid, sfida: x.id, extra: 1, perExtra: p.key, periodoTxt: p.label, titolo: x.nome.slice(0, 60), punti: n, ...(msg ? {causale: msg} : {})},
+  const c = sxCalcola(); if(!c.ok || c.n !== ids.length) return toast(`Punti non validi: da 1 a ${MAX_PT_EXTRA} per collega`, 'err');
+  const n = c.per, msg = val('sx-msg').trim().slice(0, 60), p = sfPeriodo(x.per, new Date());
+  ids.forEach(mid => addMov({tipo: 'bonus_podio', mid, sfida: x.id, extra: 1, perExtra: p.key, periodoTxt: p.label, titolo: x.nome.slice(0, 60), punti: n, ...(c.tot ? {monte: c.q, nPart: ids.length} : {}), ...(msg ? {causale: msg} : {})},
     null, true, er => toast('Punti non assegnati (' + errMsg(er) + ')', 'err')));
   closeSheet(); toast(`🎯 +${n} pt a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
 };
@@ -3983,7 +4001,7 @@ A['carica-archivio'] = async () => {
 /* rimborso misto: testo con la ripartizione (null se il movimento non e' misto) */
 const spesaMista = m => (m && Number.isInteger(m.quotaDenaro) && Number.isInteger(m.quotaCrediti) && m.quotaDenaro > 0 && m.quotaCrediti > 0) ? `Totale ${eur(m.importo)} → ${eur(m.quotaDenaro)} in denaro reale + ${eur(m.quotaCrediti)} in crediti` : null;
 function compactMov(m){
-  return clean({tipo:m.tipo, cp:m.cp, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, quotaDenaro:m.quotaDenaro, quotaCrediti:m.quotaCrediti, mese:m.mese, pos:m.pos, nPart:m.nPart, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, sfida:m.sfida, titolo:m.titolo, periodoTxt:m.periodoTxt, extra:m.extra, perExtra:m.perExtra, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id, nota:m.nota});
+  return clean({tipo:m.tipo, cp:m.cp, ob:m.ob, fase:m.fase, ciclo:m.ciclo, n:m.n, scad:m.scad, car:m.car, mid:m.mid, pid:m.pid, qta:m.qta, importo:m.importo, quotaDenaro:m.quotaDenaro, quotaCrediti:m.quotaCrediti, mese:m.mese, pos:m.pos, nPart:m.nPart, metodo:m.metodo, fonte:m.fonte, da:m.da, a:m.a, anno:m.anno, cred:m.cred, qmAnno:m.qmAnno, mids:m.mids, stato:m.stato, fondo:m.fondo, daMid:m.daMid, aMid:m.aMid, dest:m.dest, causale:m.causale, descr:m.descr, nome:m.nome, emoji:m.emoji, rif:m.rif, orig:m.orig, autore:m.autore, amid:m.amid, esitoDa:m.esitoDa, punti:m.punti, sfida:m.sfida, titolo:m.titolo, periodoTxt:m.periodoTxt, extra:m.extra, perExtra:m.perExtra, monte:m.monte, pt:m.pt, msg:m.msg, kind:m.kind, giorno:m.giorno, task:m.task, t:m.t, id:m.id, nota:m.nota});
 }
 A['storno'] = ds => {
   const d = derived(), m = d.movs.find(x => x.id === ds.id); if(!m) return;
@@ -4995,6 +5013,7 @@ document.addEventListener('change', e => {
   if(el && el.dataset.chg === 'rd-opz') aggiornaAnteprimaRd();
   if(el && el.dataset.chg === 'rg-upd') rgAggiorna();
   if(el && el.dataset.chg === 'ac-upd') acAggiorna();
+  if(el && el.dataset.chg === 'sx-upd') sxAggiorna();
   if(el && el.dataset.chg === 'bf-upd') bfAggiorna();
   if(e.target && e.target.id === 'bk-file' && e.target.files && e.target.files[0]) guard(leggiBackup)(e.target.files[0]);
 });
@@ -5004,6 +5023,7 @@ document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-chg="rg-upd"]');
   if(el) rgAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="ac-upd"]')) acAggiorna();
+  if(e.target.closest && e.target.closest('[data-chg="sx-upd"]')) sxAggiorna();
   if(e.target.closest && e.target.closest('[data-chg="bf-upd"]')) bfAggiorna();
   if(e.target && e.target.dataset && e.target.dataset.cerca) cercaApplica(e.target);
   if(e.target && e.target.id === 'feed-q'){   // filtra la sola lista, senza ricostruire la pagina (la tastiera resta aperta)
