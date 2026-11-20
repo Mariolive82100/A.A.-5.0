@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.78.0';
+const VERSION = '1.78.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1876,7 +1876,7 @@ function pRegolamento(){
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
     `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
     '<b>I punti non si riscattano più:</b> non si convertono in crediti e concorrono solo alla classifica (settimanale e generale).',
-    `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti, stabilito dal Creatore${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì, in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e serve almeno 1 punto.`,
+    `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti, stabilito dal Creatore${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e serve almeno 1 punto.`,
     `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti della settimana in corso (da lunedì) o classifica generale di sempre. In Home vedi i punti della tua settimana e la tua posizione; in alto compaiono i premi in crediti del podio settimanale.',
@@ -2410,6 +2410,7 @@ function classSett(d, prev){
 /* premio della settimana scorsa per il collegato: sul podio con almeno 1 punto e premio impostato; «fatto» se già riscattato */
 function premioSett(d){
   if(!st.mid || !ptMaster() || !st.ready.mv || !st.ready.m) return null;
+  if(Date.now() < lunediDi(new Date()).getTime() + 60000) return null;   // il premio si riscatta solo a settimana scaduta: dal lunedì alle 00:01
   const P = classSett(d, true), i = P.righe.findIndex(x => x.id === st.mid);
   if(i < 0 || i > 2 || P.righe[i].tot <= 0) return null;
   const importo = premioPos(i + 1); if(importo <= 0) return null;
