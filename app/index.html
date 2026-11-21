@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.0';
+const VERSION = '1.79.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -3827,7 +3827,8 @@ function disegnaSfida(x, D){
   g.fillStyle = '#f5a524'; g.fillText(fit(x.nome, W - 2 * P, 52, 800, 30), P, 100);
   g.fillStyle = '#e8eaf0'; g.fillText(fit((D.conc ? 'Classifica finale · ' : 'Classifica in corso · ') + D.p.label, W - 2 * P, 32, 600, 22), P, 150);
   const win = D.conc && D.aw && D.aw.length;
-  const prem = win ? `✅ Premio assegnato: ${D.aw.map(D.nm).join(', ')} (+${x.pt} pt)` : D.conc ? `⏳ Premio da assegnare: +${x.pt} pt` : `+${x.pt} punti in palio`;
+  const tier = D.p.top3 ? `1° +${sfPt(x, 1)} · 2° +${sfPt(x, 2)} · 3° +${sfPt(x, 3)} pt` : `+${x.pt} pt`;
+  const prem = win ? `✅ Premi assegnati: ${D.aw.map(D.nm).join(', ')}` : D.conc ? `⏳ Premi da assegnare: ${tier}` : `In palio: ${tier}`;
   g.fillStyle = win ? '#34d399' : '#aab0c2'; g.fillText(fit(prem, W - 2 * P, 30, 500, 20), P, 200);
   g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, 226, W - 2 * P, 2);
   let y = hh + 10;
