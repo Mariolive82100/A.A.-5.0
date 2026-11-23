@@ -377,6 +377,8 @@ header.hasonesta .prizepill{padding-right:78px}
 .onpill.green{color:var(--green)}.onpill.amber{color:var(--amber)}.onpill.red{color:var(--red)}.onpill.mut{color:var(--mut)}
 .prizepill{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;gap:2px;font-size:11.5px;font-weight:800;color:#fde68a;white-space:nowrap;cursor:pointer}
 .pz-s{opacity:.5;white-space:pre}
+.pz-l{opacity:.75;font-weight:700}
+.prizepill{flex-wrap:wrap;row-gap:0}
 .rp-grid{display:block}
 /* ---------- desktop / tablet orizzontale: sidebar fissa e contenuti a piu' colonne (il mobile resta invariato) ---------- */
 @media (min-width:1000px){
@@ -502,7 +504,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.12';
+const VERSION = '1.79.13';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2560,8 +2562,8 @@ function aggiornaPillola(d, av){
   /* premi in crediti del podio settimanale, sempre sott'occhio (nascosti se nessun premio e' impostato o se i punti sono disattivati) */
   const pz = $('hdr-prize'), mx = premiPodio(), pr = (!av && st.mid && ptMaster() && premiPerc() > 0 && st.ready.mv && st.ready.m && d) ? premiEff(classSett(d, false).inc) : mx, ridotto = pr.some((x, i) => x < mx[i]);   // in testa: premi effettivi della settimana in corso, in base agli incassi finora
   let premi = (!av && st.mid && ptMaster() && mx.some(x => x > 0)) ? [1, 2, 3].filter(i => pr[i - 1] > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} ${eur(pr[i - 1])}`) : [];
-  if(!premi.length && !av && st.mid && ptMaster() && mx.some(x => x > 0)) premi = ['🏆 premi in base agli incassi'];
-  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>') + (ridotto && pr.some(x => x > 0) ? '<span class="pz-s"> finora</span>' : ''); pz.title = premiPerc() > 0 ? 'Premi di questa settimana in base agli incassi finora: salgono con le vendite, fino a un massimo di ' + eur(mx.reduce((a, b) => a + b, 0)) : 'In palio ogni settimana'; } }
+  if(!premi.length && !av && st.mid && ptMaster() && mx.some(x => x > 0)) premi = ['ancora nessuno (dipendono dagli incassi)'];
+  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = '<span class="pz-l">Premi di questa settimana:&nbsp;</span>' + premi.join('<span class="pz-s"> · </span>'); pz.title = premiPerc() > 0 ? 'Premi di questa settimana in base agli incassi finora: salgono con le vendite, fino a un massimo di ' + eur(mx.reduce((a, b) => a + b, 0)) : 'In palio ogni settimana'; } }
   const op = $('hdr-onesta'), iO = (op && !av && st.mid && st.page === 'bar') ? onestaIndici(d) : null;
   if(op){ op.classList.toggle('hidden', !iO); hd.classList.toggle('hasonesta', !!iO); if(iO){ op.className = 'onpill ' + (iO.g == null ? 'mut' : onCls(iO.g)); op.innerHTML = '🛡️ ' + onPill(iO.g); op.title = 'Tasso di Onestà (caffè + snack e bibite)'; } }
 }
