@@ -504,7 +504,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.13';
+const VERSION = '1.79.14';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -2774,11 +2774,12 @@ function pClassifiche(d){
 }
 A['cl-mod'] = ds => { st.clMod = ds.v === 'stat' ? 'stat' : (ds.v === 'arc' && st.isAdmin) ? 'arc' : 'classifica'; st.scSel = null; render(); };
 /* --- modalità «Statistiche»: pagamenti/consumi (caffè e snack) per ambito e periodo, tutto dai movimenti già in memoria --- */
-const SC_PER = [['ieri', 'Ieri'], ['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['mese', 'Questo mese']];
+const SC_PER = [['ieri', 'Ieri'], ['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['scorsa', 'Settimana scorsa']];
 const scPer = () => SC_PER.some(x => x[0] === st.scP) ? st.scP : 'oggi';
 function scRange(){
   const p = scPer();
   if(p === 'ieri'){ const o = new Date(), da = new Date(o.getFullYear(), o.getMonth(), o.getDate() - 1).getTime(); return {p, da, a: new Date(o.getFullYear(), o.getMonth(), o.getDate()).getTime() - 1, label: `Ieri (${dBr(da)})`}; }
+  if(p === 'scorsa'){ const o = new Date(), dow = (o.getDay() + 6) % 7, lun = new Date(o.getFullYear(), o.getMonth(), o.getDate() - dow), da = new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() - 7).getTime(), a = lun.getTime() - 1; return {p, da, a, label: `Settimana scorsa (${dBr(da)} - ${dBr(a)})`}; }
   return rpRange(p);
 }
 const scChips = (id, act, cur, opz) => `<div class="chips" id="${id}">${opz.map(([v, l]) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
