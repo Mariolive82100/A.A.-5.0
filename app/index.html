@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.10';
+const VERSION = '1.79.11';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -909,7 +909,7 @@ function premiEff(inc){
   return v.map((x, i) => Math.min(x, base[i]));
 }
 const montepremi = () => premiPodio().reduce((a, b) => a + b, 0);
-const riepPremi = () => montepremi() > 0 ? [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') + ' (totale ' + eur(montepremi()) + ')' : 'nessun premio impostato';
+const riepPremi = () => montepremi() > 0 ? [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') + ' (massimo ' + eur(montepremi()) + ')' : 'nessun premio impostato';
 /* punti spesa (importo in centesimi → euro): proporzionali all'importo (rapporto punti/€ × importo, arrotondati all'intero, con tetto per singola spesa); il rimborso in denaro/crediti resta al 100% */
 const cfgD = (k, def) => { const v = st.gruppo && st.gruppo[k]; return typeof v === 'number' && isFinite(v) && v >= 0 ? v : def; };
 const ptSpesaEuro = () => Math.min(100, cfgD('ptSpesaEuro', 10)), ptSpesaMax = () => Math.min(1000, cfgN('ptSpesaMax', 500));
@@ -1888,7 +1888,7 @@ function pRegolamento(){
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
     `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
     '<b>I punti non si riscattano più:</b> non si convertono in crediti e concorrono solo alla classifica (settimanale e generale).',
-    `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e servono almeno ${premiMinPt()} ${premiMinPt() === 1 ? 'punto' : 'punti'}. ${premiPerc() > 0 ? `Il montepremi non supera il ${premiPerc()}% degli incassi della settimana (vendite di caffè, snack e caffè pagati subito): nelle settimane di poco incasso i premi scendono da soli.` : ''}`,
+    `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il tetto massimo del montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e servono almeno ${premiMinPt()} ${premiMinPt() === 1 ? 'punto' : 'punti'}. ${premiPerc() > 0 ? `Il montepremi non supera il ${premiPerc()}% degli incassi della settimana (vendite di caffè, snack e caffè pagati subito): nelle settimane di poco incasso i premi scendono da soli.` : ''}`,
     `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti della settimana in corso (da lunedì), della <b>settimana scorsa</b> (🏁 la classifica finale su cui si assegna il podio). In Home vedi i punti della tua settimana e la tua posizione; in alto compaiono i premi in crediti del podio settimanale.',
@@ -3199,13 +3199,13 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
   </div>
-  <div class="card" id="rp-c"><h3>C · Premi del podio settimanale</h3>
-    ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Imposta il <b>montepremi totale</b> della settimana (da lunedì a domenica): lo divido io tra i primi tre in proporzione <b>100% · 50% · 25%</b>, cioè circa 57% · 29% · 14%. Lo imposta solo il Creatore. Metti 0 per nessun premio. Chi è sul podio lo riscatta da solo, in Home, a settimana chiusa.</p>
-    <label class="f"><span>💰 Montepremi settimanale (€)</span><input class="in mono" id="rp-montepremi" inputmode="decimal" value="${(montepremi() / 100).toFixed(2).replace('.', ',')}"></label>
+  <div class="card" id="rp-c"><h3>C · Premi del podio settimanale (massimi)</h3>
+    ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Imposta il <b>tetto massimo del montepremi</b> della settimana (da lunedì a domenica): è il massimo che si distribuisce, e lo divido io tra i primi tre in proporzione <b>100% · 50% · 25%</b>, cioè circa 57% · 29% · 14%. Lo imposta solo il Creatore. Metti 0 per nessun premio. Chi è sul podio lo riscatta da solo, in Home, a settimana chiusa.</p>
+    <label class="f"><span>💰 Tetto massimo del montepremi (€)</span><input class="in mono" id="rp-montepremi" inputmode="decimal" value="${(montepremi() / 100).toFixed(2).replace('.', ',')}"></label>
     <p class="hint" id="rp-premi-riep" style="margin:6px 0 0">Attuali: ${riepPremi()}</p>
-    <label class="f"><span>📉 Tetto in % degli incassi della settimana (0 = nessun tetto)</span><input class="in mono" id="rp-premiperc" inputmode="numeric" value="${premiPerc()}"></label>
+    <label class="f"><span>📉 Quota massima degli incassi (%)</span><input class="in mono" id="rp-premiperc" inputmode="numeric" value="${premiPerc()}"></label>
     <label class="f"><span>⭐ Punti minimi per il podio</span><input class="in mono" id="rp-premiminpt" inputmode="numeric" value="${premiMinPt()}"></label>
-    <p class="hint" style="margin:0 0 6px;font-size:12px">Il montepremi effettivo è il minore tra quello impostato e questa percentuale delle vendite della settimana (caffè, snack, caffè pagati subito). Nelle settimane di poco incasso i premi scendono da soli.</p>
+    <p class="hint" style="margin:0 0 6px;font-size:12px">Il montepremi non supera questa quota delle vendite della settimana (caffè, snack, caffè pagati subito); 0 = nessun limite. Nelle settimane di poco incasso i premi scendono da soli, mai oltre il tetto massimo.</p>
     <button class="btn amber block" id="btn-salva-premi" data-act="salva-premi-podio" style="margin-top:8px">Salva il montepremi</button>`
     : `<p class="hint" style="margin:0">I premi li imposta solo il Creatore. Attuali: ${riepPremi()}.</p>`}
   </div>
