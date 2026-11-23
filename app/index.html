@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.9';
+const VERSION = '1.79.10';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -900,6 +900,14 @@ const PREMI_PERC = [1, 0.5, 0.25];   // distribuzione del premio: 1° 100%, 2° 
 /* premi del podio settimanale, in crediti: li imposta solo il Creatore nel documento del gruppo (premiPodio = 3 importi in centesimi: 1°, 2°, 3°) */
 const premiPodio = () => { const v = st.gruppo && st.gruppo.premiPodio; return [0, 1, 2].map(i => Array.isArray(v) && Number.isInteger(v[i]) && v[i] > 0 ? Math.min(50000, v[i]) : 0); };
 const premioPos = pos => premiPodio()[pos - 1] || 0;
+const premiPerc = () => Math.min(100, cfgN('premiPerc', 30)), premiMinPt = () => Math.min(1000, Math.max(1, cfgN('premiMinPt', 1)));
+/* tetto legato agli incassi: il montepremi effettivo della settimana è il minore tra quello impostato e premiPerc % delle vendite (caffè, snack, caffè pagati subito); si divide sempre 4/7 · 2/7 · 1/7 e non supera mai l'importo impostato per la posizione (lo richiedono le regole) */
+function premiEff(inc){
+  const base = premiPodio(), tot = base.reduce((a, b) => a + b, 0), pc = premiPerc();
+  if(!pc || inc == null || tot <= 0) return base;
+  const P = Math.min(tot, Math.floor(Math.max(0, inc) * pc / 100)), a = Math.round(P * 4 / 7), b = Math.round(P * 2 / 7), v = [a, b, P - a - b];
+  return v.map((x, i) => Math.min(x, base[i]));
+}
 const montepremi = () => premiPodio().reduce((a, b) => a + b, 0);
 const riepPremi = () => montepremi() > 0 ? [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') + ' (totale ' + eur(montepremi()) + ')' : 'nessun premio impostato';
 /* punti spesa (importo in centesimi → euro): proporzionali all'importo (rapporto punti/€ × importo, arrotondati all'intero, con tetto per singola spesa); il rimborso in denaro/crediti resta al 100% */
@@ -1880,7 +1888,7 @@ function pRegolamento(){
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
     `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
     '<b>I punti non si riscattano più:</b> non si convertono in crediti e concorrono solo alla classifica (settimanale e generale).',
-    `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e serve almeno 1 punto.`,
+    `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e servono almeno ${premiMinPt()} ${premiMinPt() === 1 ? 'punto' : 'punti'}. ${premiPerc() > 0 ? `Il montepremi non supera il ${premiPerc()}% degli incassi della settimana (vendite di caffè, snack e caffè pagati subito): nelle settimane di poco incasso i premi scendono da soli.` : ''}`,
     `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
     '<b>Classifica:</b> punti della settimana in corso (da lunedì), della <b>settimana scorsa</b> (🏁 la classifica finale su cui si assegna il podio). In Home vedi i punti della tua settimana e la tua posizione; in alto compaiono i premi in crediti del podio settimanale.',
@@ -2451,7 +2459,8 @@ function classSett(d, prev){
   const G = aggConChiusi(d, {da: ini.getTime(), a: prev ? lun.getTime() - 1 : Infinity, label}, prev ? 'pw' : 'hd').G;
   const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}));
   righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
-  return {key: settKey(ini), label, righe};
+  const inc = Object.values(G.euro || {}).reduce((a, v) => a + (v || 0), 0);   // incassi della settimana: vendite di caffè, snack e caffè pagati subito
+  return {key: settKey(ini), label, righe, inc};
 }
 const PREMI_DAL = '2026-11-16';   // lunedì della prima settimana con i premi in crediti: si riscatta dal lunedì successivo
 /* premio della settimana scorsa per il collegato: sul podio con almeno 1 punto e premio impostato; «fatto» se già riscattato */
@@ -2460,8 +2469,8 @@ function premioSett(d){
   if(Date.now() < lunediDi(new Date()).getTime() + 60000) return null;   // il premio si riscatta solo a settimana scaduta: dal lunedì alle 00:01
   const P = classSett(d, true), i = P.righe.findIndex(x => x.id === st.mid);
   if(P.key < PREMI_DAL) return null;   // le settimane precedenti all'introduzione dei premi non danno diritto a nulla
-  if(i < 0 || i > 2 || P.righe[i].tot <= 0) return null;
-  const importo = premioPos(i + 1); if(importo <= 0) return null;
+  if(i < 0 || i > 2 || P.righe[i].tot < premiMinPt()) return null;   // serve almeno premiMinPt punti
+  const importo = premiEff(P.inc)[i]; if(importo <= 0) return null;
   const id = `pp_${P.key}_${st.mid}`;
   return {pos: i + 1, key: P.key, id, importo, label: P.label, medal: ['🥇', '🥈', '🥉'][i], fatto: !!LS.get(id + '_' + st.gid) || tuttiMov().some(m => m.id === id)};
 }
@@ -2550,7 +2559,7 @@ function aggiornaPillola(d, av){
   const hd = $('hdr'); if(!hd) return;
   /* premi in crediti del podio settimanale, sempre sott'occhio (nascosti se nessun premio e' impostato o se i punti sono disattivati) */
   const pz = $('hdr-prize'), pr = premiPodio(), premi = (!av && st.mid && ptMaster()) ? [1, 2, 3].filter(i => pr[i - 1] > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} ${eur(pr[i - 1])}`) : [];
-  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio ogni settimana'; } }
+  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = premiPerc() > 0 ? 'Massimo in palio ogni settimana (ridotto se gli incassi sono bassi)' : 'In palio ogni settimana'; } }
   const op = $('hdr-onesta'), iO = (op && !av && st.mid && st.page === 'bar') ? onestaIndici(d) : null;
   if(op){ op.classList.toggle('hidden', !iO); hd.classList.toggle('hasonesta', !!iO); if(iO){ op.className = 'onpill ' + (iO.g == null ? 'mut' : onCls(iO.g)); op.innerHTML = '🛡️ ' + onPill(iO.g); op.title = 'Tasso di Onestà (caffè + snack e bibite)'; } }
 }
@@ -2808,7 +2817,7 @@ function pClassificaPunti(d){
   const filtri = `<div class="card" id="cl-filtri">
     <div class="chips" id="cl-amb">${chip('cl-amb', amb, 'saletta', '👥 Saletta')}${chip('cl-amb', amb, 'io', '👤 Io')}</div>
     <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'settimana', '📅 Questa settimana')}${chip('cl-per', per, 'scorsa', '🏁 Settimana scorsa')}</div>
-    ${per === 'settimana' && premiPodio().some(x => x > 0) ? `<p class="hint" id="cl-premi" style="margin:8px 0 0">In palio a fine settimana: ${[1, 2, 3].filter(i => premioPos(i) > 0).map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ')}</p>` : ''}
+    ${per === 'settimana' && premiPodio().some(x => x > 0) ? (() => { const C = classSett(d, false), pe = premiEff(C.inc), cap = premiPerc() > 0 && pe.some((x, i) => x < premioPos(i + 1)); return `<p class="hint" id="cl-premi" style="margin:8px 0 0">In palio a fine settimana: ${[1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(pe[i - 1])).join(' · ')}${premiPerc() > 0 ? ` <small class="mut">(al massimo ${eur(montepremi())}; il montepremi è il ${premiPerc()}% degli incassi della settimana${cap ? ', per ora ridotto' : ''})</small>` : ''}</p>`; })() : ''}
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
   if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
@@ -3194,6 +3203,9 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
     ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Imposta il <b>montepremi totale</b> della settimana (da lunedì a domenica): lo divido io tra i primi tre in proporzione <b>100% · 50% · 25%</b>, cioè circa 57% · 29% · 14%. Lo imposta solo il Creatore. Metti 0 per nessun premio. Chi è sul podio lo riscatta da solo, in Home, a settimana chiusa.</p>
     <label class="f"><span>💰 Montepremi settimanale (€)</span><input class="in mono" id="rp-montepremi" inputmode="decimal" value="${(montepremi() / 100).toFixed(2).replace('.', ',')}"></label>
     <p class="hint" id="rp-premi-riep" style="margin:6px 0 0">Attuali: ${riepPremi()}</p>
+    <label class="f"><span>📉 Tetto in % degli incassi della settimana (0 = nessun tetto)</span><input class="in mono" id="rp-premiperc" inputmode="numeric" value="${premiPerc()}"></label>
+    <label class="f"><span>⭐ Punti minimi per il podio</span><input class="in mono" id="rp-premiminpt" inputmode="numeric" value="${premiMinPt()}"></label>
+    <p class="hint" style="margin:0 0 6px;font-size:12px">Il montepremi effettivo è il minore tra quello impostato e questa percentuale delle vendite della settimana (caffè, snack, caffè pagati subito). Nelle settimane di poco incasso i premi scendono da soli.</p>
     <button class="btn amber block" id="btn-salva-premi" data-act="salva-premi-podio" style="margin-top:8px">Salva il montepremi</button>`
     : `<p class="hint" style="margin:0">I premi li imposta solo il Creatore. Attuali: ${riepPremi()}.</p>`}
   </div>
@@ -4501,7 +4513,10 @@ A['salva-premi-podio'] = () => {
   const b = Math.round(Number(val('rp-montepremi').replace(',', '.')) * 100);
   if(!Number.isInteger(b) || b < 0 || b > 80000) return toast('Importo non valido (da 0 a 800 €)', 'err');
   const v = [Math.round(b * 4 / 7), Math.round(b * 2 / 7)]; v.push(b - v[0] - v[1]);   // montepremi diviso 100% · 50% · 25% (4/7, 2/7, 1/7), in centesimi: il 3° prende il resto così la somma torna esattamente; le regole confrontano il premio riscattato con questa lista
-  G().set({premiPodio: v}, {merge: true}).then(() => toast('Premi del podio salvati')).catch(e => toast(errMsg(e), 'err'));
+  const pc = Number(val('rp-premiperc')), mp = Number(val('rp-premiminpt'));
+  if(!Number.isInteger(pc) || pc < 0 || pc > 100) return toast('Percentuale non valida (da 0 a 100)', 'err');
+  if(!Number.isInteger(mp) || mp < 1 || mp > 1000) return toast('Punti minimi non validi (da 1 a 1000)', 'err');
+  G().set({premiPodio: v, premiPerc: pc, premiMinPt: mp}, {merge: true}).then(() => toast('Premi del podio salvati')).catch(e => toast(errMsg(e), 'err'));
 };
 A['salva-sf-punti'] = () => {
   if(!sonoCreatore()) return toast('Solo il Creatore può impostare i montepremi', 'err');
