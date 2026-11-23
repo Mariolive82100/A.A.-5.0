@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.4';
+const VERSION = '1.79.5';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1882,7 +1882,7 @@ function pRegolamento(){
     `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e serve almeno 1 punto.`,
     `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
   ${sez('🏆 Classifica e statistiche', [
-    '<b>Classifica:</b> punti della settimana in corso (da lunedì), della <b>settimana scorsa</b> (🏁 Scorsa: la classifica finale su cui si assegna il podio) o classifica generale di sempre. In Home vedi i punti della tua settimana e la tua posizione; in alto compaiono i premi in crediti del podio settimanale.',
+    '<b>Classifica:</b> punti della settimana in corso (da lunedì), della <b>settimana scorsa</b> (🏁 la classifica finale su cui si assegna il podio). In Home vedi i punti della tua settimana e la tua posizione; in alto compaiono i premi in crediti del podio settimanale.',
     '<b>Statistiche:</b> consumi di caffè e snack, della saletta o personali.',
     '<b>Tasso di Onestà:</b> indice globale della saletta (media ponderata tra caffè e prodotti confezionati), un indice per il caffè e uno per snack e bibite. <b>Caffè:</b> il Registro caffè (Inventario → «📒 Registro caffè») è un vero registro cronologico di <b>acquisti</b> (kg aggiunti) e <b>rilevazioni</b> (kg pesati), fino a ' + REG_MAX + ' righe: oltre, le più vecchie vengono assorbite. Il Creatore e i Supervisor con permesso Inventario possono aggiungere, correggere ed eliminare righe: data e ora sono precompilate alle 08:00 di oggi e modificabili, anche con date passate (mai future). La scorta mostra sempre due barre: quella <b>stimata</b> (verde, gialla o rossa; scalata dai caffè pagati) e quella <b>reale</b> (sempre gialla): l\'ultima quantità rilevata con la sua data, scalata dei caffè registrati da allora. Ogni caffè pesa i grammi impostati da chi gestisce (Impostazioni → Regole punti → «A · Consumi e spese»). Il Tasso di Onestà si calcola tra rilevazioni consecutive: kg consumati davvero (rilevazione precedente + acquisti in mezzo − kg pesati, ×' + resaKg() + ' caffè/kg) contro i caffè pagati nello stesso intervallo. Se ci sono acquisti prima della prima rilevazione, l\'app ipotizza una giacenza di 0 kg subito prima del primo acquisto e calcola già il tasso sulla prima pesata; una rilevazione inserita prima degli acquisti diventa invece il punto di partenza. Senza acquisti, la prima rilevazione avvia soltanto il conteggio. Tra una pesata e l\'altra la rimanenza è stimata (barra nel pulsante «Caffè» in Home). In Home il tasso aggregato sta nel badge 🛡️ accanto ai premi del Podio: toccandolo si apre la pagina con i dettagli. Verde da 85%, giallo 70–85%, rosso sotto 70%.',
     `Caffè in grani: caffè registrati ÷ (kg caricati × ${resaKg()}). Snack e bibite: pezzi registrati ÷ pezzi caricati nel lotto, valutato a giacenza 0 o con «Esaurito». Verde da 85%, giallo 70–84%, rosso sotto 70%.`])}
@@ -2423,7 +2423,7 @@ function aggRange(d, r, slot){
 }
 function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
 /* periodo della classifica punti: settimana in corso (da lunedì) o "sempre" = cumulato */
-function clPerKey(){ return st.clP === 'sempre' ? 'sempre' : st.clP === 'scorsa' ? 'scorsa' : 'settimana'; }
+function clPerKey(){ return st.clP === 'scorsa' ? 'scorsa' : 'settimana'; }
 function clRange(){
   const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = clPerKey();
   const ini = dt => { dt.setHours(0, 0, 0, 0); return dt.getTime(); };
@@ -2797,7 +2797,7 @@ function pClassificaPunti(d){
   const chip = (act, cur, v, l) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
   const filtri = `<div class="card" id="cl-filtri">
     <div class="chips" id="cl-amb">${chip('cl-amb', amb, 'saletta', '👥 Saletta')}${chip('cl-amb', amb, 'io', '👤 Io')}</div>
-    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'settimana', '📅 Questa settimana')}${chip('cl-per', per, 'scorsa', '🏁 Scorsa')}${chip('cl-per', per, 'sempre', '🏆 Di sempre')}</div>
+    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'settimana', '📅 Questa settimana')}${chip('cl-per', per, 'scorsa', '🏁 Settimana scorsa')}</div>
     ${per === 'settimana' && premiPodio().some(x => x > 0) ? `<p class="hint" id="cl-premi" style="margin:8px 0 0">In palio a fine settimana: ${[1, 2, 3].filter(i => premioPos(i) > 0).map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ')}</p>` : ''}
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
@@ -2807,7 +2807,7 @@ function pClassificaPunti(d){
   return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
-A['cl-per'] = ds => { st.clP = ds.v === 'sempre' ? 'sempre' : ds.v === 'scorsa' ? 'scorsa' : 'settimana'; st.scSel = null; render(); };
+A['cl-per'] = ds => { st.clP = ds.v === 'scorsa' ? 'scorsa' : 'settimana'; st.scSel = null; render(); };
 A['cl-chip'] = ds => { st.clSort = {k: CL_KEYS.includes(ds.k) ? ds.k : 'tot', dir: -1}; render(); };
 A['carica-arc-mov'] = () => { if(!st.arcLoading && !st.arcMov) caricaArcMov(); };
 
