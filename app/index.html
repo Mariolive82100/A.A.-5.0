@@ -502,7 +502,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.5';
+const VERSION = '1.79.6';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -1861,9 +1861,9 @@ function pRegolamento(){
     'Il rimborso vale solo dopo la <b>convalida</b> di un Supervisor ed è sempre al 100%. Se rifiutato o annullato, non cambia nulla.',
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🏆 Sfide', [
-    'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi tre blocchi: <b>🔥 In corso</b> (📅 <i>Settimana</i> e 🗓️ <i>Mese</i>), <b>🏁 Concluse</b> (🏁 <i>Settimana</i> e 🏆 <i>Mese</i>, il periodo appena trascorso) e <b>⚔️ Lancia una sfida</b> (presto). Toccane una per vedere l\'elenco con i punti in palio e <b>la tua posizione</b>; tocca una sfida per aprire la <b>classifica completa</b>. L\'icona <b>ⓘ</b> accanto al titolo spiega la regola e lo spareggio.',
-    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. Premi: per ogni sfida il Creatore imposta un montepremi di punti, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%); si assegna a sfida conclusa (nel weekend) e conta per la classifica della settimana. <b>Settimanali</b> (chiusura il venerdì a mezzanotte): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati). <b>Mensili</b> (chiusura l\'ultimo venerdì del mese): 🔋 <i>Ricarica Top del Mese</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (<b>sospesa temporaneamente</b>; più punti pulizia, assegnati solo dal Creatore o dagli admin con «Sfide e Regole») · 👏 <i>Collega del Mese</i> (più «Ben fatto» ricevuti) · 💪 <i>Indefesso</i> (più «Lavoro compiuto» registrati, 40 punti). I punti totali del mese li premia già il Podio del mese, se attivo. Nelle schede 📅 e 🗓️ vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
-    '<b>🛩️ Lavoro compiuto e 💪 Indefesso:</b> in Home il pulsante «Lavoro compiuto» è temporaneamente disabilitato (<i>coming soon</i>); quando sarà attivo registrerà un lavoro o intervento svolto per la saletta (nota facoltativa, massimo 5 al giorno). Ogni lavoro vale +1 nella sfida mensile <b>Indefesso</b>, che premia con un montepremi di punti (impostato dal Creatore e diviso tra i primi tre) chi ne ha di più nel mese di sfida (ex aequo: tutti). Il Creatore o un Supervisor con «Sfide e Regole» verifica le segnalazioni dalla classifica della sfida e può <b>stornare</b> quelle che non risultano, finché il premio del periodo non è stato assegnato; poi assegna il premio come per le altre sfide. Le segnalazioni compaiono nel registro e restano nella classifica anche dopo la Chiusura Periodo.',
+    'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi tre blocchi: <b>🔥 In corso</b> (📅 <i>Settimana</i>), <b>🏁 Concluse</b> (🏁 <i>Settimana</i>, il periodo appena trascorso) e <b>⚔️ Lancia una sfida</b> (presto). Toccane una per vedere l\'elenco con i punti in palio e <b>la tua posizione</b>; tocca una sfida per aprire la <b>classifica completa</b>. L\'icona <b>ⓘ</b> accanto al titolo spiega la regola e lo spareggio.',
+    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. Premi: per ogni sfida il Creatore imposta un montepremi di punti, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%); si assegna a sfida conclusa (nel weekend) e conta per la classifica della settimana. <b>Tutte le sfide sono settimanali</b> (chiusura il venerdì a mezzanotte; fa eccezione solo l\'ultima edizione mensile di novembre 2026, che chiude venerdì 27 novembre): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati) · 🔋 <i>Ricarica Top</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (<b>sospesa temporaneamente</b>; più punti pulizia, assegnati solo dal Creatore o dagli admin con «Sfide e Regole») · 👏 <i>Collega della Settimana</i> (più «Ben fatto» ricevuti) · 💪 <i>Indefesso</i> (più «Lavoro compiuto» registrati). Nelle schede vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
+    '<b>🛩️ Lavoro compiuto e 💪 Indefesso:</b> in Home il pulsante «Lavoro compiuto» è temporaneamente disabilitato (<i>coming soon</i>); quando sarà attivo registrerà un lavoro o intervento svolto per la saletta (nota facoltativa, massimo 5 al giorno). Ogni lavoro vale +1 nella sfida settimanale <b>Indefesso</b>, che premia con un montepremi di punti (impostato dal Creatore e diviso tra i primi tre) chi ne ha di più nella settimana di sfida (ex aequo: tutti). Il Creatore o un Supervisor con «Sfide e Regole» verifica le segnalazioni dalla classifica della sfida e può <b>stornare</b> quelle che non risultano, finché il premio del periodo non è stato assegnato; poi assegna il premio come per le altre sfide. Le segnalazioni compaiono nel registro e restano nella classifica anche dopo la Chiusura Periodo.',
     '<b>Punti e condivisione:</b> nella classifica di ogni sfida, accanto a chi è in testa (o ha vinto) vedi i punti: <i>in palio</i> finché il periodo è aperto, <i>da assegnare</i> a periodo concluso finché chi gestisce le sfide non assegna il premio, <i>assegnati</i> dopo l\'assegnazione. Con il pulsante <b>📤 Condividi</b> in alto a destra puoi condividere la classifica come immagine, con i nomi abbreviati (nome e iniziale del cognome, es. «Mario R.») per leggerla meglio (si apre il menu di condivisione del telefono; se non è disponibile l\'immagine viene scaricata). Nella sfida delle ricariche l\'immagine mostra, come la schermata, solo l\'ordine.',
     '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi; nella sfida delle spese si vede solo il numero di acquisti.',
     '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti in palio al vincitore con un tocco, dalla classifica della sfida. Il premio compare nel registro e conta nella <b>classifica</b>, nella settimana in cui viene assegnato; un premio non si può assegnare due volte.',
@@ -1934,21 +1934,22 @@ function cpRiga(m, me){
 const SF_PER = {sett: ['Settimana', '📅', 'Settimanale'], mese: ['Mese', '🗓️', 'Mensile'], sett_c: ['Settimana', '🏁', 'Settimanale'], mese_c: ['Mese', '🏆', 'Mensile']};
 const sfBase = k => k ? k.replace('_c', '') : k;   // 'sett_c' → 'sett'
 const SF_PAREGGIO = 'In caso di parità vincono tutti i primi (ex aequo).';
+const SF_TUTTE_SETT = new Date(2026, 10, 28).getTime();   // dal sabato dopo l'ultimo venerdì di novembre 2026 tutte le sfide sono settimanali (l'ultimo mese è novembre)
 const SF_FISSE = {
   sfauto_giro: {id: 'sfauto_giro', nome: '🤝 Il benefattore', per: 'sett', pt: 20, tipo: 'giro',
     descr: 'Vince chi, nella settimana (la sfida chiude il venerdì a mezzanotte), offre più giri di caffè: un giro sono 2 o più caffè registrati insieme.', spareggio: 'A parità di giri vince chi ha offerto più caffè in totale. ' + SF_PAREGGIO},
   sfauto_caffe: {id: 'sfauto_caffe', nome: '☕ Re della Caffeina', per: 'sett', pt: 20, tipo: 'caffe',
     descr: 'Vince chi registra più caffè nella settimana (la sfida chiude il venerdì a mezzanotte); contano anche i caffè pagati subito, non quelli annullati.', spareggio: SF_PAREGGIO},
-  sfauto_ricarica: {id: 'sfauto_ricarica', nome: '🔋 Ricarica Top del Mese', per: 'mese', pt: 30, tipo: 'ricarica',
-    descr: 'Vince chi nel mese (la sfida chiude l\'ultimo venerdì) ricarica di più (ricariche convalidate). Per privacy si vede solo l\'ordine dei colleghi, mai gli importi.', spareggio: 'Se due colleghi ricaricano la stessa cifra vincono entrambi (ex aequo).'},
-  sfauto_spese: {id: 'sfauto_spese', nome: '🧾 Superstar della Spesa', per: 'mese', pt: 30, tipo: 'spese',
-    descr: 'Vince chi nel mese (la sfida chiude l\'ultimo venerdì) registra più spese per il fondo, contando solo quelle convalidate.', spareggio: 'A parità di spese vince chi ha speso di più in totale (l\'importo non viene mostrato). ' + SF_PAREGGIO},
+  sfauto_ricarica: {id: 'sfauto_ricarica', nome: '🔋 Ricarica Top', get per(){ return Date.now() >= SF_TUTTE_SETT ? 'sett' : 'mese'; }, migra: true, pt: 30, tipo: 'ricarica',
+    descr: 'Vince chi nella settimana (la sfida chiude il venerdì a mezzanotte) ricarica di più (ricariche convalidate). Per privacy si vede solo l\'ordine dei colleghi, mai gli importi.', spareggio: 'Se due colleghi ricaricano la stessa cifra vincono entrambi (ex aequo).'},
+  sfauto_spese: {id: 'sfauto_spese', nome: '🧾 Superstar della Spesa', get per(){ return Date.now() >= SF_TUTTE_SETT ? 'sett' : 'mese'; }, migra: true, pt: 30, tipo: 'spese',
+    descr: 'Vince chi nella settimana (la sfida chiude il venerdì a mezzanotte) registra più spese per il fondo, contando solo quelle convalidate.', spareggio: 'A parità di spese vince chi ha speso di più in totale (l\'importo non viene mostrato). ' + SF_PAREGGIO},
   sfauto_pulizie: {id: 'sfauto_pulizie', nome: '🧹 Mastro Lindo', per: 'mese', pt: 30, tipo: 'pulizie', sospesa: true,   // sospesa: nascosta e senza assegnazioni finché non si rivedono i punti
     descr: 'Vince chi ottiene più punti pulizia nel mese (la sfida chiude l\'ultimo venerdì). I punti li assegna solo il Creatore o un admin con «Sfide e Regole» (🎯 Punti extra); contano anche i vecchi turni e compiti convalidati.', spareggio: 'A parità di punti vince chi ha più turni di pulizia. ' + SF_PAREGGIO},
-  sfauto_bf: {id: 'sfauto_bf', nome: '👏 Collega del Mese', per: 'mese', pt: 30, tipo: 'benfatto',
-    descr: 'Vince chi riceve più «Ben fatto!» nel mese (la sfida chiude l\'ultimo venerdì).', spareggio: SF_PAREGGIO},
-  sfauto_lavoro: {id: 'sfauto_lavoro', nome: '💪 Indefesso', per: 'mese', pt: 40, tipo: 'lavoro',
-    descr: 'Vince chi nel mese (la sfida chiude l\'ultimo venerdì) registra più «Lavoro compiuto» con il tasto in Home. Le segnalazioni le verifica l\'admin, che può stornare quelle che non risultano.', spareggio: SF_PAREGGIO}
+  sfauto_bf: {id: 'sfauto_bf', nome: '👏 Collega della Settimana', get per(){ return Date.now() >= SF_TUTTE_SETT ? 'sett' : 'mese'; }, migra: true, pt: 30, tipo: 'benfatto',
+    descr: 'Vince chi riceve più «Ben fatto!» nella settimana (la sfida chiude il venerdì a mezzanotte).', spareggio: SF_PAREGGIO},
+  sfauto_lavoro: {id: 'sfauto_lavoro', nome: '💪 Indefesso', get per(){ return Date.now() >= SF_TUTTE_SETT ? 'sett' : 'mese'; }, migra: true, pt: 40, tipo: 'lavoro',
+    descr: 'Vince chi nella settimana (la sfida chiude il venerdì a mezzanotte) registra più «Lavoro compiuto» con il tasto in Home. Le segnalazioni le verifica l\'admin, che può stornare quelle che non risultano.', spareggio: SF_PAREGGIO}
 };
 /* nuove regole delle sfide (dal 16/11/2026): le settimanali chiudono il venerdì a mezzanotte, le mensili l'ultimo venerdì del mese; premi a 1°, 2° e 3° (100% · 50% · 25%).
    Sabato e domenica aprono già la sfida della settimana dopo; il mese di sfida va dal sabato dopo l'ultimo venerdì del mese prima all'ultimo venerdì del mese. */
@@ -2016,6 +2017,8 @@ function sfPeriodo(per, rif){
   const fine = sfFineMese(a.getFullYear(), a.getMonth());
   return {key, da: Math.max(sfFineMese(a.getFullYear(), a.getMonth() - 1), SF_NUOVE_MESE), a: fine - 1, fine, top3: true, label};
 }
+/* periodo di una sfida a una data: le sfide passate a settimanali hanno l'ultimo periodo mensile (novembre 2026) prima del passaggio */
+const sfPx = (x, rif) => x.migra && rif.getTime() < SF_TUTTE_SETT ? sfPeriodo('mese', rif) : sfPeriodo(x.per, rif);
 function sfRimanente(fine){
   const ms = Math.max(0, fine - Date.now()), g = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
   return g > 0 ? g + (g === 1 ? ' giorno ' : ' giorni ') + h + ' h' : h > 0 ? h + ' h ' + m + ' min' : Math.max(1, m) + ' min';
@@ -2043,18 +2046,18 @@ function sfBuckets(list){
     if(m.tipo === 'storno'){ src = byId[m.rif] || m.orig; sg = -1; if(!src || !src.tipo) return; }
     if(src.tipo === 'storno') return;
     const t = src.t, wk = sfWk(t), tc = sfTc(src);
-    if(src.tipo === 'caffe' && src.stato !== 'annullata' && src.qta > 1){ const r = row(W, wk, src.mid, 3); r[0] += sg; r[1] += sg * src.qta; }
-    if((src.tipo === 'caffe' || src.tipo === 'caffe_pagato') && src.stato !== 'annullata') row(W, wk, src.mid, 3)[2] += sg * (src.qta || 0);
+    if(src.tipo === 'caffe' && src.stato !== 'annullata' && src.qta > 1){ const r = row(W, wk, src.mid, 8); r[0] += sg; r[1] += sg * src.qta; }
+    if((src.tipo === 'caffe' || src.tipo === 'caffe_pagato') && src.stato !== 'annullata') row(W, wk, src.mid, 8)[2] += sg * (src.qta || 0);
     if(src.tipo === 'pulizia') (src.mids || []).forEach(x => { const r = row(M, sfMs(t), x, 7); r[4] += sg; r[5] += sg * ptPulM(src); });
     else if((src.tipo === 'compito' && src.stato === 'confermata') || (src.tipo === 'obiettivo' && src.fase === 'fatto')){ const r = row(M, sfMs(t), src.mid, 7); r[4] += sg; r[5] += sg * (src.punti || 0); }
     if(src.tipo === 'bonus_podio' && src.extra && src.sfida === 'sfauto_pulizie'){ const r = row(M, src.perExtra && src.perExtra[0] === 'm' ? src.perExtra : sfMs(t), src.mid, 8); r[7] = (r[7] || 0) + sg * (src.punti || 0); }   // Mastro Lindo: punti pulizia dati dall'admin
-    if(src.tipo === 'ben_fatto') row(M, sfMs(t), src.aMid, 7)[6] += sg;
-    if(src.tipo === 'lavoro') row(M, sfMs(t), src.mid, 7)[3] += sg;   // Indefesso: lavori compiuti (si somma col segno: lo storno toglie 1 nel mese dell'originale)
-    if(src.tipo === 'ricarica' && src.stato === 'confermata') row(M, sfMs(tc), src.mid, 7)[0] += sg * (src.importo || 0);
-    if(src.tipo === 'spesa' && src.stato === 'confermata'){ const r = row(M, sfMs(tc), src.mid, 7); r[1] += sg; r[2] += sg * (src.importo || 0); }
+    if(src.tipo === 'ben_fatto'){ row(M, sfMs(t), src.aMid, 7)[6] += sg; row(W, wk, src.aMid, 8)[7] += sg; }
+    if(src.tipo === 'lavoro'){ row(M, sfMs(t), src.mid, 7)[3] += sg; row(W, wk, src.mid, 8)[3] += sg; }   // Indefesso: lavori compiuti (si somma col segno: lo storno toglie 1 nel mese dell'originale)
+    if(src.tipo === 'ricarica' && src.stato === 'confermata'){ row(M, sfMs(tc), src.mid, 7)[0] += sg * (src.importo || 0); row(W, sfWk(tc), src.mid, 8)[4] += sg * (src.importo || 0); }
+    if(src.tipo === 'spesa' && src.stato === 'confermata'){ const r = row(M, sfMs(tc), src.mid, 7); r[1] += sg; r[2] += sg * (src.importo || 0); const q = row(W, sfWk(tc), src.mid, 8); q[5] += sg; q[6] += sg * (src.importo || 0); }
   });
   [W, M].forEach(o => Object.keys(o).forEach(k => { Object.keys(o[k]).forEach(i => { if(o[k][i].every(v => !v)) delete o[k][i]; }); if(!Object.keys(o[k]).length) delete o[k]; }));
-  return {w: W, m: M, v: 2};
+  return {w: W, m: M, v: 3};
 }
 /* chiave 'w2026-11-09' / 'm2026-11' → inizio periodo in ms; retention: settimane ~7 settimane, mesi ~4 mesi (bastano per il recupero premi: 4 settimane / 2 mesi) */
 const sfKeyMs = k => { const q = k.slice(1).split('-').map(Number); return new Date(q[0], q[1] - 1, q[2] || 1).getTime(); };
@@ -2086,7 +2089,7 @@ function sfMerge(p){
   const c = sfInit(); if(c.mp[p.key]) return c.mp[p.key];
   const kind = p.key[0], rows = {}; let parz = false;
   const sum = src => Object.keys(src || {}).forEach(mid => { const a = src[mid], r = rows[mid] = rows[mid] || []; a.forEach((v, i) => { r[i] = (r[i] || 0) + v; }); });
-  c.P.forEach(r => { if(r.sf && (kind === 'w' || r.sf.v === 2)) sum((r.sf[kind] || {})[p.key]); else if(r.da < p.a && r.fino > p.da) parz = true; });   // v:2 = mensili con turni e «Ben fatto»
+  c.P.forEach(r => { if(r.sf && (kind === 'w' ? (r.sf.v >= 3 || p.da < SF_TUTTE_SETT) : r.sf.v >= 2)) sum((r.sf[kind] || {})[p.key]); else if(r.da < p.a && r.fino > p.da) parz = true; });   // v:2 = mensili con turni e «Ben fatto»
   sum(c.live[kind][p.key]);
   return c.mp[p.key] = {rows, parz};
 }
@@ -2099,8 +2102,9 @@ function sfClassifica(tipo, p){
   Object.keys(rows).forEach(id => {
     if(!att.has(id)) return;
     const a = rows[id], g = i => a[i] || 0;
-    const [v, v2] = tipo === 'giro' ? [g(0), g(1)] : tipo === 'caffe' ? [g(2), 0] : tipo === 'pulizie' ? [g(5) + g(7), g(4)] : tipo === 'benfatto' ? [g(6), 0]
-      : tipo === 'ricarica' ? [g(0), 0] : tipo === 'spese' ? [g(1), g(2)] : [g(3), 0];
+    const sett = p.key[0] === 'w';   // bucket settimanali: [giri, caffè offerti, caffè, lavori, ricariche €, n. spese, spese €, «Ben fatto»]
+    const [v, v2] = tipo === 'giro' ? [g(0), g(1)] : tipo === 'caffe' ? [g(2), 0] : tipo === 'pulizie' ? [g(5) + g(7), g(4)] : tipo === 'benfatto' ? [sett ? g(7) : g(6), 0]
+      : tipo === 'ricarica' ? [sett ? g(4) : g(0), 0] : tipo === 'spese' ? (sett ? [g(5), g(6)] : [g(1), g(2)]) : [g(3), 0];
     if(v > 0) righe.push({id, v, v2});
   });
   righe.forEach(r => {
@@ -2115,14 +2119,15 @@ function sfClassifica(tipo, p){
 /* i dati del periodo sono incompleti solo se toccano una chiusura fatta prima del dettaglio per settimana/mese */
 const sfParziale = (tipo, p) => sfMerge(p).parz;
 /* periodo concluso più recente (settimana o mese appena trascorso) */
-function sfPrec(x){ return sfPeriodo(x.per, new Date(sfPeriodo(x.per, new Date()).da - 1)); }
+function sfPrec(x){ return sfPx(x, new Date(sfPx(x, new Date()).da - 1)); }
 /* periodi conclusi con premi ancora da assegnare (solo admin con «Sfide e Regole»; fino a 4 settimane / 2 mesi indietro): dal nuovo regolamento 1°, 2° e 3° */
 function sfDaAssegnare(x){
   if(!st.isAdmin || !can('compiti') || !ptMaster() || !x.tipo) return [];
-  const N = x.per === 'sett' ? 4 : 2, aw = sfAssegnati(), out = [];
-  let p = sfPeriodo(x.per, new Date());
-  for(let k = 1; k <= N; k++){
-    p = sfPeriodo(x.per, new Date(p.da - 1));
+  const aw = sfAssegnati(), out = []; let nw = 0, nm = 0;
+  let p = sfPx(x, new Date());
+  for(let k = 1; k <= 6; k++){
+    p = sfPx(x, new Date(p.da - 1));
+    if(p.key[0] === 'w' ? ++nw > 4 : ++nm > 2) break;   // fino a 4 settimane / 2 mesi indietro
     const dato = aw[x.id + '|' + p.key] || [];
     if(!p.top3 && dato.length) continue;
     const R = sfClassifica(x.tipo, p); if(!R.length) continue;
@@ -2227,11 +2232,11 @@ function pSfide(d){
     return `<h2>${ic('trophy')} Sfide</h2><p class="sub" style="margin-bottom:12px">Scegli una scheda: sfide in corso o concluse.</p>
     <p class="mut" style="margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase">🔥 In corso</p>
     <div class="card" style="padding:4px 14px"><div class="list" id="sf-panoramica">
-      ${['sett', 'mese'].map(k => { const c = /_c$/.test(k), n = sfLista(sfBase(k)).length, da = c && gest ? sfLista(sfBase(k)).reduce((a, y) => a + sfDaAssegnare(y).length, 0) : 0; return `<button class="li" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}" style="width:100%;text-align:left"><div class="av">${SF_PER[k][1]}</div><div class="grow"><div class="t">${SF_PER[k][0]}</div><div class="d">${c ? (n === 1 ? '1 sfida conclusa' : n + ' sfide concluse') : sfConteggio(n)}${da ? ' · 🔔 ' + da + (da === 1 ? ' premio da assegnare' : ' premi da assegnare') : ''}</div></div>${c ? '' : (f => `<span class="pill amber" id="sf-cd-${k}" data-cd="${f}" title="Tempo alla chiusura" style="font-size:13px;font-weight:800;padding:5px 10px;white-space:nowrap">⏳ ${sfCd(f)}</span>`)(sfPeriodo(sfBase(k), new Date()).fine)}<span class="mut" style="font-size:22px;line-height:1" aria-hidden="true">›</span></button>`; }).join('')}
+      ${['sett', 'mese'].filter(k => sfLista(sfBase(k)).length).map(k => { const c = /_c$/.test(k), n = sfLista(sfBase(k)).length, da = c && gest ? sfLista(sfBase(k)).reduce((a, y) => a + sfDaAssegnare(y).length, 0) : 0; return `<button class="li" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}" style="width:100%;text-align:left"><div class="av">${SF_PER[k][1]}</div><div class="grow"><div class="t">${SF_PER[k][0]}</div><div class="d">${c ? (n === 1 ? '1 sfida conclusa' : n + ' sfide concluse') : sfConteggio(n)}${da ? ' · 🔔 ' + da + (da === 1 ? ' premio da assegnare' : ' premi da assegnare') : ''}</div></div>${c ? '' : (f => `<span class="pill amber" id="sf-cd-${k}" data-cd="${f}" title="Tempo alla chiusura" style="font-size:13px;font-weight:800;padding:5px 10px;white-space:nowrap">⏳ ${sfCd(f)}</span>`)(sfPeriodo(sfBase(k), new Date()).fine)}<span class="mut" style="font-size:22px;line-height:1" aria-hidden="true">›</span></button>`; }).join('')}
     </div></div>
     <p class="mut" style="margin:16px 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase">🏁 Concluse</p>
     <div class="card" style="padding:4px 14px"><div class="list" id="sf-panoramica-concluse">
-      ${['sett_c', 'mese_c'].map(k => { const c = /_c$/.test(k), n = sfLista(sfBase(k)).length, da = c && gest ? sfLista(sfBase(k)).reduce((a, y) => a + sfDaAssegnare(y).length, 0) : 0; return `<button class="li" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}" style="width:100%;text-align:left"><div class="av">${SF_PER[k][1]}</div><div class="grow"><div class="t">${SF_PER[k][0]}</div><div class="d">${c ? (n === 1 ? '1 sfida conclusa' : n + ' sfide concluse') : sfConteggio(n)}${da ? ' · 🔔 ' + da + (da === 1 ? ' premio da assegnare' : ' premi da assegnare') : ''}</div></div>${c ? '' : (f => `<span class="pill amber" id="sf-cd-${k}" data-cd="${f}" title="Tempo alla chiusura" style="font-size:13px;font-weight:800;padding:5px 10px;white-space:nowrap">⏳ ${sfCd(f)}</span>`)(sfPeriodo(sfBase(k), new Date()).fine)}<span class="mut" style="font-size:22px;line-height:1" aria-hidden="true">›</span></button>`; }).join('')}
+      ${['sett_c', 'mese_c'].filter(k => sfLista(sfBase(k)).length).map(k => { const c = /_c$/.test(k), n = sfLista(sfBase(k)).length, da = c && gest ? sfLista(sfBase(k)).reduce((a, y) => a + sfDaAssegnare(y).length, 0) : 0; return `<button class="li" id="sf-btn-${k}" data-act="sf-apri" data-s="${k}" style="width:100%;text-align:left"><div class="av">${SF_PER[k][1]}</div><div class="grow"><div class="t">${SF_PER[k][0]}</div><div class="d">${c ? (n === 1 ? '1 sfida conclusa' : n + ' sfide concluse') : sfConteggio(n)}${da ? ' · 🔔 ' + da + (da === 1 ? ' premio da assegnare' : ' premi da assegnare') : ''}</div></div>${c ? '' : (f => `<span class="pill amber" id="sf-cd-${k}" data-cd="${f}" title="Tempo alla chiusura" style="font-size:13px;font-weight:800;padding:5px 10px;white-space:nowrap">⏳ ${sfCd(f)}</span>`)(sfPeriodo(sfBase(k), new Date()).fine)}<span class="mut" style="font-size:22px;line-height:1" aria-hidden="true">›</span></button>`; }).join('')}
     </div></div>
     <div class="card" style="padding:4px 14px;margin-top:16px"><div class="list" id="sf-duelli">
       <div class="li" id="sf-btn-duelli" aria-disabled="true" style="opacity:.55"><div class="av">⚔️</div><div class="grow"><div class="t">Lancia una sfida</div><div class="d">Duelli 1 contro 1</div></div><span class="pill mut">Coming soon</span></div>
@@ -3555,10 +3560,10 @@ const lavoriMiei = (d, da) => d.movs.filter(m => m.tipo === 'lavoro' && m.mid ==
 A['lavoro-menu'] = () => {
   return;   // «Lavoro compiuto» temporaneamente disabilitato (coming soon)
   const d = derived(), o = new Date(); o.setHours(0, 0, 0, 0);
-  const n = lavoriMiei(d, o.getTime()).length, mese = lavoriMiei(d, sfPeriodo('mese', new Date()).da).length;
-  openSheet(`<h3>${LAVORO_ICO} Lavoro compiuto</h3><p class="sub">Hai portato a termine un lavoro o un intervento per la saletta? Registralo: vale <b>+1</b> nella sfida mensile <b>💪 Indefesso</b>. Un admin può verificarlo e stornarlo se non risulta.</p>
+  const n = lavoriMiei(d, o.getTime()).length, mese = lavoriMiei(d, sfPeriodo('sett', new Date()).da).length;
+  openSheet(`<h3>${LAVORO_ICO} Lavoro compiuto</h3><p class="sub">Hai portato a termine un lavoro o un intervento per la saletta? Registralo: vale <b>+1</b> nella sfida settimanale <b>💪 Indefesso</b>. Un admin può verificarlo e stornarlo se non risulta.</p>
     <label class="f"><span>Nota o riferimento (facoltativo)</span><input class="in" id="lv-nota" maxlength="80" placeholder="es. sistemato lo scaffale"></label>
-    <p class="hint" style="margin:0 0 10px">Questo mese: <b>${mese}</b> · oggi ${n}/${LAVORO_MAX_GG}</p>
+    <p class="hint" style="margin:0 0 10px">Questa settimana: <b>${mese}</b> · oggi ${n}/${LAVORO_MAX_GG}</p>
     <button class="btn amber block big" id="btn-lavoro-ok" data-act="lavoro-ok" ${n >= LAVORO_MAX_GG ? 'disabled' : ''}>${n >= LAVORO_MAX_GG ? 'Limite giornaliero raggiunto' : 'Registra lavoro compiuto'}</button>`);
 };
 A['lavoro-ok'] = () => {
