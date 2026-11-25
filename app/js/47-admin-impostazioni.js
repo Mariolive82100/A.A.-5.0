@@ -114,6 +114,14 @@ function accountCard(){
     ${st.authProv.includes('password') ? `<button class="btn sm ghost" id="btn-reset-pw" data-act="reset-password">Reimposta password</button>` : ''}</div></div>`;
 }
 
+function cardTema(){
+  const s = temaScelta();
+  return `<div class="card" id="card-tema"><h3>🎨 Tema grafico</h3>
+    <div class="chips" style="margin-bottom:8px">${TEMI.map(([v, l]) => `<button class="${s === v ? 'on' : ''}" id="tema-${v}" data-act="tema" data-v="${v}" aria-pressed="${s === v}">${l}</button>`).join('')}</div>
+    <div class="mut" style="font-size:12px">Automatico: natalizio dal 1° dicembre al 6 gennaio. La scelta vale solo su questo telefono.</div></div>`;
+}
+A['tema'] = ds => { if(!TEMI.some(t => t[0] === ds.v)) return; LS.set('tema', ds.v); applicaTema(); render(); };
+
 function pImpostazioni(){
   const link = location.origin + location.pathname + '#g=' + st.gid;
   return `<h2>${ic(st.isAdmin ? 'settings' : 'user')} ${st.isAdmin ? 'Impostazioni' : 'Profilo'}</h2><p class="sub">${esc(st.gruppo.nome || '')}</p>
@@ -122,6 +130,7 @@ function pImpostazioni(){
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
   ${st.mid ? `<div class="card"><div class="between"><div><b>PIN personale</b><div class="mut" style="font-size:12px">Serve a ritrovare il profilo se cambi telefono</div></div><button class="btn sm" data-act="pin-cambia">${ic('lock','s')} Cambia</button></div></div>` : ''}
   ${accountCard()}
+  ${cardTema()}
   ${sonoCreatore() ? cardParametri() : ''}
   ${sonoCreatore() ? `<div class="card" id="card-bacheca-sw"><h3>📢 Bacheca in Home</h3><label class="check"><input type="checkbox" id="bac-aperta" data-act="bac-aperta" ${bacAperta() ? 'checked' : ''}><b style="flex:1;font-size:14px">Consenti ai colleghi di pubblicare in Bacheca</b></label><p class="hint" style="margin:6px 0 0">Acceso: tutti possono pubblicare avvisi, eventi e sondaggi e gestire i propri. Spento: i colleghi consultano e votano, e pubblicano solo i compleanni; il resto lo pubblicano Creatore e Supervisor con «Strumenti di Sistema».</p></div>` : ''}
   ${st.isAdmin && !sonoCreatore() ? `<div class="card"><div class="between"><div><b>Ruolo di Supervisor</b><div class="mut" style="font-size:12px">${badgePerm(permDi(st.uid)) || 'nessun permesso'}</div></div><button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia</button></div></div>` : ''}

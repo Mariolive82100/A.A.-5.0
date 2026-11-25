@@ -15,6 +15,9 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 ### `js/00-base.js` — costanti, utilità, PIN (hash), stato `st`
 `hashPin`, `parseEuro`, `dataOra`, `quando`, `clean`, `add`, `normCode`, `errMsg`
 
+### `js/01-tema.js` — tema grafico (attuale / natalizio): periodo automatico, scelta locale `ps_tema`, `theme-color`, neve
+`periodoNatale`, `temaScelta`, `temaAttivo`, `neve`, `applicaTema`
+
 ### `js/10-firebase.js` — inizializzazione Firebase, accesso (anonimo e account collegato), listener, dati riservati
 `initFirebase`, `authInfo`, `authErr`, `onErr`, `setSync`, `disconnect`, `connect`, `stopData`, `syncMode`, `subMovimenti`
 
@@ -46,7 +49,7 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `pSpesa`, `aggiornaArticoli`, `giocoSt`, `pGioco`, `pCassa`, `scortaRighe`, `caffeLivello`, `cardCaffeScorta`, `pInventario`, `quoteMigra`, `pQuote`, `consumiRange`, `disegnaConsumi`, `labelChiusura`, `pMembri`, `pPin`
 
 ### `js/47-admin-impostazioni.js` — strumenti amministratore, chiusure ravvicinate, impostazioni
-`pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `accountCard`, `pImpostazioni`
+`pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `accountCard`, `cardTema`, `pImpostazioni`
 
 ### `js/50-azioni-base.js` — azioni: condivisione, accesso e account (collega Google/email), Bar, Paga, ricarica e riscatto, ruoli
 `joinVerifica`, `passaAAccount`, `nuovoGoogle`, `pwv`, `dopoCollegamento`, `collegaEmail`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
@@ -70,4 +73,4 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 _(nessuna funzione di primo livello)_
 
 ### `css/`
-- `stile.css`: stili generali e mobile, badge beta. `desktop.css`: layout desktop/tablet (media query).
+- `stile.css`: stili generali e mobile, badge beta. `desktop.css`: layout desktop/tablet (media query). `natale.css`: solo il tema natalizio (regole sotto `html[data-tema="natale"]` e neve); i colori del tema attuale restano nel `:root` di `stile.css`.

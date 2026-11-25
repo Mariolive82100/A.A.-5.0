@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="css/stile.css">
 <link rel="stylesheet" href="css/desktop.css">
+<link rel="stylesheet" href="css/natale.css">
 </head>
 <body>
 
@@ -99,7 +100,7 @@
 <script>
 'use strict';
 const BETA = /\/beta(\/|$)/.test(location.pathname);
-const VERSION = '1.82.3' + (BETA ? '-beta' : '');
+const VERSION = '1.83.0' + (BETA ? '-beta' : '');
 if(BETA){
   document.title += ' BETA';
   const b = document.createElement('div'); b.id = 'beta-badge'; b.textContent = 'BETA'; b.setAttribute('aria-hidden', 'true');
@@ -108,6 +109,7 @@ if(BETA){
 </script>
 <!-- codice dell'app, diviso per sezione (vedi INDICE.md): l'ordine di caricamento e' quello dei numeri -->
 <script src="js/00-base.js"></script>
+<script src="js/01-tema.js"></script>
 <script src="js/10-firebase.js"></script>
 <script src="js/20-dati.js"></script>
 <script src="js/30-ui-base.js"></script>

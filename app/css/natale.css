@@ -1,0 +1,65 @@
+/* ---------- tema natalizio "Notte di Natale": ogni regola vale solo con <html data-tema="natale"> (vedi js/01-tema.js) ---------- */
+:root[data-tema="natale"]{
+  --bg:#0a1712;--bg2:#0d1d17;--card:#12251d;--card2:#193126;--line:#27463a;--line2:#345a4a;
+  --tx:#f6f3ea;--tx2:#c5d3ca;--mut:#8fa79a;
+  --amber:#f2c14e;--amber2:#ffd873;--green:#4ade80;--red:#ff7b86;--sky:#7dd3fc;--violet:#c4b5fd;
+  color-scheme:dark;
+}
+:root[data-tema="natale"] header{background:rgba(10,23,18,.9)}
+:root[data-tema="natale"] nav.dock{background:rgba(10,23,18,.95)}
+:root[data-tema="natale"] .ov{background:rgba(3,10,7,.74)}
+:root[data-tema="natale"] #toast{background:#1d3a2d}
+:root[data-tema="natale"] #vittoria{background:rgba(5,14,10,.9)}
+
+/* titoli oro-crema, con alberello accanto al nome dell'app */
+:root[data-tema="natale"] .brand b,:root[data-tema="natale"] .hero h1{background-image:linear-gradient(90deg,var(--amber),#fff1c9)}
+:root[data-tema="natale"] .brand b::after{content:'🎄';color:#fff;-webkit-text-fill-color:initial}
+
+/* filo di lucine fisse sotto l'intestazione */
+:root[data-tema="natale"] header::after{content:'';position:absolute;left:0;right:0;top:100%;height:9px;pointer-events:none;
+  background:
+    radial-gradient(circle at 12px 5px,#ff5a66 0 2.6px,rgba(255,90,102,.28) 3px,transparent 5px) 0 0/72px 9px repeat-x,
+    radial-gradient(circle at 36px 4px,#ffd873 0 2.6px,rgba(255,216,115,.28) 3px,transparent 5px) 0 0/72px 9px repeat-x,
+    radial-gradient(circle at 60px 5px,#4ade80 0 2.6px,rgba(74,222,128,.28) 3px,transparent 5px) 0 0/72px 9px repeat-x,
+    linear-gradient(rgba(143,167,154,.45),rgba(143,167,154,.45)) 0 1px/100% 1px no-repeat}
+
+/* pulsanti: oro con testo scuro, rosso bacca per le azioni "rosse" */
+:root[data-tema="natale"] .btn.amber{background:linear-gradient(90deg,#f2c14e,#e5ad2f);color:#1f1503}
+:root[data-tema="natale"] .chips button.on{color:#1f1503}
+:root[data-tema="natale"] .btn.red{background:#b4232f;border-color:#b4232f}
+:root[data-tema="natale"] .btn.green{background:#047857;border-color:#047857}
+
+/* sfumature e bordi che nel tema attuale sono ambra */
+:root[data-tema="natale"] .gm-hint.su{border-color:rgba(242,193,78,.5)}
+:root[data-tema="natale"] .ic.amber,:root[data-tema="natale"] .pill.amber,:root[data-tema="natale"] .steps li::before{background:rgba(242,193,78,.15)}
+:root[data-tema="natale"] .in:focus{box-shadow:0 0 0 3px rgba(242,193,78,.18)}
+:root[data-tema="natale"] .seg input:checked+label{background:rgba(242,193,78,.1)}
+:root[data-tema="natale"] .card.hero{background:linear-gradient(135deg,var(--card),rgba(180,35,47,.26));border-color:rgba(242,193,78,.4)}
+:root[data-tema="natale"] .hero .logo{background:rgba(180,35,47,.24);border-color:rgba(242,193,78,.45)}
+:root[data-tema="natale"] .pc.me .ps{background:rgba(242,193,78,.18);border-color:rgba(242,193,78,.5)}
+:root[data-tema="natale"] .rk.me{border-color:rgba(242,193,78,.5);background:rgba(242,193,78,.1)}
+:root[data-tema="natale"] .sala{background:linear-gradient(135deg,rgba(242,193,78,.16),rgba(180,35,47,.14));border-color:rgba(242,193,78,.38)}
+:root[data-tema="natale"] .tesoro{background:linear-gradient(135deg,var(--card),rgba(180,35,47,.24));border-color:rgba(242,193,78,.35)}
+:root[data-tema="natale"] .cols i{background:linear-gradient(180deg,var(--amber),#9a6a12)}
+:root[data-tema="natale"] .bar i{background:linear-gradient(90deg,#34d399,#a7f3d0)}
+:root[data-tema="natale"] .banner.amber{background:rgba(242,193,78,.11);border-color:rgba(242,193,78,.34);color:#ffe9a8}
+:root[data-tema="natale"] .avv.amber{--avc:rgba(242,193,78,.75);--avb:rgba(242,193,78,.14);--avt:#ffe9a8;--avg:242,193,78}
+:root[data-tema="natale"] .bac-it.amber{--avc:rgba(242,193,78,.75);--avb:rgba(242,193,78,.12);--avt:#ffe9a8}
+:root[data-tema="natale"] .prizepill{color:#ffe9a8}
+
+/* Home e menu: rosso, oro e verde (gli aloni hanno il colore scritto nell'elemento, da qui !important) */
+:root[data-tema="natale"] .home .blob:nth-of-type(1){background:#d12f3d!important}
+:root[data-tema="natale"] .home .blob:nth-of-type(2){background:#f2c14e!important;opacity:.34}
+:root[data-tema="natale"] .home .blob:nth-of-type(3){background:#10b981!important}
+:root[data-tema="natale"] .gbtn.adm{border-color:rgba(242,193,78,.4);background:linear-gradient(135deg,rgba(180,35,47,.3),rgba(242,193,78,.14))}
+@media (min-width:1000px){
+  :root[data-tema="natale"] nav.dock .dk button:first-child{border-color:rgba(242,193,78,.45);background:linear-gradient(135deg,rgba(180,35,47,.45),rgba(242,193,78,.2))}
+  :root[data-tema="natale"] .prizepill{border-color:rgba(242,193,78,.4);background:rgba(242,193,78,.1)}
+}
+
+/* neve: sopra i contenuti, sotto intestazione, barra in basso, menu e finestre; non intercetta i tocchi */
+#neve{position:fixed;inset:0;z-index:25;overflow:hidden;pointer-events:none}
+#neve i{position:absolute;top:-10px;border-radius:50%;background:#fff;opacity:.4;animation:neve-giu linear infinite}
+@keyframes neve-giu{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(18px,52vh,0)}100%{transform:translate3d(-6px,104vh,0)}}
+@media (prefers-reduced-motion:reduce){#neve{display:none}}
+@media print{#neve{display:none}}
