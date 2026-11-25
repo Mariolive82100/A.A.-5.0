@@ -188,10 +188,22 @@ async function dopoCollegamento(u, uidPrima){
   if(u.uid !== uidPrima) console.error('UID cambiato dopo il collegamento', uidPrima, u.uid);
 }
 /* l'account è già di un profilo: invece di un errore si propone di usarlo su questo telefono (il profilo attuale resta recuperabile col PIN) */
-async function passaAAccount(signIn){
-  if(!confirm('Questo account è già collegato a un profilo. Vuoi usarlo su questo telefono?\n\nIl profilo che stai usando adesso resta recuperabile con il suo PIN.')) return false;
-  await signIn(); closeSheet(); toast('Accesso eseguito'); return true;
+let passaPending = null;
+function passaAAccount(signIn){
+  passaPending = signIn;
+  openSheet(`<h3>${ic('user')} Account già collegato</h3><p class="sub">Questo account è già collegato a un profilo. Vuoi usarlo su questo telefono?</p>
+    <p class="hint" style="margin-bottom:12px">Il profilo che stai usando adesso resta recuperabile con il suo PIN.</p>
+    <button class="btn amber block big" id="btn-passa-si" data-act="passa-account">Sì, usa questo account</button>
+    <button class="btn link block" id="btn-passa-no" data-act="passa-annulla">Annulla</button>`);
 }
+A['passa-annulla'] = () => { passaPending = null; closeSheet(); };
+A['passa-account'] = async (ds, el) => {
+  const f = passaPending; passaPending = null;
+  if(!f) return closeSheet();
+  el.disabled = true;
+  try { await f(); closeSheet(); toast('Accesso eseguito'); }
+  catch(e){ closeSheet(); toast(authErr(e), 'err'); }
+};
 async function collegaEmail(mail, pw, el){
   if(!/^\S+@\S+\.\S+$/.test(mail)) return toast(AUTH_ERR['auth/invalid-email'], 'err');
   if(pw.length < 6) return toast(AUTH_ERR['auth/weak-password'], 'err');
@@ -201,7 +213,7 @@ async function collegaEmail(mail, pw, el){
   try { await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(mail, pw)); await dopoCollegamento(u, prima); closeSheet(); toast('Email collegata'); render(); }
   catch(e){
     if(e && e.code === 'auth/email-already-in-use'){   // l'email ha già un account: con la stessa password è il suo
-      try { if(await passaAAccount(() => firebase.auth().signInWithEmailAndPassword(mail, pw))) return; } catch(e2){ toast(authErr(e2), 'err'); }
+      passaAAccount(() => firebase.auth().signInWithEmailAndPassword(mail, pw)); return;
     } else toast(authErr(e), 'err');
     if(el) el.disabled = false;
   }
@@ -213,8 +225,9 @@ A['collega-google'] = async () => {
   const prima = u.uid;
   try { await u.linkWithPopup(nuovoGoogle()); await dopoCollegamento(u, prima); toast('Account Google collegato'); render(); }   // la finestra si apre subito dentro il tocco: così non viene bloccata
   catch(e){
+    console.error('collega-google', e);
     if(e && e.code === 'auth/credential-already-in-use' && e.credential){
-      try { await passaAAccount(() => firebase.auth().signInWithCredential(e.credential)); } catch(e2){ toast(authErr(e2), 'err'); }
+      passaAAccount(() => firebase.auth().signInWithCredential(e.credential));
     } else toast(authErr(e), 'err');
   }
 };
