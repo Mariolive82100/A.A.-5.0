@@ -11,13 +11,46 @@ function initFirebase(){
   firebase.initializeApp(FIREBASE_CONFIG);
   db = firebase.firestore();
   db.enablePersistence({synchronizeTabs: true}).catch(() => {});
+  firebase.auth().languageCode = 'it';   // email di reimpostazione password in italiano
   firebase.auth().onAuthStateChanged(u => {
-    if(!u) return;
-    st.uid = u.uid;
+    if(!u){
+      // nessun accesso salvato: sessione anonima. Si chiama SOLO qui: con un account già collegato la chiamata lo sostituirebbe con uno anonimo nuovo
+      firebase.auth().signInAnonymously().catch(e => { st.sync = 'err'; st.syncErr = e.code || e.message; render(); });
+      return;
+    }
+    st.uid = u.uid; authInfo(u);
     if(st.gid) connect(st.gid); else { st.sync = 'ok'; render(); }
   });
-  firebase.auth().signInAnonymously().catch(e => { st.sync = 'err'; st.syncErr = e.code || e.message; render(); });
 }
+
+/* Account di accesso: st.authAnon = sessione anonima (non ancora collegata a Google / email); st.authProv = metodi collegati; st.authEmail = email (solo in locale, mai salvata nei dati del gruppo) */
+function authInfo(u){
+  u = u || firebase.auth().currentUser;
+  st.authAnon = !u || u.isAnonymous;
+  st.authProv = u ? u.providerData.map(p => p.providerId) : [];
+  st.authEmail = (u && (u.email || (u.providerData.map(p => p.email).find(Boolean)))) || '';
+}
+const AUTH_ERR = {
+  'auth/credential-already-in-use': 'Questo account è già collegato a un altro profilo. Se è il tuo, esci dal gruppo e usa «Ho già un account»; altrimenti scegli un altro account.',
+  'auth/email-already-in-use': 'Questa email è già usata da un altro account. Se è il tuo, usa «Ho già un account» dalla schermata iniziale.',
+  'auth/provider-already-linked': 'Questo profilo ha già un account collegato.',
+  'auth/weak-password': 'Password troppo corta: servono almeno 6 caratteri.',
+  'auth/invalid-email': 'Indirizzo email non valido.',
+  'auth/missing-email': 'Scrivi l\'indirizzo email.',
+  'auth/popup-closed-by-user': 'Finestra chiusa prima di finire: riprova.',
+  'auth/cancelled-popup-request': 'Finestra chiusa prima di finire: riprova.',
+  'auth/popup-blocked': 'Il browser ha bloccato la finestra di Google: consenti i popup oppure usa email e password.',
+  'auth/network-request-failed': 'Nessuna connessione.',
+  'auth/too-many-requests': 'Troppi tentativi: attendi qualche minuto e riprova.',
+  'auth/invalid-credential': 'Email o password non corretti.',
+  'auth/wrong-password': 'Email o password non corretti.',
+  'auth/user-not-found': 'Email o password non corretti.',
+  'auth/operation-not-allowed': 'Questo metodo di accesso non è attivo su Firebase.',
+  'auth/unauthorized-domain': 'Dominio non autorizzato su Firebase (Authentication → Impostazioni).',
+  'auth/account-exists-with-different-credential': 'Esiste già un account con questa email ma con un altro metodo di accesso.',
+  'auth/requires-recent-login': 'Per sicurezza rifai l\'accesso e riprova.'
+};
+const authErr = e => AUTH_ERR[e && e.code] || ('Errore (' + errMsg(e) + ')');
 
 function onErr(e){ console.error(e); st.sync = 'err'; st.syncErr = e.code || e.message; render(); }
 /* st.isAdmin = ha un ruolo di gestione (Supervisor con documento admin, oppure Creatore). Cosa può fare lo dice can(permesso). */

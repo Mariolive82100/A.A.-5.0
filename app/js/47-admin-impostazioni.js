@@ -102,6 +102,18 @@ function pChiusura(d){
 }
 
 /* ---------- IMPOSTAZIONI ---------- */
+/* Account di accesso: collegare Google o email al profilo (l'UID e i dati restano gli stessi); collegato, mostra il metodo e (per la password) il reset */
+function accountCard(){
+  if(st.authAnon === undefined) return '';
+  if(st.authAnon) return `<div class="card" id="card-account"><h3>${ic('lock','s')} Account di accesso</h3>
+    <p class="mut" style="font-size:13px;margin:0 0 10px">Collega un account per ritrovare il tuo profilo su qualsiasi telefono, senza PIN. Saldo, crediti e punti restano quelli di oggi.</p>
+    <div class="grid2"><button class="btn sm amber" id="btn-collega-google" data-act="collega-google">Google</button><button class="btn sm" id="btn-collega-email" data-act="collega-email-apri">Email e password</button></div>
+    <p class="hint" style="margin:8px 0 0">Il PIN personale resta valido come ripiego.</p></div>`;
+  const metodi = st.authProv.map(p => p === 'google.com' ? 'Google' : p === 'password' ? 'email e password' : p).join(' + ');
+  return `<div class="card" id="card-account"><div class="between"><div><b>${ic('check','s')} Account collegato</b><div class="mut" style="font-size:12px">${esc(metodi)}${st.authEmail ? ' · ' + esc(st.authEmail) : ''}</div></div>
+    ${st.authProv.includes('password') ? `<button class="btn sm ghost" id="btn-reset-pw" data-act="reset-password">Reimposta password</button>` : ''}</div></div>`;
+}
+
 function pImpostazioni(){
   const link = location.origin + location.pathname + '#g=' + st.gid;
   return `<h2>${ic(st.isAdmin ? 'settings' : 'user')} ${st.isAdmin ? 'Impostazioni' : 'Profilo'}</h2><p class="sub">${esc(st.gruppo.nome || '')}</p>
@@ -109,6 +121,7 @@ function pImpostazioni(){
     <div class="between"><div><b>${esc(membro(st.mid).nome)}</b>${membro(st.mid).nick ? `<div class="amber" style="font-size:13px;font-weight:700">“${esc(membro(st.mid).nick)}”</div>` : ''}<div class="mut" style="font-size:12px">${ruolo()}</div></div>
     <button class="btn sm ghost" data-act="nick">${ic('edit','s')} Nickname</button></div></div>
   ${st.mid ? `<div class="card"><div class="between"><div><b>PIN personale</b><div class="mut" style="font-size:12px">Serve a ritrovare il profilo se cambi telefono</div></div><button class="btn sm" data-act="pin-cambia">${ic('lock','s')} Cambia</button></div></div>` : ''}
+  ${accountCard()}
   ${sonoCreatore() ? cardParametri() : ''}
   ${sonoCreatore() ? `<div class="card" id="card-bacheca-sw"><h3>📢 Bacheca in Home</h3><label class="check"><input type="checkbox" id="bac-aperta" data-act="bac-aperta" ${bacAperta() ? 'checked' : ''}><b style="flex:1;font-size:14px">Consenti ai colleghi di pubblicare in Bacheca</b></label><p class="hint" style="margin:6px 0 0">Acceso: tutti possono pubblicare avvisi, eventi e sondaggi e gestire i propri. Spento: i colleghi consultano e votano, e pubblicano solo i compleanni; il resto lo pubblicano Creatore e Supervisor con «Strumenti di Sistema».</p></div>` : ''}
   ${st.isAdmin && !sonoCreatore() ? `<div class="card"><div class="between"><div><b>Ruolo di Supervisor</b><div class="mut" style="font-size:12px">${badgePerm(permDi(st.uid)) || 'nessun permesso'}</div></div><button class="btn sm ghost" data-act="lascia-admin">${ic('logout','s')} Lascia</button></div></div>` : ''}

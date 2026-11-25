@@ -32,6 +32,7 @@ async function joinVerifica(code){
     const sn = await db.collection('saletta').doc(code).get({source:'server'});
     if(!sn.exists){ toast('Codice non trovato', 'err'); LS.set('invito', code); return; }
     st.joinCode = code; st.joinNome = sn.data().nome || ''; st.entry = 'creatore'; LS.del('invito');
+    if(st.authAnon === false) A['join-collega']();   // account già collegato: si entra subito (se il profilo è suo, nessun PIN)
   } catch(e){ toast('Impossibile verificare il codice (' + errMsg(e) + ')', 'err'); }
   finally { st.busy = false; render(); }
 }
@@ -175,6 +176,82 @@ A['esci-gruppo'] = force => {
   } else if(force !== true && !confirm('Uscire dal gruppo su questo telefono? Potrai rientrare con il codice.')) return;
   if(force === true) LS.del('ultimoGruppo'); else if(st.gid) LS.set('ultimoGruppo', {gid: st.gid, nome: (st.gruppo && st.gruppo.nome) || ''});   // l'ultimo codice resta sul telefono
   disconnect(); st.gid = null; st.mid = null; st.entry = null; st.autoUlt = false; LS.del('gid'); LS.del('mid'); render();
+};
+
+/* ---------- account di accesso: collegamento Google / email sulla sessione anonima (l'UID non cambia) ---------- */
+const nuovoGoogle = () => { const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt: 'select_account'}); return p; };
+const pwv = id => { const e = $(id); return e ? e.value : ''; };   // le password non si tagliano
+/* dopo il collegamento: nuovo token (le regole vedono il nuovo provider) e controllo che l'UID sia rimasto lo stesso */
+async function dopoCollegamento(u, uidPrima){
+  await u.getIdToken(true);
+  authInfo(u);
+  if(u.uid !== uidPrima) console.error('UID cambiato dopo il collegamento', uidPrima, u.uid);
+}
+async function collegaEmail(mail, pw, el){
+  if(!/^\S+@\S+\.\S+$/.test(mail)) return toast(AUTH_ERR['auth/invalid-email'], 'err');
+  if(pw.length < 6) return toast(AUTH_ERR['auth/weak-password'], 'err');
+  const u = firebase.auth().currentUser;
+  if(!u || !u.isAnonymous) return toast('Hai già un account collegato', 'err');
+  const prima = u.uid; if(el) el.disabled = true;
+  try { await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(mail, pw)); await dopoCollegamento(u, prima); closeSheet(); toast('Email collegata'); render(); }
+  catch(e){ toast(authErr(e), 'err'); if(el) el.disabled = false; }
+}
+/* dal Profilo: collega l'account al profilo già in uso (mai cambio di account: se è già di un altro profilo, errore) */
+A['collega-google'] = async () => {
+  const u = firebase.auth().currentUser;
+  if(!u || !u.isAnonymous) return toast('Hai già un account collegato', 'err');
+  const prima = u.uid;
+  try { await u.linkWithPopup(nuovoGoogle()); await dopoCollegamento(u, prima); toast('Account Google collegato'); render(); }   // la finestra si apre subito dentro il tocco: così non viene bloccata
+  catch(e){ toast(authErr(e), 'err'); }
+};
+A['collega-email-apri'] = () => openSheet(`<h3>${ic('lock')} Collega email e password</h3><p class="sub">Il tuo profilo resta lo stesso: saldo, crediti e punti non cambiano.</p>
+  <label class="f"><span>Email</span><input class="in" id="ac-mail" type="email" autocomplete="email" autocapitalize="off" autofocus></label>
+  <label class="f"><span>Password (almeno 6 caratteri)</span><input class="in" id="ac-pw" type="password" autocomplete="new-password"></label>
+  <label class="f"><span>Ripeti la password</span><input class="in" id="ac-pw2" type="password" autocomplete="new-password"></label>
+  <button class="btn amber block big" data-act="collega-email">Collega</button>`);
+A['collega-email'] = (ds, el) => {
+  if(pwv('ac-pw') !== pwv('ac-pw2')) return toast('Le due password non coincidono', 'err');
+  return collegaEmail(val('ac-mail'), pwv('ac-pw'), el);
+};
+A['reset-password'] = async () => {
+  const mail = val('ac-mail') || st.authEmail;
+  if(!mail) return toast('Scrivi prima la tua email', 'err');
+  try { await firebase.auth().sendPasswordResetEmail(mail); toast('Email inviata a ' + mail + ' (controlla anche lo spam)'); }
+  catch(e){ toast(authErr(e), 'err'); }
+};
+/* dalle schermate di ingresso (chi non è ancora nel gruppo): accedere a un account già collegato, oppure crearne uno nuovo */
+A['accedi-apri'] = () => openSheet(`<h3>${ic('user')} Ho già un account</h3><p class="sub">Entra con l'account collegato al tuo profilo, oppure creane uno nuovo.</p>
+  <button class="btn block big" id="btn-accedi-google" data-act="accedi-google">Continua con Google</button>
+  <p class="hint" style="text-align:center;margin:10px 0">oppure con email e password</p>
+  <label class="f"><span>Email</span><input class="in" id="ac-mail" type="email" autocomplete="email" autocapitalize="off"></label>
+  <label class="f"><span>Password</span><input class="in" id="ac-pw" type="password" autocomplete="current-password"></label>
+  <div class="grid2"><button class="btn amber" id="btn-accedi-email" data-act="accedi-email">Accedi</button><button class="btn" id="btn-crea-account" data-act="crea-account">Crea account</button></div>
+  <button class="btn link" data-act="reset-password" style="margin-top:6px">Password dimenticata?</button>`);
+A['accedi-google'] = async () => {
+  const u = firebase.auth().currentUser;
+  if(!u || !u.isAnonymous || st.mid) return toast('Sei già dentro: usa il Profilo', 'err');
+  const prima = u.uid;
+  try { await u.linkWithPopup(nuovoGoogle()); await dopoCollegamento(u, prima); closeSheet(); toast('Account Google collegato'); render(); }
+  catch(e){
+    if(e && e.code === 'auth/credential-already-in-use' && e.credential){   // account già usato: qui (nessun profilo da perdere) si passa a quello
+      try { await firebase.auth().signInWithCredential(e.credential); closeSheet(); toast('Accesso eseguito'); } catch(e2){ toast(authErr(e2), 'err'); }
+    } else toast(authErr(e), 'err');
+  }
+};
+A['accedi-email'] = async (ds, el) => {
+  const mail = val('ac-mail'), pw = pwv('ac-pw');
+  if(!mail || !pw) return toast('Scrivi email e password', 'err');
+  if(st.mid) return toast('Sei già dentro: usa il Profilo', 'err');
+  el.disabled = true;
+  try { await firebase.auth().signInWithEmailAndPassword(mail, pw); closeSheet(); toast('Accesso eseguito'); }
+  catch(e){ toast(authErr(e), 'err'); el.disabled = false; }
+};
+A['crea-account'] = (ds, el) => { if(st.mid) return toast('Sei già dentro: usa il Profilo', 'err'); return collegaEmail(val('ac-mail'), pwv('ac-pw'), el); };
+A['account-esci'] = async () => {
+  if(st.mid) return;
+  if(!confirm('Uscire da questo account su questo telefono?')) return;
+  try { disconnect(); st.uid = null; await firebase.auth().signOut(); render(); }
+  catch(e){ toast(authErr(e), 'err'); }
 };
 
 /* --- bar --- */

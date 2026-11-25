@@ -5,7 +5,7 @@ function pRegolamento(){
   const sez = (t, righe) => `<div class="card"><h3>${t}</h3><ul class="rg">${righe.filter(Boolean).map(r => `<li>${r}</li>`).join('')}</ul></div>`;
   const pt = n => `+${n} pt`;
   const nota = (ok, txt) => ok ? '' : txt;
-  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 5.2 · novembre 2026</p>
+  return `<h2>${ic('receipt')} Regolamento</h2><p class="sub">${esc(g.nome || 'Armieri 5.0')} · versione 5.3 · novembre 2026</p>
   ${sez('🎯 Principi', [
     '<b>Registra subito</b> ogni consumo: ognuno risponde del proprio.',
     '<b>Contabilità, non denaro:</b> l\'app tiene crediti e debiti; i soldi passano in contanti o Revolut, fuori dall\'app.',
@@ -57,6 +57,11 @@ function pRegolamento(){
     '<b>Supervisor:</b> usa le stesse schermate di tutti; vede solo i comandi dei permessi che il Creatore gli ha concesso: ✅ <i>Approva richieste</i> (Notifiche: spese, ricariche, riscatti, nuovi iscritti) · 💶 <i>Cassa e Storni</i> (entrate, giroconti, correzione saldo cassa, storni) · 📦 <i>Inventario e Scorte</i> (prezzi, articoli, giacenze, scorta caffè, Esaurito) · 👥 <i>Quote e Saldi Soci</i> (quote annuali, saldi e punti — anche impostando direttamente il nuovo saldo —, PIN, archivia / espelli) · 🏆 <i>Punti e Regole</i> (sfide, punteggi e premi) · 🛠️ <i>Strumenti di Sistema</i> (moderazione della Bacheca: avvisi, eventi e sondaggi; backup; chiusura periodo).',
     '<b>Accesso:</b> si entra solo con il codice del gruppo, che solo il Creatore può vedere e mandare come link (☰ → Impostazioni → «Invita i colleghi»); la condivisione dell\'app e il codice non sono visibili a Supervisor e colleghi, a cui basta chiederlo al Creatore. Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
+  ${sez('🔐 Account di accesso', [
+    'In <b>Profilo → Account di accesso</b> puoi collegare il tuo profilo a un account <b>Google</b> oppure a <b>email e password</b>. Il collegamento non cambia nulla: saldo, crediti, punti e storico restano i tuoi.',
+    'Con l\'account collegato ritrovi il tuo profilo su qualsiasi telefono dalla schermata iniziale («Ho già un account»), senza PIN. Se dimentichi la password puoi reimpostarla con l\'email.',
+    'La tua email non compare mai nell\'app agli altri colleghi e non finisce nei dati del gruppo: la vede solo chi gestisce il progetto Firebase.',
+    'Il <b>PIN personale</b> resta valido come ripiego, ad esempio se perdi l\'accesso al tuo account.'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [
     `${eur(g.quotaAnnua)} di contributo al fondo, <b>separato dal saldo</b>: non crea debiti né blocca i consumi.`,
     'Fino al pagamento in Home compare un avviso con il pulsante «Paga quota»: scegli contanti o Revolut e invia la richiesta; quando un Supervisor conferma di aver ricevuto i soldi la quota risulta pagata e l\'importo entra in cassa. Il tuo saldo non cambia.', 'Il Creatore o un Supervisor con «Quote e Saldi Soci» può anche registrarla direttamente (☰ → Quote annuali) o annullarla: la quota è sempre solo contributo al fondo (mai crediti: per dare credito a un collega si usa una ricarica) e l\'annullamento non toglie mai crediti a nessuno.']) : ''}

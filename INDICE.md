@@ -15,8 +15,8 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 ### `js/00-base.js` — costanti, utilità, PIN (hash), stato `st`
 `hashPin`, `parseEuro`, `dataOra`, `quando`, `clean`, `add`, `normCode`, `errMsg`
 
-### `js/10-firebase.js` — inizializzazione Firebase, accesso, listener, dati riservati
-`initFirebase`, `onErr`, `setSync`, `disconnect`, `connect`, `stopData`, `syncMode`, `subMovimenti`
+### `js/10-firebase.js` — inizializzazione Firebase, accesso (anonimo e account collegato), listener, dati riservati
+`initFirebase`, `authInfo`, `authErr`, `onErr`, `setSync`, `disconnect`, `connect`, `stopData`, `syncMode`, `subMovimenti`
 
 ### `js/20-dati.js` — dati derivati: saldi, punti, scale, regole punti, scambi
 `tuttiMov`, `emptyState`, `emptyStats`, `applyMov`, `applyStat`, `derived`, `debitoLibero`, `riscala`, `riepScala`, `scambiRicevuti`, `scambiInviati`, `creditoLibero`, `premiEff`
@@ -25,7 +25,7 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `addMov`, `guard`, `toast`, `openSheet`, `closeSheet`, `segOpts`, `render`, `doRender`, `cardShareMark`, `cardTesto`, `renderDrawer`, `qsRisultati`, `qsFiltra`
 
 ### `js/40-ingresso.js` — schermate di ingresso (crea/unisciti/recupera)
-`renderEntry`, `entryInstall`, `entryWelcome`, `entryJoin`, `entryCreatore`, `entryRichiesta`, `entryRecupero`, `entryPinGate`
+`renderEntry`, `entryInstall`, `entryWelcome`, `entryJoin`, `entryCreatore`, `entryRichiesta`, `entryAccount`, `entryRecupero`, `entryPinGate`
 
 ### `js/41-bar-crediti.js` — pagina Bar, consiglio chiusura, richieste, notifiche, crediti
 `bannerChiusura`, `pBar`, `richiesteUtente`, `contatori`, `pNotifiche`, `inboxAdmin`, `pCrediti`
@@ -46,10 +46,10 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `pSpesa`, `aggiornaArticoli`, `giocoSt`, `pGioco`, `pCassa`, `scortaRighe`, `caffeLivello`, `cardCaffeScorta`, `pInventario`, `quoteMigra`, `pQuote`, `consumiRange`, `disegnaConsumi`, `labelChiusura`, `pMembri`, `pPin`
 
 ### `js/47-admin-impostazioni.js` — strumenti amministratore, chiusure ravvicinate, impostazioni
-`pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `pImpostazioni`
+`pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `accountCard`, `pImpostazioni`
 
-### `js/50-azioni-base.js` — azioni: condivisione, Bar, Paga, ricarica e riscatto, ruoli
-`joinVerifica`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
+### `js/50-azioni-base.js` — azioni: condivisione, accesso e account (collega Google/email), Bar, Paga, ricarica e riscatto, ruoli
+`joinVerifica`, `nuovoGoogle`, `pwv`, `dopoCollegamento`, `collegaEmail`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
 
 ### `js/51-azioni-gestione.js` — azioni: Mastro Lindo e punti extra, regalo crediti, storni, cassa, inventario, registro caffè, quote, admin
 `rgAggiorna`, `acAggiorna`, `compactMov`, `corrAggiorna`, `caricaProdotto`, `sheetReg`, `salvaRegCaffe`, `quotaAggiorna`, `scollega`, `selMembro`, `bfInizioPeriodo`, `bfRinnovo`, `bfCountdown`, `bfUsati`, `bfAggiorna`, `sfPulCard`, `sxCalcola`, `sxAggiorna`, `vitPremio`

@@ -60,9 +60,16 @@ function entryInstall(){
     <p class="hint" style="margin:2px 0 0">Sconsigliato: se installerai l'app più tardi dovrai registrarti di nuovo.</p></div>`;
 }
 
+/* accesso con account (Google / email): link in fondo alle schermate di ingresso; con un account già collegato mostra quale e permette di cambiarlo */
+function entryAccount(){
+  return st.authAnon === false
+    ? `<p class="hint" style="text-align:center;margin-top:14px">Account: <b>${esc(st.authEmail || 'collegato')}</b><br><button class="btn link" id="btn-account-esci" data-act="account-esci" style="font-size:13px">Cambia account</button></p>`
+    : `<div style="text-align:center;margin-top:14px"><button class="btn link" id="btn-accedi" data-act="accedi-apri" style="color:var(--mut);font-size:13px">Ho già un account (Google o email)</button></div>`;
+}
+
 function entryWelcome(){
   return `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1><p>Caffè, snack, cassa e turni della saletta,<br>condivisi con i colleghi.</p></div>
-  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Te lo manda il Creatore del gruppo</span></button>`;
+  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Te lo manda il Creatore del gruppo</span></button>${entryAccount()}`;
 }
 
 function entryJoin(){
@@ -72,18 +79,20 @@ function entryJoin(){
     <label class="f"><span>Codice gruppo</span><input class="in mono" id="j-code" placeholder="XXXX-XXXX-XXXX" value="${esc(pre)}" autocapitalize="characters" autocomplete="off" autofocus></label>
     <button class="btn amber block big" data-act="join" ${st.busy?'disabled':''}>${st.busy ? 'Verifico…' : 'Continua'}</button>
   </div>
-  ${st.joinCode ? `<button class="btn link" data-act="entry" data-v="creatore" style="color:var(--mut);font-size:13px">← Torna a ${esc(st.joinNome || 'questo gruppo')}</button>` : ''}`;
+  ${st.joinCode ? `<button class="btn link" data-act="entry" data-v="creatore" style="color:var(--mut);font-size:13px">← Torna a ${esc(st.joinNome || 'questo gruppo')}</button>` : ''}${entryAccount()}`;
 }
 
 function entryCreatore(){
   return `<div class="hero" style="padding-bottom:8px"><div class="logo">${ic('users','l')}</div><h1>${esc(st.joinNome || 'Gruppo')}</h1><p>Come vuoi entrare?</p></div>
   <div class="card">
-    <button class="btn amber block big" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo</button>
+    ${st.authAnon === false ? `<button class="btn amber block big" id="btn-entra-account" data-act="join-collega">${ic('check','s')} Entra con il tuo account</button>
+    <p class="hint" style="margin:6px 0 12px">Se questo account è già collegato al tuo profilo, entri subito, senza PIN.</p>` : ''}
+    <button class="btn ${st.authAnon === false ? '' : 'amber '}block big" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo</button>
     <p class="hint" style="margin:6px 0 12px">Eri già nel gruppo (nuovo telefono, app reinstallata…): ti ritrovi con il tuo PIN personale.</p>
     <button class="btn block big" data-act="join-collega">${ic('user','s')} Sono un nuovo collega</button>
     <p class="hint" style="margin:6px 0 0">Invii una richiesta che un Supervisor deve approvare.</p>
   </div>
-  <button class="btn link" id="btn-altro-codice" data-act="entry" data-v="join" style="color:var(--mut);font-size:13px">Usa un altro codice gruppo</button>`;
+  <button class="btn link" id="btn-altro-codice" data-act="entry" data-v="join" style="color:var(--mut);font-size:13px">Usa un altro codice gruppo</button>${entryAccount()}`;
 }
 
 
@@ -111,7 +120,7 @@ function entryRichiesta(){
     <button class="btn amber block big" data-act="invia-richiesta" ${st.busy?'disabled':''}>${st.busy ? 'Invio…' : 'Invia richiesta'}</button>
   </div>
   <button class="btn block ghost" style="margin-bottom:8px" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo (recupero con PIN)</button>
-  <button class="btn link" data-act="esci-gruppo">Usa un altro codice</button>`;
+  <button class="btn link" data-act="esci-gruppo">Usa un altro codice</button>${entryAccount()}`;
 }
 
 function entryRecupero(){
