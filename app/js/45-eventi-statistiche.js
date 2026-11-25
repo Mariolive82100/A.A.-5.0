@@ -22,7 +22,6 @@ const backHome = () => `<button class="btn link" style="padding:0;margin:0 0 8px
 const backSaletta = () => `<button class="btn link" style="padding:0;margin:0 0 8px" data-act="go" data-p="saletta">← Saletta</button>`;
 /* lista della spesa: articoli ancora da comprare (badge su pulsanti e schede) */
 const nSpesa = () => (st.listaSpesa || []).filter(x => x.stato === 'da_comprare').length;
-const badgeSpesa = () => nSpesa() ? `<span class="tb tbi" id="badge-spesa">${nSpesa()}</span>` : '';
 const badgeSpesaAbs = () => nSpesa() ? `<span class="tb" id="badge-spesa" style="top:10px;right:14px;min-width:22px;height:22px;font-size:12px">${nSpesa()}</span>` : '';
 function pSaletta(d){
   return `<h2>${ic('sparkles')} Saletta</h2><p class="sub">Spesa, scorte e un po' di svago.</p>
@@ -40,18 +39,6 @@ const A = {};   // tabella delle azioni (data-act)
 
 /* ---------- Statistiche saletta (colleghi): classifica e andamento caffè per periodo ---------- */
 const isoDi = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
-function rangeSal(){
-  const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = st.salPer;
-  const ini = dt => { dt.setHours(0,0,0,0); return dt.getTime(); }, fine = dt => { dt.setHours(23,59,59,999); return dt.getTime(); };
-  if(p === 'oggi') return {da: ini(new Date(y, m, o.getDate())), a: Infinity, label: 'Oggi'};
-  if(p === 'settimana'){ const dow = (o.getDay() + 6) % 7; return {da: ini(new Date(y, m, o.getDate() - dow)), a: Infinity, label: 'Questa settimana'}; }
-  if(p === 'anno') return {da: ini(new Date(y, 0, 1)), a: Infinity, label: 'Quest\'anno'};
-  if(p === 'custom'){
-    const da = st.salDa ? ini(new Date(st.salDa + 'T00:00:00')) : 0, a = st.salA ? fine(new Date(st.salA + 'T00:00:00')) : Infinity;
-    return {da, a, label: (st.salDa ? st.salDa.split('-').reverse().join('/') : 'inizio') + ' → ' + (st.salA ? st.salA.split('-').reverse().join('/') : 'oggi')};
-  }
-  return {da: ini(new Date(y, m, 1)), a: Infinity, label: 'Questo mese'};
-}
 async function caricaArcMov(){
   st.arcLoading = true;
   try { const s = await C('archivio').get(); st.arcMov = []; s.docs.forEach(d => st.arcMov.push(...(d.data().movimenti || []))); }
@@ -171,7 +158,6 @@ function aggRange(d, r, slot){
   if(slot === 'cl') _aggCl = n; else if(slot === 'hd') _aggHd = n; else if(slot === 'on') _aggOn = n; else if(slot === 'sf') _aggSf = n; else if(slot === 'pw') _aggPw = n; else _aggC = n;
   return n;
 }
-function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
 /* periodo della classifica punti: settimana in corso (da lunedì) o "sempre" = cumulato */
 function clPerKey(){ return st.clP === 'scorsa' ? 'scorsa' : 'settimana'; }
 function clRange(){
@@ -252,7 +238,6 @@ function aggConChiusi(d, r, slot){
   Object.keys(G.tot).forEach(k => { G.tot[k] = (base.G.tot[k] || 0) + L.reduce((a, p) => a + ((p.tot && p.tot[k]) || 0), 0); });
   out.G = G; return out;
 }
-const aggPeriodoC = d => aggConChiusi(d, rangeSal(), 'st');
 function noteChiusi(c){
   if(!c.usa) return '';
   const o = [];
@@ -260,28 +245,8 @@ function noteChiusi(c){
   if(c.parziali.length) o.push(`Il periodo chiuso ${riepLabel(c.parziali[0])} inizia prima dell'intervallo scelto e non è incluso.`);
   return o.length ? `<p class="hint" style="margin:0 0 10px" id="nota-chiusi">${o.join(' ')}</p>` : '';
 }
-/* serie di gruppo continua: barre dei periodi chiusi inclusi (settimanali se disponibili, altrimenti una per periodo) + serie normale del periodo aperto */
-function serieCont(c, f, idx, legacy){
-  const r = c.r, ini = c.usa ? Math.max(r.da || 0, c.cut) : r.da;
-  const S = serieGen(c.tutti, {da: ini, a: r.a}, f);
-  if(!c.L.length) return S;
-  const dm = ms => { const x = new Date(ms); return `${pad(x.getDate())}/${pad(x.getMonth() + 1)}`; };
-  const pre = [];
-  c.L.forEach(p => {
-    if(p.ser && p.ser.length) p.ser.forEach(w => pre.push({lab: dm(w[0]), full: 'Settimana dal ' + dm(w[0]) + ' (periodo chiuso)', n: Math.max(0, w[1 + idx] || 0)}));
-    else pre.push({lab: dm(p.fino), full: riepLabel(p) + ' (periodo chiuso)', n: Math.max(0, legacy(p))});
-  });
-  return {g: 'misto', buck: pre.concat(S.buck)};
-}
 
-function rankList(items, fmt, vuoto){
-  items = items.filter(x => x.v > 0).sort((a, b) => b.v - a.v || nomeM(a.id).localeCompare(nomeM(b.id)));
-  if(!items.length) return `<div class="empty">${vuoto}</div>`;
-  const max = items[0].v;
-  return items.map((x, i) => `<div style="margin-bottom:9px"><div class="between" style="font-size:13px"><span><span class="mut mono">${i+1}.</span> ${esc(nomeM(x.id))}${x.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}${x.sub ? ` <span class="mut" style="font-size:11.5px">${x.sub}</span>` : ''}</span><b class="mono">${fmt(x.v)}</b></div><div class="bar"><i style="width:${Math.round(x.v / max * 100)}%"></i></div></div>`).join('');
-}
 const rigaTot = (e, l, v, sub) => `<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span>${e} ${l}${sub ? ` <span class="mut" style="font-size:11.5px">${sub}</span>` : ''}</span><b class="mono">${v}</b></div>`;
-const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi prima della versione 1.10.0.</div>';
 
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */

@@ -8,7 +8,6 @@
   nav.dock .dk button.on{background:var(--card2);color:var(--amber)}
   nav.dock .dk button:hover{background:var(--card2)}
   body:has(nav.dock:not(.hidden)) .sheet{left:232px}
-  body:has(nav.dock:not(.hidden)) #fab-menu{left:calc(50% + 116px)}
   header{padding-left:22px;padding-right:26px;gap:14px}
   header.hasprize{padding-bottom:10px}
   .prizepill{position:static;flex:none;padding:5px 12px;border:1px solid rgba(251,191,36,.4);border-radius:99px;background:rgba(251,191,36,.10)}

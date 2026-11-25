@@ -246,7 +246,6 @@ A['riscatta-menu'] = () => {
   <button class="btn amber block big" id="scelta-rimborso" data-act="rimborso-nuovo" style="margin-top:8px">🧾 Rimborso spesa</button>
   ${infoBtn(`Riscatta crediti: chiedi al Fondo Gruppo di restituirti denaro in cambio dei tuoi crediti. Rimborso spesa: hai anticipato dei soldi per la saletta o per il gruppo (acquisti, un telegramma, un omaggio…) e chiedi di essere rimborsato in crediti, in denaro o in modo misto.`, 'Differenza')}`);
 };
-A['ricarica-nuova'] = () => A['ricarica-saldo']();
 A['ricarica-saldo'] = () => {
   const deb = debitoLibero(), base = deb > 0 ? deb : 1000;
   openSheet(`<h3>${ic('wallet')} Ricarica crediti</h3>

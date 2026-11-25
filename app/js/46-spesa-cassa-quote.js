@@ -132,12 +132,6 @@ function scortaRighe(S){
   const st2 = u ? `Reale: ${kgTxt(u.kg)} kg • ~${Math.round(u.kg * S.resa)} caffè (${dMese(u.t)})` : 'Reale: nessuna rilevazione';
   return {st1, st2};
 }
-/* barra «Reale» della Home: ultima quantità rilevata, scalata dei caffè registrati da quella rilevazione (gli acquisti successivi non contano) */
-function realeDisp(S){
-  const u = S && S.ultReale; if(!u) return null;
-  const rest = Math.max(0, u.kg - S.registrati / S.resa), lv = caffeLivello({kg: u.kg, restKg: rest});
-  return {pct: lv.pct, cls: 'reale-y', col: '#facc15', rest, tz: Math.max(0, Math.round(u.kg * S.resa) - S.registrati), t: u.t};
-}
 function caffeLivello(S){
   const pct = S && S.kg > 0 ? Math.max(0, Math.min(100, S.restKg / S.kg * 100)) : 0, low = S && S.restKg <= 1;
   const rosso = low || pct < 15, giallo = pct < 40;

@@ -73,19 +73,6 @@ function richiesteUtente(d){
       <div class="li"><div class="av">${ic('clock','s')}</div><div class="grow"><div class="t" style="font-size:13px">${testoAttesa(m)}</div><div class="d">In attesa di conferma di un Supervisor</div></div>
       <button class="btn sm ghost" data-act="annulla-richiesta" data-id="${m.id}">Annulla</button></div>`).join('')}</div></div>` : '';
 }
-function richiesteFondo(d){
-  const pend = d.pendenti;
-  return `  <div class="card"><h3><span>Richieste di accesso</span>${st.richieste.length ? `<span class="pill red">${st.richieste.length}</span>` : ''}</h3>
-    ${st.richieste.length ? `<div class="list">${st.richieste.map(r => `<div class="li"><div class="av">${esc(r.nome.slice(0,1))}</div>
-      <div class="grow"><div class="t">${esc(r.nome)}</div><div class="d">${r.nick ? '“' + esc(r.nick) + '” · ' : ''}${quando(r.ts && r.ts.toMillis ? r.ts.toMillis() : 0)}</div></div>
-      <button class="btn sm green" data-act="approva" data-id="${r.id}">Valuta</button></div>`).join('')}</div>` : '<div class="empty">Nessuna richiesta di accesso.</div>'}
-  </div>
-
-  <div class="card"><h3><span>Richieste da confermare</span>${pend.length ? `<span class="pill red">${pend.length}</span>` : ''}</h3>
-    ${pend.length ? righeMov(pend.slice().reverse(), d) : '<div class="empty">Nessuna richiesta in attesa.</div>'}
-  </div>
-`;
-}
 const recVisti = () => LS.get('recVisti_' + st.gid, []);
 const recuperiNuovi = () => { const v = recVisti(); return st.utenti.filter(u => u.recuperato && u.id !== st.uid && !v.includes(u.id) && (tms(u.ts) || Date.now()) > Date.now() - 7 * 864e5); };
 function contatori(d){

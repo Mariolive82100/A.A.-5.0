@@ -52,14 +52,7 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
 /* =====================================================================
    RENDER
    ===================================================================== */
-const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], supervisor:['Gestione Supervisor','shield'], pin:['Gestione PIN','lock'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'],
-  cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote annuali','banknote'],
-  regolamento:['Regolamento','receipt'], membri:['Gestione Soci','users'], statistiche:['Classifica e statistiche','chart'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
-};
 
-// Modello prepagato: la quota non genera piu' addebiti sul saldo. Resta la funzione (vuota) per i punti di chiamata.
-function assicuraQuote(){}
 
 let rq = false;
 /* scroll: ogni render ricostruisce main; ricordiamo la posizione per non farla tornare in cima (a ogni aggiornamento dati) */
@@ -91,7 +84,6 @@ function doRender(){
   }
 
   let d = derived();
-  assicuraQuote(d); d = derived();
   // header
   const s = d.S.saldi[st.mid] || 0;
 
@@ -111,7 +103,6 @@ function doRender(){
   const nb = cn.tot;
   $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'saletta' && perleNuova() ? '<span class="tdot" id="dot-saletta" aria-label="Nuova perla nella bacheca"></span>' : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
-  $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   renderDrawer();
 

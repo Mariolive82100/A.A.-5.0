@@ -232,24 +232,6 @@ A['conferma-cassa'] = ds => {
 
 /* --- inventario (admin) --- */
 A['inv-sort'] = ds => { if(st.invSort.k === ds.k) st.invSort.asc = !st.invSort.asc; else st.invSort = {k: ds.k, asc: true}; render(); };
-/* scorta buste di caffe': articolo speciale 'caffe' creato dal Supervisor al primo carico (prezzo 0, categoria fondo: non compare tra gli snack) */
-function caricaBusteCaffe(q){
-  const d = derived();
-  if(q < 0 && -q > busteDisp(d)) return toast('Non ci sono abbastanza buste da togliere', 'err');
-  if(!prodCaffe()) C('prodotti').doc(PID_CAFFE).set({nome: 'Caffè (buste)', emoji: '☕', categoria: 'fondo', prezzo: 0, attivo: true, speciale: 'caffe'}, {merge: true}).catch(e => toast('Non salvato (' + errMsg(e) + ')', 'err'));
-  addMov({tipo:'carico', pid: PID_CAFFE, qta: q, nome: 'Caffè (buste)'});
-  return true;
-}
-A['carico-caffe'] = ds => { caricaBusteCaffe(Number(ds.v)); };
-A['carico-caffe-n'] = () => {
-  openSheet(`<h3>${ic('bean')} Carico buste di caffè</h3><p class="sub">Buste aggiunte alla scorta (negativo per toglierle). Ora disponibili: <b class="mono">${busteDisp(derived())}</b>.</p>
-    <label class="f"><span>Buste</span><input class="in mono" id="cc-q" inputmode="numeric" value="5" autofocus></label>
-    <button class="btn amber block big" data-act="conferma-carico-caffe">Registra</button>`);
-};
-A['conferma-carico-caffe'] = () => {
-  const q = parseInt(val('cc-q'), 10); if(!q) return toast('Numero non valido', 'err');
-  if(caricaBusteCaffe(q) === true){ closeSheet(); toast('Scorta buste aggiornata'); }
-};
 A['prodotto'] = ds => {
   const p = ds.id ? prodotto(ds.id) : null;
   openSheet(`<h3>${ic('package')} ${p ? 'Modifica articolo' : 'Nuovo articolo'}</h3><p class="sub">${p ? 'Il nuovo prezzo vale dai prossimi acquisti.' : 'Aggiungi un articolo al listino.'}</p>
@@ -619,16 +601,5 @@ A['rp-consigliati'] = () => {
   const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptRicEuro: 'rp-riceuro', ptRicMax: 'rp-ricmax', ptBenFatto: 'rp-bf'}, prima = {};
   Object.keys(ids).forEach(k => { const e = $(ids[k]); if(e){ prima[ids[k]] = e.value; e.value = nDec(RP_CONSIGLIATI[k]); } });
   G().set(RP_CONSIGLIATI, {merge: true}).then(() => toast('Valori consigliati applicati')).catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
-};
-/* passaggio alla scala punti ×10: una sola scrittura sul documento del gruppo (scalaDa + valori espliciti); i movimenti vecchi si rivalutano in memoria */
-A['scala10'] = () => {
-  if(!can('compiti') || scalaDa()) return;
-  if(!confirm('Passare alla scala punti ×10?\n\nValori: soglia 300 punti = 1 credito · caffè 10 · snack 10 · «Ben fatto» 20 · macchinetta 10.\nI punti già maturati vengono moltiplicati per 10 (i vecchi turni di pulizia valgono 50). L\'operazione non si annulla.')) return;
-  // i campi della pagina conservano il testo digitato tra un render e l'altro: li aggiorno subito, altrimenti «Salva le regole» riscriverebbe i valori vecchi
-  const campi = {'rp-soglia': 300, 'rp-caffe': 10, 'rp-snack': 10, 'rp-bf': 20}, prima = {};
-  Object.keys(campi).forEach(id => { const e = $(id); if(e){ prima[id] = e.value; e.value = campi[id]; } });
-  G().set({scalaDa: Date.now(), sogliaPunti: 300, creditiSoglia: creditiSoglia(), ptCaffe: 10, ptBenFatto: 20}, {merge: true})
-    .then(() => toast('Scala ×10 attiva'))
-    .catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
 };
 

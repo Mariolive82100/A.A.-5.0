@@ -22,13 +22,6 @@ function indietro(){
   if(st.page !== 'bar'){ A['go']({p: SALETTA_SUB.includes(st.page) && st.page !== 'saletta' ? 'saletta' : 'bar'}); return true; }
   return false;
 }
-const overlayAperto = () => !!(($('infopop') && $('infopop').classList.contains('on')) || $('sheet').classList.contains('on') || $('drawer').classList.contains('on') || $('vittoria'));
-function chiudiOverlay(){
-  if($('vittoria')) A['vittoria-chiudi']();
-  else if($('infopop') && $('infopop').classList.contains('on')) A['info-x']();
-  else if($('sheet').classList.contains('on')) closeSheet();
-  else A['drawer-close']();
-}
 window.addEventListener('popstate', () => {
   if(!backArmata) return;
   const hs = history.state;

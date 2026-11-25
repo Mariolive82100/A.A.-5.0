@@ -1,8 +1,5 @@
 'use strict';
 /* ---------- Avvisi e comunicazioni in Home ---------- */
-const isoLocale = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-/* campo scadenza: '' -> null (nessuna), data nel passato -> false, altrimenti millisecondi */
-const scadInput = id => { const v = val(id); if(!v) return null; const t = new Date(v).getTime(); return Number.isFinite(t) && t > Date.now() ? t : false; };
 /* avvisi automatici: eventi da oggi a 3 giorni. Solo dati gia' in memoria (st.eventi), nessuna lettura ne' scrittura */
 function avvisiAuto(){
   return evVeri().filter(e => e && e.titolo && e.data)
@@ -38,13 +35,6 @@ const bacAperta = () => !!(st.gruppo && st.gruppo.bachecaAperta === true);
 const puoBacheca = () => moderatore() || bacAperta();
 const sondAperto = e => e.chiuso !== true && scadVivo(e);
 const bacOrd = (a, b) => (b.fissato ? 1 : 0) - (a.fissato ? 1 : 0) || tms(b.ts) - tms(a.ts);
-/* novita' degli altri dall'ultima volta che hai aperto la Bacheca: stato solo locale, nessuna lettura */
-function nBacNuovi(){
-  if(!st.gid) return 0;
-  const k = 'bacVisti_' + st.gid, v = LS.get(k, null);
-  if(v == null){ LS.set(k, Date.now()); return 0; }
-  return (st.eventi || []).filter(e => e.uid !== st.uid && tms(e.ts) > v && (!isBac(e) || scadVivo(e))).length;
-}
 function bacVoti(e){
   const n = (e.opzioni || []).length, c = Array(n).fill(0), v = e.voti || {};
   Object.keys(v).forEach(k => { const i = v[k]; if(Number.isInteger(i) && i >= 0 && i < n) c[i]++; });
@@ -99,11 +89,6 @@ function bacheca(){
 }
 const bacEv = id => (st.eventi || []).find(x => x.id === id);
 A['bac-tutti'] = () => { st.bacTutti = !st.bacTutti; render(); };
-A['bac-vai'] = () => {
-  LS.set('bacVisti_' + st.gid, Math.max(Date.now(), ...(st.eventi || []).map(e => tms(e.ts))));
-  render();
-  setTimeout(() => { const el = $('bacheca'); if(el){ el.scrollIntoView({block: 'start', behavior: 'smooth'}); el.classList.add('qs-flash'); setTimeout(() => el.classList.remove('qs-flash'), 1800); } }, 60);
-};
 A['bac-nuovo'] = ds => {
   const piena = puoBacheca(), t0 = piena && ds.v !== 'ev' ? 'info' : 'evento';
   st.bacTipo = t0;

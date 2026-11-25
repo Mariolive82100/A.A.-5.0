@@ -10,7 +10,6 @@ function tesoro(d){
 }
 /* ---------- registro movimenti, notifiche ---------- */
 const tms = x => x && x.toMillis ? x.toMillis() : (typeof x === 'number' ? x : 0);
-function saldoDisp(d){ const s = d.S.saldi[st.mid] || 0; return s > 0 ? creditoLibero() : s; }
 function pRegistro(d){ return pFeed(d); }
 /* storico delle richieste gia' decise (accettate, rifiutate, annullate): solo dati gia' in memoria, nessuna lettura in piu' */
 function storicoRichieste(d){
@@ -82,13 +81,6 @@ function sincronizzaGiacenze(d){
 }
 const giacenza = (d, p) => st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 1);
 
-/* buste di caffe' in scorta = buste caricate dal Supervisor (articolo speciale 'caffe'); nessuna apertura manuale */
-const prodCaffe = () => prodotto(PID_CAFFE);
-function busteCaricate(d){
-  const p = prodCaffe(); if(!p) return 0;
-  return st.isAdmin ? (d.S.stock[p.id] || 0) : (typeof p.giacenza === 'number' ? p.giacenza : 0);
-}
-const busteDisp = d => Math.max(0, busteCaricate(d));
 /* ---------- scorta caffe' in grani (kg) e lotti di snack/bibite: base del Tasso di Onesta' ---------- */
 const grCaffe = () => String(Math.round(10000 / resaKg()) / 10).replace('.', ',');   // grammi stimati per caffè = 1000 ÷ tazzine per kg
 const resaKg = () => { const v = Number(st.gruppo && st.gruppo.resaKg); return v >= 1 && v <= 500 ? v : CAFFE_PER_KG; };

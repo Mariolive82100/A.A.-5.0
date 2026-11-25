@@ -1,6 +1,5 @@
 'use strict';
 /* ---------- strumenti amministratore (menù a panino) ---------- */
-const uidNome = uid => { const u = st.utenti.find(x => x.id === uid); return u ? nomeM(u.mid) : null; };
 const bannerBackup = () => { const b = LS.get('backup_' + st.gid); return (!b || Date.now() - b > 7 * 864e5) ? `<div class="banner amber">${ic('alert')}<div>${b ? 'L\'ultimo backup risale a più di una settimana fa.' : 'Non hai ancora fatto un backup dei dati.'} <a href="#" data-act="go" data-p="backup" style="color:inherit;font-weight:800">Vai al backup</a></div></div>` : ''; };
 const cardParametri = () => `  <div class="card"><h3>Nome del gruppo</h3>
     <label class="f"><span>Nome gruppo</span><input class="in" id="ad-nome" value="${esc(st.gruppo.nome||'')}" maxlength="40"></label>
@@ -133,9 +132,6 @@ function pImpostazioni(){
 /* =====================================================================
    AZIONI  (la tabella A è dichiarata in p7)
    ===================================================================== */
-A['fab'] = () => { st.fab = !st.fab; render(); };
-A['fab-close'] = () => { st.fab = false; render(); };
-A['fab-go'] = ds => { st.fab = false; render(); A[ds.v]({}); };
 A['notif-letti'] = () => { LS.set('notifSeen_' + st.mid, Date.now() + 1); render(); };
 
 
@@ -176,6 +172,6 @@ A['aggiorna'] = async () => {
 };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
-A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
 

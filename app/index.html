@@ -36,7 +36,6 @@
 <main id="main"></main>
 
 <nav class="dock hidden" id="dock"></nav>
-<div id="fab-ov" data-act="fab-close"></div><div id="fab-menu"></div>
 
 <div class="ov" id="drawer-ov" data-act="drawer-close"></div>
 <aside class="drawer" id="drawer"></aside>
@@ -100,7 +99,7 @@
 <script>
 'use strict';
 const BETA = /\/beta(\/|$)/.test(location.pathname);
-const VERSION = '1.81.2' + (BETA ? '-beta' : '');
+const VERSION = '1.81.3' + (BETA ? '-beta' : '');
 if(BETA){
   document.title += ' BETA';
   const b = document.createElement('div'); b.id = 'beta-badge'; b.textContent = 'BETA'; b.setAttribute('aria-hidden', 'true');

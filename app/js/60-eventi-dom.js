@@ -66,24 +66,6 @@ function rpRange(pp){
   }
   return {p: 'oggi', da: ini(new Date(y, m, o.getDate())), a: Infinity, label: `Oggi (${dBr(Date.now())})`};
 }
-/* totali del periodo dai movimenti gia' in memoria (stessa regola degli storni delle altre statistiche) */
-function riepRange(r){
-  const R = {caffe: 0, caffeE: 0, snack: 0, snackE: 0, inC: 0, inR: 0, spese: 0, per: {}};
-  const per = mid => R.per[mid] || (R.per[mid] = {n: 0, e: 0});
-  const pass = (m, sg) => {
-    switch(m.tipo){
-      case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ R.caffe += sg * (m.qta || 0); R.caffeE += sg * (m.importo || 0); const p = per(m.mid); p.n += sg * (m.qta || 0); p.e += sg * (m.importo || 0); } break;
-      case 'snack': if(m.stato !== 'annullata'){ R.snack += sg * (m.qta || 0); R.snackE += sg * (m.importo || 0); const p = per(m.mid); p.n += sg * (m.qta || 0); p.e += sg * (m.importo || 0); } break;
-      case 'ricarica': if(m.stato === 'confermata'){ if(m.metodo === 'revolut') R.inR += sg * m.importo; else R.inC += sg * m.importo; } break;
-      case 'quota': if(!m.stato || m.stato === 'confermata'){ if(m.metodo === 'revolut') R.inR += sg * m.importo; else if(m.metodo === 'contanti') R.inC += sg * m.importo; } break;
-      case 'spesa': if(m.stato === 'confermata') R.spese += sg * m.importo; break;
-      case 'storno': if(m.orig) pass(m.orig, -sg); break;
-    }
-  };
-  (st.isAdmin && st.arcMov ? st.arcMov : []).concat(tuttiMov()).filter(m => m.t >= r.da && m.t <= r.a).forEach(m => pass(m, 1));
-  R.top = Object.entries(R.per).filter(([, v]) => v.n > 0).sort((a, b) => b[1].e - a[1].e || b[1].n - a[1].n).slice(0, 5).map(([mid, v]) => ({mid, n: v.n, e: v.e}));
-  return R;
-}
 A['rp-per'] = ds => { if(!RP_PER.some(x => x[0] === ds.v)) return; st.rpPer = ds.v; render(); };
 /* ---------- Icone (i): spiegazioni a comparsa, si chiudono con un tocco sullo sfondo ---------- */
 const INFOS = {};

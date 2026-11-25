@@ -13,25 +13,25 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 ## File e contenuto
 
 ### `js/00-base.js` — costanti, utilità, PIN (hash), stato `st`
-`hashPin`, `parseEuro`, `dataOra`, `quando`, `clean`, `add`, `newCode`, `normCode`, `errMsg`
+`hashPin`, `parseEuro`, `dataOra`, `quando`, `clean`, `add`, `normCode`, `errMsg`
 
 ### `js/10-firebase.js` — inizializzazione Firebase, accesso, listener, dati riservati
 `initFirebase`, `onErr`, `setSync`, `disconnect`, `connect`, `stopData`, `syncMode`, `subMovimenti`
 
 ### `js/20-dati.js` — dati derivati: saldi, punti, scale, regole punti, scambi
-`tuttiMov`, `emptyState`, `emptyStats`, `applyMov`, `applyStat`, `derived`, `debitoLibero`, `riscala`, `riepScala`, `giorniLavorativi`, `scambiRicevuti`, `scambiInviati`, `creditoLibero`, `premiEff`
+`tuttiMov`, `emptyState`, `emptyStats`, `applyMov`, `applyStat`, `derived`, `debitoLibero`, `riscala`, `riepScala`, `scambiRicevuti`, `scambiInviati`, `creditoLibero`, `premiEff`
 
 ### `js/30-ui-base.js` — scritture, toast, sheet, render/scroll, condivisione, ricerca rapida, installazione PWA
-`addMov`, `guard`, `toast`, `openSheet`, `closeSheet`, `segOpts`, `assicuraQuote`, `render`, `doRender`, `cardShareMark`, `cardTesto`, `renderDrawer`, `qsRisultati`, `qsFiltra`
+`addMov`, `guard`, `toast`, `openSheet`, `closeSheet`, `segOpts`, `render`, `doRender`, `cardShareMark`, `cardTesto`, `renderDrawer`, `qsRisultati`, `qsFiltra`
 
 ### `js/40-ingresso.js` — schermate di ingresso (crea/unisciti/recupera)
 `renderEntry`, `entryInstall`, `entryWelcome`, `entryJoin`, `entryCreatore`, `entryRichiesta`, `entryRecupero`, `entryPinGate`
 
 ### `js/41-bar-crediti.js` — pagina Bar, consiglio chiusura, richieste, notifiche, crediti
-`bannerChiusura`, `pBar`, `richiesteUtente`, `richiesteFondo`, `contatori`, `pNotifiche`, `inboxAdmin`, `pCrediti`
+`bannerChiusura`, `pBar`, `richiesteUtente`, `contatori`, `pNotifiche`, `inboxAdmin`, `pCrediti`
 
 ### `js/42-registro-feed.js` — tesoreria, registro movimenti, giacenze, scorta caffè, descrizione movimenti, feed
-`tesoro`, `saldoDisp`, `pRegistro`, `storicoRichieste`, `notifiche`, `sincronizzaEstratti`, `sincronizzaGiacenze`, `busteCaricate`, `regCaffe`, `contaCaffe`, `statoCaffe`, `calcolaCaffe`, `statoProd`, `descMov`, `puoStornare`, `righeMov`, `feedLista`, `cassaRange`, `periodoChips`, `pFeed`
+`tesoro`, `pRegistro`, `storicoRichieste`, `notifiche`, `sincronizzaEstratti`, `sincronizzaGiacenze`, `regCaffe`, `contaCaffe`, `statoCaffe`, `calcolaCaffe`, `statoProd`, `descMov`, `puoStornare`, `righeMov`, `feedLista`, `cassaRange`, `periodoChips`, `pFeed`
 
 ### `js/43-regolamento.js` — `pRegolamento` (testo del regolamento interno)
 `pRegolamento`
@@ -40,10 +40,10 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `cpRiga`
 
 ### `js/45-eventi-statistiche.js` — eventi, statistiche saletta, classifiche punti, Tasso di Onestà, statistiche per periodo
-`prossimaData`, `giorniA`, `pSaletta`, `rangeSal`, `caricaArcMov`, `serieGen`, `graficoBarre`, `nuovoAgg`, `aggMov`, `aggrega`, `aggRange`, `aggPeriodo`, `clPerKey`, `clRange`, `riepDaChiusura`, `serieSett`, `aggConChiusi`, `noteChiusi`, `serieCont`, `rankList`, `aggiornaPillola`, `clRighe`, `clConteggi`, `clTitoli`, `clHero`, `onestaIndici`, `pCaffeReg`, `pOnesta`, `cardOnesta`, `clSala`, `viewMiei`, `clIo`, `clClassifica`, `pClassifiche`, `scRange`, `pStatConsumi`, `pClassificaPunti`, `classSett`, `premioSett`, `homeSett`, `clCategorie`
+`prossimaData`, `giorniA`, `pSaletta`, `caricaArcMov`, `serieGen`, `graficoBarre`, `nuovoAgg`, `aggMov`, `aggrega`, `aggRange`, `clPerKey`, `clRange`, `riepDaChiusura`, `serieSett`, `aggConChiusi`, `noteChiusi`, `aggiornaPillola`, `clRighe`, `clConteggi`, `clTitoli`, `clHero`, `onestaIndici`, `pCaffeReg`, `pOnesta`, `cardOnesta`, `clSala`, `viewMiei`, `clIo`, `clClassifica`, `pClassifiche`, `scRange`, `pStatConsumi`, `pClassificaPunti`, `classSett`, `premioSett`, `homeSett`, `clCategorie`
 
 ### `js/46-spesa-cassa-quote.js` — lista spesa, gioco, cassa, inventario, quote, statistiche, colleghi, gestione PIN
-`pSpesa`, `aggiornaArticoli`, `giocoSt`, `pGioco`, `pCassa`, `scortaRighe`, `realeDisp`, `caffeLivello`, `cardCaffeScorta`, `pInventario`, `quoteMigra`, `pQuote`, `consumiRange`, `disegnaConsumi`, `labelChiusura`, `pMembri`, `pPin`
+`pSpesa`, `aggiornaArticoli`, `giocoSt`, `pGioco`, `pCassa`, `scortaRighe`, `caffeLivello`, `cardCaffeScorta`, `pInventario`, `quoteMigra`, `pQuote`, `consumiRange`, `disegnaConsumi`, `labelChiusura`, `pMembri`, `pPin`
 
 ### `js/47-admin-impostazioni.js` — strumenti amministratore, chiusure ravvicinate, impostazioni
 `pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `pImpostazioni`
@@ -52,19 +52,19 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `joinVerifica`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
 
 ### `js/51-azioni-gestione.js` — azioni: Mastro Lindo e punti extra, regalo crediti, storni, cassa, inventario, registro caffè, quote, admin
-`rgAggiorna`, `acAggiorna`, `compactMov`, `corrAggiorna`, `caricaBusteCaffe`, `caricaProdotto`, `sheetReg`, `salvaRegCaffe`, `quotaAggiorna`, `scollega`, `selMembro`, `bfInizioPeriodo`, `bfRinnovo`, `bfCountdown`, `bfUsati`, `bfAggiorna`, `sfPulCard`, `sxCalcola`, `sxAggiorna`, `vitPremio`
+`rgAggiorna`, `acAggiorna`, `compactMov`, `corrAggiorna`, `caricaProdotto`, `sheetReg`, `salvaRegCaffe`, `quotaAggiorna`, `scollega`, `selMembro`, `bfInizioPeriodo`, `bfRinnovo`, `bfCountdown`, `bfUsati`, `bfAggiorna`, `sfPulCard`, `sxCalcola`, `sxAggiorna`, `vitPremio`
 
 ### `js/52-azioni-pin-backup.js` — azioni: Punti Collega, Ben fatto, PIN, backup/ripristino, archivio
 `scaricaBlob`, `condividiBlob`, `costruisciBackup`, `leggiBackup`, `datiRendiconto`, `opzRd`, `disegnaRendiconto`, `testoRendiconto`, `datiArchivio`, `pArchivio`, `testoArchivio`, `disegnaArchivio`, `aggiornaAnteprimaRd`
 
 ### `js/60-eventi-dom.js` — eventi DOM (click, input), riepilogo per periodo, icone (i), cerca collega
-`rpRange`, `riepRange`, `cercaApplica`
+`rpRange`, `cercaApplica`
 
 ### `js/61-bacheca-ruota.js` — avvisi, bacheca in Home, Ruota del Barista, Perle
-`avvisiAuto`, `avvisiHome`, `nBacNuovi`, `bacVoti`, `bacheca`, `bacPulisciVecchi`, `rndInt`, `ruotaSt`, `ruotaReset`, `ruotaSvg`, `pRuota`, `ruotaParti`, `perleSegnaVista`, `perleCheck`, `perleSync`, `pPerle`
+`avvisiAuto`, `avvisiHome`, `bacVoti`, `bacheca`, `bacPulisciVecchi`, `rndInt`, `ruotaSt`, `ruotaReset`, `ruotaSvg`, `pRuota`, `ruotaParti`, `perleSegnaVista`, `perleCheck`, `perleSync`, `pPerle`
 
 ### `js/62-navigazione.js` — tasto Indietro (History API)
-`backRiarma`, `backArma`, `indietro`, `chiudiOverlay`, `cardImmagine`
+`backRiarma`, `backArma`, `indietro`, `cardImmagine`
 
 ### `js/99-avvio.js` — avvio (`boot`)
 _(nessuna funzione di primo livello)_

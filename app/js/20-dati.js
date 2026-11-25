@@ -138,7 +138,6 @@ const ptCaffeE = () => onP('ptCaffeOn') ? ptCaffe() : 0;
 /* snack: punti proporzionali al prezzo (punti per ogni 1,00 €, arrotondati all'intero), calcolati dal prezzo senza impostarli articolo per articolo */
 const ptSnackEuro = () => Math.min(100, cfgD('ptSnackEuro', 10));
 const ptSnackP = prezzo => onP('ptCaffeOn') ? Math.max(0, Math.round((Number(prezzo) || 0) / 100 * ptSnackEuro())) : 0;
-const PREMI_PERC = [1, 0.5, 0.25];   // distribuzione del premio: 1° 100%, 2° 50%, 3° 25%
 /* premi del podio settimanale, in crediti: li imposta solo il Creatore nel documento del gruppo (premiPodio = 3 importi in centesimi: 1°, 2°, 3°) */
 const premiPodio = () => { const v = st.gruppo && st.gruppo.premiPodio; return [0, 1, 2].map(i => Array.isArray(v) && Number.isInteger(v[i]) && v[i] > 0 ? Math.min(50000, v[i]) : 0); };
 const premioPos = pos => premiPodio()[pos - 1] || 0;
@@ -186,18 +185,9 @@ function riepScala(q){
   for(const k in (q.pPul || {})){ const t = tn ? (tn[k] || 0) : null; pPul[k] = t === null ? q.pPul[k] * 5 : t * PUL_LEGACY; }
   return {...q, sc: 1, ptC: x10(q.ptC), ptS: x10(q.ptS), ptB: x10(q.ptB), ptP: q.ptP ? pP : q.ptP, pPul: q.pPul ? pPul : q.pPul};
 }
-const puntiPerCredito = () => (st.gruppo && st.gruppo.puntiPerCredito) || PUNTI_CREDITO_DEF;
-const puntiCaffeRate = () => (st.gruppo && st.gruppo.puntiCaffePerCredito) || 30;
-const puntiCaffeDisp = (d, mid) => Math.max(0, ((d.S.pcaf || {})[mid] || 0) - ((d.S.pcafConv || {})[mid] || 0));
 const ptLordi = (d, mid) => nz(d.S.pcaf, mid) + nz(d.S.punti, mid) + nz(d.S.pspesa, mid) + nz(d.S.pbf, mid);
 const ptUsati = (d, mid) => nz(d.S.pcafConv, mid) + nz(d.S.puntiConv, mid) + nz(d.S.pRisc, mid);
 const ptDisp = (d, mid) => Math.max(0, ptLordi(d, mid) - ptUsati(d, mid));
-const puntiDisp = (d, mid) => Math.max(0, (d.S.punti[mid] || 0) - (d.S.puntiConv[mid] || 0));
-function giorniLavorativi(da, a){
-  const x = new Date(da), f = new Date(a || Date.now()); x.setHours(12,0,0,0); f.setHours(12,0,0,0);
-  let n = 0; while(x < f){ x.setDate(x.getDate() + 1); const w = x.getDay(); if(w !== 0 && w !== 6) n++; } return n;
-}
-const msDoc = r => r && r.ts && r.ts.toMillis ? r.ts.toMillis() : Date.now();
 /* acquisto di crediti da un collega (movimento 'scambio'): i crediti passano solo quando il venditore conferma di aver ricevuto il denaro */
 const scambiPerMe = d => d.scambiAttesa.filter(m => m.daMid === st.mid);
 const scambiMiei = d => d.scambiAttesa.filter(m => m.mid === st.mid);

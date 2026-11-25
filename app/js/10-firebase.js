@@ -32,7 +32,7 @@ function disconnect(){
   stopData();
   modeKey = null;
   _derCache = null;
-  Object.assign(st, {pinDoc:undefined, gruppo:null, membri:[], prodotti:[], eventi:[], chiusure:[], estratto:null, movimenti:[], pending:{}, admins:[], utenti:[], richiesta:null, richieste:[], reqAdmin:null, richAdmin:[], riscatti:[], acquisti:[], buste:[], listaSpesa:[], spesaSel:{}, movD:[], fab:false, isAdmin:false, ready:{}, archivio:null});
+  Object.assign(st, {pinDoc:undefined, gruppo:null, membri:[], prodotti:[], eventi:[], chiusure:[], estratto:null, movimenti:[], pending:{}, admins:[], utenti:[], richiesta:null, richieste:[], reqAdmin:null, richAdmin:[], riscatti:[], acquisti:[], buste:[], listaSpesa:[], spesaSel:{}, movD:[], isAdmin:false, ready:{}, archivio:null});
 }
 
 function connect(gid){

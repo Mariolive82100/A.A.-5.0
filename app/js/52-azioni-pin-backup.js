@@ -28,7 +28,6 @@ A['recupera'] = async () => {
   } catch(e){ toast(errIngresso(e, 'PIN errato, oppure nessun PIN impostato per questo profilo (chiedi un PIN temporaneo a un Supervisor)'), 'err'); }
   finally { st.busy = false; render(); }
 };
-let offertaAdminAperta = false;
 const REG_KEY = 'regolamento_letto_v25';   // memorizzato come ps_regolamento_letto_v7: si cambia suffisso a ogni nuova versione del regolamento
 let regModalAperto = false;
 A['reg-avviso'] = () => {
@@ -135,20 +134,6 @@ A['conferma-saldo-punti'] = ds => {
   if(!imp || Math.abs(imp) > 500000) return toast('Importo non valido', 'err');
   addMov({tipo:'rettifica', mid, importo: imp, causale: caus});
   closeSheet(); toast('Saldo aggiornato');
-};
-A['spesa-admin'] = () => {
-  const c = derived().S.cassa;
-  openSheet(`<h3>${ic('receipt')} Registra spesa ${infoBtn(`Acquisto per il fondo già fatto (caffè, palette, zucchero, detersivi…).`)}</h3>
-    <label class="f"><span>Descrizione</span><input class="in" id="sa-desc" maxlength="80" placeholder="es. Palette e bicchierini" autofocus></label>
-    <label class="f"><span>Importo €</span><input class="in mono" id="sa-imp" inputmode="decimal" placeholder="12,50"></label>
-    <label class="f"><span>Pagata da</span>${segOpts('sa-met', [['contanti','💶 Contanti (' + eur(c.contanti || 0) + ')'],['revolut','📱 Revolut (' + eur(c.revolut || 0) + ')'],['tasca','🙋 Mia, in crediti']], 'contanti')}</label>
-    <button class="btn amber block big" data-act="conferma-spesa-admin">Registra</button>`);
-};
-A['conferma-spesa-admin'] = () => {
-  const descr = val('sa-desc'), imp = parseEuro(val('sa-imp')), fonte = radio('sa-met') || 'contanti';
-  if(!descr || !(imp > 0) || imp > MAXOP) return toast('Scrivi cosa è stato comprato e un importo valido', 'err');
-  addMov({tipo:'spesa', mid: st.mid, importo: imp, fonte, descr: descr.slice(0,80), stato: 'confermata', esitoDa: myName(), pt: ptSpesaE(imp)});
-  closeSheet(); toast('Spesa registrata');
 };
 A['salva-prezzo-caffe'] = () => {
   const pc = parseEuro(val('mg-caffe'));
