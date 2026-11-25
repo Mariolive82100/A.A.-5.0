@@ -504,7 +504,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.79.15';
+const VERSION = '1.80.0';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -514,7 +514,6 @@ const CHIUSURA_SOGLIA_MOV = 250, CHIUSURA_SOGLIA_GG = 30;   // il banner in Home
 const CHIUSURA_RECENTE_GG = 15, CHIUSURA_MIN_NUOVI = 5;   // sotto questi valori una nuova chiusura chiede una doppia conferma
 const CHIUSURA_MARGINE = 15 * 60000; // i movimenti degli ultimi 15 minuti restano nel periodo aperto
 const ARCHIVIO_CHUNK = 1500;
-const LAVORO_ICO = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true" style="color:#7dd3fc;display:inline-block;vertical-align:-4px"><path d="M12 1.5l1.3 5.2.6 3.6 7.6 5.7v2.4l-7.4-2.3-.4 3.3 2.2 1.8V23L12 22.2 8.2 23v-1.6l2.2-1.8-.4-3.3-7.5 2.3v-2.4l7.6-5.7.6-3.6z"/></svg>';
 const PID_CAFFE = 'caffe';        // articolo speciale: scorta di buste di caffe'
 
 /* ---------- utilita' ---------- */
@@ -915,6 +914,9 @@ const riepPremi = () => montepremi() > 0 ? [1, 2, 3].map(i => ['🥇', '🥈', '
 /* punti spesa (importo in centesimi → euro): proporzionali all'importo (rapporto punti/€ × importo, arrotondati all'intero, con tetto per singola spesa); il rimborso in denaro/crediti resta al 100% */
 const cfgD = (k, def) => { const v = st.gruppo && st.gruppo[k]; return typeof v === 'number' && isFinite(v) && v >= 0 ? v : def; };
 const ptSpesaEuro = () => Math.min(100, cfgD('ptSpesaEuro', 10)), ptSpesaMax = () => Math.min(1000, cfgN('ptSpesaMax', 500));
+const ptRicEuro = () => Math.min(100, cfgD('ptRicEuro', 1)), ptRicMax = () => Math.min(1000, cfgN('ptRicMax', 100));
+const RIC_PT_DAL = new Date(2026, 10, 25).getTime();   // le ricariche danno punti dal 25/11/2026: le precedenti non ne danno
+const ptRicE = imp => ptMaster() ? Math.min(ptRicMax(), Math.max(0, Math.round((Number(imp) || 0) / 100 * ptRicEuro()))) : 0;
 const ptSpesaE = imp => ptMaster() ? Math.min(ptSpesaMax(), Math.max(0, Math.round((Number(imp) || 0) / 100 * ptSpesaEuro()))) : 0;
 const nDec = x => String(x).replace('.', ',');
 const ptBfE = () => onP('ptBfOn') ? ptBenFatto() : 0;
@@ -1418,7 +1420,7 @@ function pBar(d){
     <div class="blob" style="width:180px;height:180px;background:#10b981;bottom:2%;left:20%"></div>
     <div class="grid">
       <button class="gbtn" id="btn-paga" data-act="paga-menu" ${noCaffe && noSnack ? 'disabled' : ''}><span class="em">💳</span>Paga${noCaffe && noSnack ? '<small>credito insufficiente</small>' : '<small>Caffè, snack e bibite</small>'}</button>
-      <button class="gbtn" id="btn-lavoro" disabled aria-disabled="true"><span class="em"><svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" aria-hidden="true" style="color:#7dd3fc;display:block"><path d="M12 1.5l1.3 5.2.6 3.6 7.6 5.7v2.4l-7.4-2.3-.4 3.3 2.2 1.8V23L12 22.2 8.2 23v-1.6l2.2-1.8-.4-3.3-7.5 2.3v-2.4l7.6-5.7.6-3.6z"/></svg></span>Lavoro compiuto<small>Coming soon</small></button>
+      <button class="gbtn" id="btn-soon" disabled aria-disabled="true"><span class="em">✨</span>Coming soon<small>Novità in arrivo</small></button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto" ${bfRestanti() > 0 ? '' : 'disabled'}><span class="em">👏</span>Ben fatto<small id="bf-stato">${!onP('ptBfOn') && bfRestanti() > 0 ? 'Riconosci un collega' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone disponibile' : ' gettoni disponibili') : 'Disponibile ' + bfCountdown()}</small></button>
       <button class="gbtn" id="btn-crediti-home" data-act="crediti-menu"><span class="em">🎁</span>Regala o scambia crediti<small>Tra colleghi</small></button>
     </div>
@@ -1872,8 +1874,7 @@ function pRegolamento(){
     'Alla convalida ricevi anche i <b>punti spesa</b>, proporzionali all\'importo, per qualunque motivo di spesa.'])}
   ${sez('🏆 Sfide', [
     'Nella scheda <b>🏆 Sfide</b> (la seconda in basso, dopo Home) trovi tre blocchi: <b>🔥 In corso</b> (📅 <i>Settimana</i>), <b>🏁 Concluse</b> (🏁 <i>Settimana</i>, il periodo appena trascorso) e <b>⚔️ Lancia una sfida</b> (presto). Toccane una per vedere l\'elenco con i punti in palio e <b>la tua posizione</b>; tocca una sfida per aprire la <b>classifica completa</b>. L\'icona <b>ⓘ</b> accanto al titolo spiega la regola e lo spareggio.',
-    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. Premi: per ogni sfida il Creatore imposta un montepremi di punti, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%); fa eccezione <b>🧾 Superstar della Spesa</b>, dove vince chi guadagna più punti con le spese convalidate e ciascuno dei primi tre riceve, come premio, esattamente i punti che ha guadagnato con le proprie spese nel periodo (nessuna percentuale); si assegna a sfida conclusa (nel weekend) e conta per la classifica della settimana. <b>Tutte le sfide sono settimanali</b> (chiusura il venerdì a mezzanotte; fa eccezione solo l\'ultima edizione mensile di novembre 2026, che chiude venerdì 27 novembre): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati) · 🔋 <i>Ricarica Top</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (<b>sospesa temporaneamente</b>; più punti pulizia, assegnati solo dal Creatore o dagli admin con «Sfide e Regole») · 👏 <i>Collega della Settimana</i> (più «Ben fatto» ricevuti) · 💪 <i>Indefesso</i> (più «Lavoro compiuto» registrati). Nelle schede vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
-    '<b>🛩️ Lavoro compiuto e 💪 Indefesso:</b> in Home il pulsante «Lavoro compiuto» è temporaneamente disabilitato (<i>coming soon</i>); quando sarà attivo registrerà un lavoro o intervento svolto per la saletta (nota facoltativa, massimo 5 al giorno). Ogni lavoro vale +1 nella sfida settimanale <b>Indefesso</b>, che premia con un montepremi di punti (impostato dal Creatore e diviso tra i primi tre) chi ne ha di più nella settimana di sfida (ex aequo: tutti). Il Creatore o un Supervisor con «Sfide e Regole» verifica le segnalazioni dalla classifica della sfida e può <b>stornare</b> quelle che non risultano, finché il premio del periodo non è stato assegnato; poi assegna il premio come per le altre sfide. Le segnalazioni compaiono nel registro e restano nella classifica anche dopo la Chiusura Periodo.',
+    'Le sfide sono <b>fisse</b> e si calcolano da sole dai movimenti dell\'app: nessuno le crea, le modifica o le elimina. Premi: per ogni sfida il Creatore imposta un montepremi di punti, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%); fa eccezione <b>🧾 Superstar della Spesa</b>, dove vince chi guadagna più punti con le spese convalidate e ciascuno dei primi tre riceve, come premio, esattamente i punti che ha guadagnato con le proprie spese nel periodo (nessuna percentuale); si assegna a sfida conclusa (nel weekend) e conta per la classifica della settimana. <b>Tutte le sfide sono settimanali</b> (chiusura il venerdì a mezzanotte; fa eccezione solo l\'ultima edizione mensile di novembre 2026, che chiude venerdì 27 novembre): 🤝 <i>Il benefattore</i> (più giri di caffè offerti, cioè 2 o più caffè registrati insieme; spareggio sul totale dei caffè offerti) · ☕ <i>Re della Caffeina</i> (più caffè registrati) · 🔋 <i>Ricarica Top</i> (più ricariche convalidate) · 🧾 <i>Superstar della Spesa</i> (più spese convalidate) · 🧹 <i>Mastro Lindo</i> (<b>sospesa temporaneamente</b>; più punti pulizia, assegnati solo dal Creatore o dagli admin con «Sfide e Regole») · 👏 <i>Collega della Settimana</i> (più «Ben fatto» ricevuti). Nelle schede vedi il conto alla rovescia alla chiusura del periodo e, su ogni sfida, la tua posizione accanto ai punti in palio. In caso di parità vincono tutti i primi (ex aequo).',
     '<b>Punti e condivisione:</b> nella classifica di ogni sfida, accanto a chi è in testa (o ha vinto) vedi i punti: <i>in palio</i> finché il periodo è aperto, <i>da assegnare</i> a periodo concluso finché chi gestisce le sfide non assegna il premio, <i>assegnati</i> dopo l\'assegnazione. Con il pulsante <b>📤 Condividi</b> in alto a destra puoi condividere la classifica come immagine, con i nomi abbreviati (nome e iniziale del cognome, es. «Mario R.») per leggerla meglio (si apre il menu di condivisione del telefono; se non è disponibile l\'immagine viene scaricata). Nella sfida delle ricariche l\'immagine mostra, come la schermata, solo l\'ordine.',
     '<b>Privacy:</b> nella sfida delle ricariche si vede solo l\'ordine dei colleghi (1°, 2°, 3°…) e la tua posizione, mai gli importi; nella sfida delle spese si vede solo il numero di acquisti.',
     '<b>Premi:</b> a periodo concluso il Creatore o un Supervisor con «Sfide e Regole» assegna i punti in palio al vincitore con un tocco, dalla classifica della sfida. Il premio compare nel registro e conta nella <b>classifica</b>, nella settimana in cui viene assegnato; un premio non si può assegnare due volte.',
@@ -1888,7 +1889,7 @@ function pRegolamento(){
     'Nessuno convalida un <b>proprio</b> incarico in sospeso: serve un altro Supervisor con il permesso «Sfide e Regole» o il Creatore (unica eccezione: il Creatore, se è l\'unico a poter convalidare).'])}
     ${sez('⭐ Punti Collega Modello', [
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
-    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
+    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🔋 ricarica convalidata: ${nDec(ptRicEuro())} ${ptRicEuro() === 1 ? 'punto' : 'punti'} per ogni € ricaricato, massimo ${ptRicMax()} per ricarica (dal 25/11/2026) · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
     '<b>I punti non si riscattano più:</b> non si convertono in crediti e concorrono solo alla classifica (settimanale e generale).',
     `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il tetto massimo del montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e servono almeno ${premiMinPt()} ${premiMinPt() === 1 ? 'punto' : 'punti'}. ${premiPerc() > 0 ? `Il montepremi non supera il ${premiPerc()}% degli incassi della settimana (vendite di caffè, snack e caffè pagati subito): nelle settimane di poco incasso i premi scendono da soli.` : ''}`,
     `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
@@ -1959,8 +1960,6 @@ const SF_FISSE = {
     descr: 'Vince chi ottiene più punti pulizia nel mese (la sfida chiude l\'ultimo venerdì). I punti li assegna solo il Creatore o un admin con «Sfide e Regole» (🎯 Punti extra); contano anche i vecchi turni e compiti convalidati.', spareggio: 'A parità di punti vince chi ha più turni di pulizia. ' + SF_PAREGGIO},
   sfauto_bf: {id: 'sfauto_bf', nome: '👏 Collega della Settimana', get per(){ return Date.now() >= SF_TUTTE_SETT ? 'sett' : 'mese'; }, migra: true, pt: 30, tipo: 'benfatto',
     descr: 'Vince chi riceve più «Ben fatto!» nella settimana (la sfida chiude il venerdì a mezzanotte).', spareggio: SF_PAREGGIO},
-  sfauto_lavoro: {id: 'sfauto_lavoro', nome: '💪 Indefesso', get per(){ return Date.now() >= SF_TUTTE_SETT ? 'sett' : 'mese'; }, migra: true, pt: 40, tipo: 'lavoro',
-    descr: 'Vince chi nella settimana (la sfida chiude il venerdì a mezzanotte) registra più «Lavoro compiuto» con il tasto in Home. Le segnalazioni le verifica l\'admin, che può stornare quelle che non risultano.', spareggio: SF_PAREGGIO}
 };
 /* nuove regole delle sfide (dal 16/11/2026): le settimanali chiudono il venerdì a mezzanotte, le mensili l'ultimo venerdì del mese; premi a 1°, 2° e 3° (100% · 50% · 25%).
    Sabato e domenica aprono già la sfida della settimana dopo; il mese di sfida va dal sabato dopo l'ultimo venerdì del mese prima all'ultimo venerdì del mese. */
@@ -2070,7 +2069,6 @@ function sfBuckets(list){
     else if((src.tipo === 'compito' && src.stato === 'confermata') || (src.tipo === 'obiettivo' && src.fase === 'fatto')){ const r = row(M, sfMs(t), src.mid, 9); r[4] += sg; r[5] += sg * (src.punti || 0); }
     if(src.tipo === 'bonus_podio' && src.extra && src.sfida === 'sfauto_pulizie'){ const r = row(M, src.perExtra && src.perExtra[0] === 'm' ? src.perExtra : sfMs(t), src.mid, 8); r[7] = (r[7] || 0) + sg * (src.punti || 0); }   // Mastro Lindo: punti pulizia dati dall'admin
     if(src.tipo === 'ben_fatto'){ row(M, sfMs(t), src.aMid, 9)[6] += sg; row(W, wk, src.aMid, 9)[7] += sg; }
-    if(src.tipo === 'lavoro'){ row(M, sfMs(t), src.mid, 9)[3] += sg; row(W, wk, src.mid, 9)[3] += sg; }   // Indefesso: lavori compiuti (si somma col segno: lo storno toglie 1 nel mese dell'originale)
     if(src.tipo === 'ricarica' && src.stato === 'confermata'){ row(M, sfMs(tc), src.mid, 9)[0] += sg * (src.importo || 0); row(W, sfWk(tc), src.mid, 9)[4] += sg * (src.importo || 0); }
     if(src.tipo === 'spesa' && src.stato === 'confermata'){ const ptS = sg * (src.pt ?? PUNTI_SPESA) * fx(src), r = row(M, sfMs(tc), src.mid, 9); r[1] += sg; r[2] += sg * (src.importo || 0); r[8] += ptS; const q = row(W, sfWk(tc), src.mid, 9); q[5] += sg; q[6] += sg * (src.importo || 0); q[8] += ptS; }
   });
@@ -2127,7 +2125,7 @@ function sfClassifica(tipo, p){
   });
   righe.forEach(r => {
     r.txt = tipo === 'giro' ? sfPlur(r.v, 'giro', 'giri') : tipo === 'caffe' ? sfPlur(r.v, 'caffè', 'caffè') : tipo === 'pulizie' ? r.v + ' pt'
-      : tipo === 'benfatto' ? sfPlur(r.v, 'Ben fatto', 'Ben fatto') : tipo === 'lavoro' ? sfPlur(r.v, 'lavoro', 'lavori') : tipo === 'spese' ? (p.top3 ? r.v + ' pt' : sfPlur(r.v, 'spesa', 'spese')) : tipo === 'punti' ? r.v + ' pt' : '';
+      : tipo === 'benfatto' ? sfPlur(r.v, 'Ben fatto', 'Ben fatto') : tipo === 'spese' ? (p.top3 ? r.v + ' pt' : sfPlur(r.v, 'spesa', 'spese')) : tipo === 'punti' ? r.v + ' pt' : '';
     r.sub = tipo === 'giro' ? r.v2 + ' caffè offerti' : tipo === 'pulizie' && r.v2 > 0 ? sfPlur(r.v2, 'turno', 'turni') : '';
   });
   righe.sort((a, b) => b.v - a.v || b.v2 - a.v2 || (nomeBreve(a.id) || '').localeCompare(nomeBreve(b.id) || ''));
@@ -2218,16 +2216,12 @@ function sfDettaglio(x){
     : !R.length ? '<p class="hint" id="sf-nessun-vincitore" style="margin:10px 0 0">Nessun vincitore in questo periodo.</p>'
     : ass ? sfBoxE(x, ass) : '<p class="hint" id="sf-premio-attesa" style="margin:10px 0 0">⏳ Premio in attesa di assegnazione da parte di chi gestisce le sfide.</p>';
   const dd = derived(), awP = sfAssegnati()[x.id + '|' + p.key];
-  const lv = x.tipo === 'lavoro' && can('compiti') && !(awP && awP.length) ? dd.movs.filter(m => m.tipo === 'lavoro' && !m._pending && m.t >= p.da && m.t <= p.a && !dd.stornati.has(m.id)).sort((a, b) => b.t - a.t).slice(0, 30) : null;
   const exPuo = !conc && st.isAdmin && can('compiti') && pOn, exStorna = sonoCreatore() || can('cassa');
   const exL = dd.movs.filter(m => m.tipo === 'bonus_podio' && m.extra && m.sfida === x.id && m.perExtra === p.key && !dd.stornati.has(m.id)).sort((a, b) => b.t - a.t).slice(0, 30);
   const extra = exPuo || exL.length ? `<div class="card" id="sf-extra"><h3>🎯 Punti extra${exL.length ? ` <span class="pill violet">${exL.length}</span>` : ''}</h3>
     <p class="hint" style="margin:0 0 8px">${x.tipo === 'pulizie' ? 'In questa sfida i punti li assegna solo chi gestisce le sfide: contano nella graduatoria della sfida e nella classifica.' : 'Punti assegnati a mano da chi gestisce le sfide, in aggiunta al premio finale. Contano nella classifica.'}</p>
     ${exL.length ? `<div class="list">${exL.map(m => `<div class="li"><div class="av">🎯</div><div class="grow"><div class="t" style="font-size:13.5px;white-space:normal"><b>${sfNome(m.mid)}</b> · +${m.punti || 0} pt${m.causale ? ' · «' + esc(m.causale) + '»' : ''}</div><div class="d">${quando(m.t)}</div></div>${exPuo && exStorna && !m._pending ? `<button class="btn sm ghost" id="btn-sx-storno-${m.id}" data-act="storno" data-id="${m.id}">↩️ Storna</button>` : ''}</div>`).join('')}</div>` : '<div class="empty">Nessun punto extra in questo periodo.</div>'}
     ${exPuo ? `<button class="btn amber block" id="btn-sx-apri" data-act="sf-extra" data-id="${x.id}" style="margin-top:10px">➕ Dai punti extra</button>` : ''}</div>` : '';
-  const verifica = lv ? `<div class="card" id="sf-verifica"><h3>🧾 Segnalazioni da verificare${lv.length ? ` <span class="pill violet">${lv.length}</span>` : ''}</h3>
-    <p class="hint" style="margin:0 0 8px">Se un lavoro non risulta, stornalo prima di assegnare il premio: la classifica si aggiorna subito.</p>
-    ${lv.length ? `<div class="list">${lv.map(m => `<div class="li"><div class="av">🛩️</div><div class="grow"><div class="t" style="font-size:13.5px;white-space:normal"><b>${sfNome(m.mid)}</b>${m.nota ? ' · «' + esc(m.nota) + '»' : ''}</div><div class="d">${quando(m.t)}</div></div><button class="btn sm ghost" id="btn-lv-storno-${m.id}" data-act="storno" data-id="${m.id}">↩️ Storna</button></div>`).join('')}</div>` : '<div class="empty">Nessuna segnalazione in questo periodo.</div>'}</div>` : '';
   return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px"><button class="btn link" style="padding:0;margin:0" id="sf-back" data-act="sf-back">← ${SF_PER[sfSez][0]}</button>
     <button class="btn sm ghost" id="btn-sf-img" data-act="sf-img" title="Condividi la classifica come immagine" aria-label="Condividi la classifica come immagine">📤 Condividi</button></div>
   <h2>${esc(x.nome)} ${sfInfo(x)}</h2><p class="sub" style="margin-bottom:8px">${p.top3 ? sfTier(x, p) : '+' + x.pt + ' pt in palio'} · ${conc ? 'classifica finale' : '⏳ chiude tra ' + sfRimanente(p.fine)} · ${esc(p.label)}</p>
@@ -2240,7 +2234,6 @@ function sfDettaglio(x){
     ${parz ? '<p class="hint" id="sf-parziale" style="margin:8px 0 0;font-size:12px">⚠️ Dati parziali: il periodo comprende una chiusura fatta prima che le sfide venissero salvate per settimana e mese.</p>' : ''}
     ${esito}${conc ? sfBox(x, p.key) : ''}</div>
   ${extra}
-  ${verifica}
   ${assegnati.length ? `<div class="card" id="sf-dett-premi"><h3>🏅 Premi già assegnati</h3>${assegnati.map(e => `<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px">${esc(e.periodoTxt || e.periodo || '')}${': ' + e.det.map(z => sfMed(z.pos) + ' <b>' + sfNome(z.id) + '</b> +' + z.pt + ' pt').join(' · ')}</div>`).join('')}</div>` : ''}`;
 }
 function pSfide(d){
@@ -2410,17 +2403,17 @@ function graficoBarre(S, o){
 A['sc-pick'] = ds => { const i = Number(ds.i); st.scSel = (st.scSel && st.scSel.c === ds.c && st.scSel.i === i) ? null : {c: ds.c, i}; render(); };
 
 /* aggregazione di una lista di movimenti (periodo corrente, oppure movimenti da archiviare alla chiusura) */
-function nuovoAgg(){ return {ptC:{}, ptP:{}, ptS:{}, ptB:{}, caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
+function nuovoAgg(){ return {ptR:{}, giri:{}, ptC:{}, ptP:{}, ptS:{}, ptB:{}, caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
 function aggMov(G, m, sg){
   sg = sg || 1; const t = G.tot;
   switch(m.tipo){
-    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ if(m.tipo === 'caffe') add(G.ptC, m.mid, sg*(m.pt ?? m.qta)*fx(m)); add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
+    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ if(m.tipo === 'caffe' && m.qta > 1) add(G.giri, m.mid, sg); if(m.tipo === 'caffe') add(G.ptC, m.mid, sg*(m.pt ?? m.qta)*fx(m)); add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
     case 'snack': if(m.stato !== 'annullata'){ add(G.snack, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); add(G.ptC, m.mid, sg*(m.pt ?? 0)*fx(m)); } break;
     case 'spesa': if(m.stato === 'confermata'){ add(G.ptS, m.mid, sg*(m.pt ?? PUNTI_SPESA)*fx(m)); add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*(Number.isInteger(m.quotaDenaro) && m.quotaDenaro > 0 ? m.quotaDenaro : m.importo); } break;
     case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*ptPulM(m)); add(G.ptP, x, sg*ptPulM(m)); }); break;
     case 'compito': if(m.stato === 'confermata'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
-    case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
+    case 'ricarica': if(m.stato === 'confermata'){ t.ric += sg*m.importo; if(!m.fondo) add(G.ptR, m.mid, sg*(m.pt ?? (m.t >= RIC_PT_DAL ? ptRicE(m.importo) : 0))*fx(m)); } break;   // punti diretti per le ricariche (dal 25/11/2026)
     case 'quota': if((!m.stato || m.stato === 'confermata') && (m.metodo === 'contanti' || m.metodo === 'revolut')) t.quote += sg*m.importo; break;
     case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
     case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)*fx(m)); break;
@@ -2462,7 +2455,7 @@ function classSett(d, prev){
   const dom = new Date(ini); dom.setDate(dom.getDate() + 6);
   const dm = x => `${pad(x.getDate())}/${pad(x.getMonth() + 1)}`, label = `Settimana dal ${dm(ini)} al ${dm(dom)}`;
   const G = aggConChiusi(d, {da: ini.getTime(), a: prev ? lun.getTime() - 1 : Infinity, label}, prev ? 'pw' : 'hd').G;
-  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}));
+  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id) + nz(G.ptR, m.id)}));
   righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
   const inc = Object.values(G.euro || {}).reduce((a, v) => a + (v || 0), 0);   // incassi della settimana: vendite di caffè, snack e caffè pagati subito
   return {key: settKey(ini), label, righe, inc};
@@ -2501,7 +2494,7 @@ const riepLabel = p => (p.da ? dBreve(p.da) : 'inizio') + ' → ' + dBreve(p.fin
 
 /* ---------- Continuità tra periodi chiusi e periodo aperto (tutto in memoria, nessuna lettura in più) ----------
    Regola: nei totali e nei grafici entrano solo i periodi chiusi compresi INTERAMENTE nell'intervallo scelto. */
-const AGG_MAPS = ['ptC', 'ptP', 'ptS', 'ptB', 'caffe', 'snack', 'euro', 'spese', 'speseN', 'turni', 'pPul', 'regDati', 'bfRic'];
+const AGG_MAPS = ['ptR', 'giri', 'ptC', 'ptP', 'ptS', 'ptB', 'caffe', 'snack', 'euro', 'spese', 'speseN', 'turni', 'pPul', 'regDati', 'bfRic'];
 /* scomposizione settimanale di gruppo salvata nel riepilogo: [lunedì ms, consumi, turni, spese, ricariche] */
 function serieSett(list, lo){
   const w = {}, fs = [fCons, fTurni, fSpese, fRic];
@@ -2558,8 +2551,8 @@ const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi pri
 
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
-const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Sfide'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
-const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
+const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Extra'], ['s', '🧾', 'Spese'], ['r', '🔋', 'Ricariche'], ['b', '👏', 'Ben fatto']];
+const CL_KEYS = ['tot', 'c', 'p', 's', 'r', 'b'];
 function aggiornaPillola(d, av){
   const hd = $('hdr'); if(!hd) return;
   /* premi in crediti del podio settimanale, sempre sott'occhio (nascosti se nessun premio e' impostato o se i punti sono disattivati) */
@@ -2572,7 +2565,7 @@ function aggiornaPillola(d, av){
 }
 function clRighe(d){
   const r = clRange(), M = aggConChiusi(d, r, 'cl'), G = M.G;
-  const righe = membriAttivi().map(m => { const c = nz(G.ptC, m.id), p = nz(G.ptP, m.id), s = nz(G.ptS, m.id), b = nz(G.ptB, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const righe = membriAttivi().map(m => { const c = nz(G.ptC, m.id), p = nz(G.ptP, m.id), s = nz(G.ptS, m.id), r = nz(G.ptR, m.id), b = nz(G.ptB, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, r, b, tot: c + p + s + r + b}; });
   const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
   return {r, righe, pos, M};
 }
@@ -2708,12 +2701,13 @@ function cardOnesta(d){
 /* totali aggregati della sala per il tipo di punti scelto */
 function clSala(righe, key, G){
   const tot = k => righe.reduce((a, x) => a + x[k], 0), nn = o => Math.max(0, sumo(o));
-  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti sfide', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
+  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti extra', s: 'Punti spesa', r: 'Punti ricariche', b: 'Punti «Ben fatto»'}[key];
   const det = {
     tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
     p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno svolto' : 'turni svolti'}</p>`,
     s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
+    r: `<p class="hint" style="margin:6px 0 0">🔋 ${ptRicEuro() === 1 ? '1 punto' : nDec(ptRicEuro()) + ' punti'} per ogni 1,00 € ricaricato (massimo ${ptRicMax()} per ricarica), dal 25/11/2026</p>`,
     b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
   return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
 }
@@ -2751,7 +2745,7 @@ function clClassifica(d, R, T, c){
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti sfide']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
+  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti extra']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['r', '🔋 Punti ricariche'], ['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
   const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
   const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
@@ -2762,7 +2756,7 @@ function clClassifica(d, R, T, c){
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Sfide: i punti delle sfide (per esempio Mastro Lindo), assegnati dal Creatore o dagli admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
+    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Extra: i punti dati a mano dal Creatore o dagli admin (per esempio Mastro Lindo) e i compiti. Spesa e ricariche: punti per ogni euro, con un tetto per singola operazione. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
   return {podio: podioCard};
@@ -2817,6 +2811,18 @@ function pStatConsumi(d){
 }
 A['sc-amb'] = ds => { st.scA = ds.v === 'io' ? 'io' : 'saletta'; render(); };
 A['sc-per'] = ds => { if(!SC_PER.some(x => x[0] === ds.v)) return; st.scP = ds.v; render(); };
+const CL_CATC = [['caffe', '☕ Caffè', 'caffè', 'caffe'], ['giri', '🔄 Giri', 'giri', 'giri'], ['bf', '👏 Ben fatto', '«Ben fatto»', 'bfRic']];
+A['cl-catc'] = ds => { st.clCatc = CL_CATC.some(x => x[0] === ds.v) ? ds.v : 'caffe'; render(); };
+/* classifica per categoria (conteggi nel periodo scelto): le vecchie sfide ora sono semplici classifiche, senza premi */
+function clCategorie(c){
+  const cur = CL_CATC.find(x => x[0] === st.clCatc) || CL_CATC[0], G = c.G || {};
+  const ord = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, v: Math.max(0, nz(G[cur[3]], m.id))})).filter(x => x.v > 0).sort((a, b) => b.v - a.v || a.nome.localeCompare(b.nome));
+  let pos = 0, prev = null; ord.forEach((x, i) => { if(x.v !== prev){ pos = i + 1; prev = x.v; } x.pos = pos; });
+  return `<div class="card" id="cl-categorie"><h3><span>🎖️ Classifiche per categoria</span></h3>
+    <div class="chips" id="cl-catc">${CL_CATC.map(([v, l]) => `<button id="cl-catc-${v}" class="${cur[0] === v ? 'on' : ''}" data-act="cl-catc" data-v="${v}">${l}</button>`).join('')}</div>
+    ${ord.length ? `<div class="list" style="margin-top:6px">${ord.map(x => `<div class="li"><div class="av">${['🥇', '🥈', '🥉'][x.pos - 1] || x.pos}</div><div class="grow"><div class="t"><b>${esc(x.nome)}</b>${x.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div><b class="mono">${x.v} ${cur[2]}</b></div>`).join('')}</div>` : `<div class="empty">Nessun dato in questa categoria nel periodo.</div>`}
+    ${infoBtn('Classifiche nel periodo scelto in alto. Sono solo statistiche: non assegnano premi né punti. I punti di spesa e ricariche sono nel podio qui sopra.', 'Come funziona')}</div>`;
+}
 function pClassificaPunti(d){
   const avvPunti = avvisoPuntiOff();
   const amb = st.clAmb === 'io' ? 'io' : 'saletta', per = clPerKey();
@@ -2831,7 +2837,7 @@ function pClassificaPunti(d){
   if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
   ${clIo(R.righe, c)}`;
   const Z = clClassifica(d, R, T, c);
-  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div></div>`;
+  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}${clCategorie(c)}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
 A['cl-per'] = ds => { st.clP = ds.v === 'scorsa' ? 'scorsa' : 'settimana'; st.scSel = null; render(); };
@@ -3190,6 +3196,8 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
     <div class="grid2">
       <label class="f"><span>🧾 Punti per ogni € di rimborso</span><input class="in mono" id="rp-speuro" inputmode="decimal" value="${nDec(ptSpesaEuro())}"></label>
       <label class="f"><span>Tetto punti per spesa</span><input class="in mono" id="rp-spmax" inputmode="numeric" value="${ptSpesaMax()}"></label>
+      <label class="f"><span>🔋 Punti per ogni € ricaricato</span><input class="in mono" id="rp-riceuro" inputmode="decimal" value="${nDec(ptRicEuro())}"></label>
+      <label class="f"><span>Tetto punti per ricarica</span><input class="in mono" id="rp-ricmax" inputmode="numeric" value="${ptRicMax()}"></label>
     </div>
     <p class="hint" style="margin:-4px 0 8px;font-size:12px">Snack e spese: punti = importo × tariffa, arrotondati all'intero (le spese anche limitate dal tetto). Il rimborso resta al 100%.</p>
     <div class="grid2">
@@ -3579,27 +3587,6 @@ A['paga-menu'] = () => {
 };
 A['paga-caffe'] = () => A['caffe-menu']();
 A['paga-snack'] = () => A['snack']();
-
-/* --- Lavoro compiuto: +1 alla sfida mensile Indefesso; nessun importo, la verifica e' dell'admin (che puo' stornare) --- */
-const LAVORO_MAX_GG = 5;
-const lavoriMiei = (d, da) => d.movs.filter(m => m.tipo === 'lavoro' && m.mid === st.mid && m.t >= da && !d.stornati.has(m.id));
-A['lavoro-menu'] = () => {
-  return;   // «Lavoro compiuto» temporaneamente disabilitato (coming soon)
-  const d = derived(), o = new Date(); o.setHours(0, 0, 0, 0);
-  const n = lavoriMiei(d, o.getTime()).length, mese = lavoriMiei(d, sfPeriodo('sett', new Date()).da).length;
-  openSheet(`<h3>${LAVORO_ICO} Lavoro compiuto</h3><p class="sub">Hai portato a termine un lavoro o un intervento per la saletta? Registralo: vale <b>+1</b> nella sfida settimanale <b>💪 Indefesso</b>. Un admin può verificarlo e stornarlo se non risulta.</p>
-    <label class="f"><span>Nota o riferimento (facoltativo)</span><input class="in" id="lv-nota" maxlength="80" placeholder="es. sistemato lo scaffale"></label>
-    <p class="hint" style="margin:0 0 10px">Questa settimana: <b>${mese}</b> · oggi ${n}/${LAVORO_MAX_GG}</p>
-    <button class="btn amber block big" id="btn-lavoro-ok" data-act="lavoro-ok" ${n >= LAVORO_MAX_GG ? 'disabled' : ''}>${n >= LAVORO_MAX_GG ? 'Limite giornaliero raggiunto' : 'Registra lavoro compiuto'}</button>`);
-};
-A['lavoro-ok'] = () => {
-  if(Date.now() - lastTap < 900) return; lastTap = Date.now();
-  const o = new Date(); o.setHours(0, 0, 0, 0);
-  if(lavoriMiei(derived(), o.getTime()).length >= LAVORO_MAX_GG){ closeSheet(); return toast('Hai già registrato ' + LAVORO_MAX_GG + ' lavori oggi', 'err'); }
-  const nota = (val('lv-nota') || '').trim().slice(0, 80);
-  addMov({tipo: 'lavoro', mid: st.mid, ...(nota ? {nota} : {})});
-  closeSheet(); toast('Lavoro registrato: +1 in Indefesso');
-};
 
 /* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un Supervisor --- */
 A['riscatta-menu'] = () => {
@@ -4098,7 +4085,7 @@ A['esito'] = ds => {
   if(mv && mv.tipo === 'compito' && !cpPuoConv(mv)) return toast('Non puoi convalidare questo compito', 'err');
   if(mv && mv.tipo === 'quota' && ds.v === 'confermata' && statoQuota(derived(), mv.mid, String(mv.anno)) === 'pagata') return toast('Quota già registrata per questo collega', 'err');
   if(mv && mv.tipo === 'spesa' && mv.fonte === 'misto' && ds.v === 'confermata') return A['paga-spesa'](ds);   // la spesa mista si convalida scegliendo il canale della quota in denaro
-  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesaE(mv.importo)} : {})})
+  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && ds.v === 'confermata' && (mv.tipo === 'spesa' || (mv.tipo === 'ricarica' && !mv.fondo)) ? {pt: mv.tipo === 'spesa' ? ptSpesaE(mv.importo) : ptRicE(mv.importo)} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
@@ -4506,16 +4493,16 @@ A['bf-invia'] = () => {
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), d = id => Math.round(Number(val(id).replace(',', '.')) * 100) / 100;
   const v = {ptCaffe: n('rp-caffe'), ptBenFatto: n('rp-bf'), ptSpesaMax: n('rp-spmax'), bfN: n('rp-bfn'),
-    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), resaKg: n('rp-resa')};
+    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), ptRicEuro: d('rp-riceuro'), ptRicMax: n('rp-ricmax'), resaKg: n('rp-resa')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi, inD = x => isFinite(x) && x >= 0 && x <= 100;
-  const ok = inR(v.resaKg, 1, 500) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inR(v.bfN, 1, 20);
+  const ok = inR(v.resaKg, 1, 500) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inR(v.ptRicMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inD(v.ptRicEuro) && inR(v.bfN, 1, 20);
   if(!ok) return toast('Valori non validi', 'err');
   const sw = {ptOn: !!($('rp-on') && $('rp-on').checked)};
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
   G().set({...v, ...sw, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
 /* valori consigliati: una sola scrittura, solo su richiesta del Supervisor; nulla viene sovrascritto in automatico */
-const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptBenFatto: 20};
+const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptRicEuro: 1, ptRicMax: 100, ptBenFatto: 20};
 A['salva-premi-podio'] = () => {
   if(!sonoCreatore()) return toast('Solo il Creatore può impostare i premi', 'err');
   const b = Math.round(Number(val('rp-montepremi').replace(',', '.')) * 100);
@@ -4537,7 +4524,7 @@ A['salva-sf-punti'] = () => {
 A['rp-consigliati'] = () => {
   if(!can('compiti')) return;
   if(!confirm('Applicare i valori consigliati?\n\nCaffè 10 punti · snack 10 punti per 1,00 € · rimborsi 10 punti per € (tetto 500) · «Ben fatto» 20.\nVale per gli eventi futuri: quelli passati non cambiano.')) return;
-  const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptBenFatto: 'rp-bf'}, prima = {};
+  const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptRicEuro: 'rp-riceuro', ptRicMax: 'rp-ricmax', ptBenFatto: 'rp-bf'}, prima = {};
   Object.keys(ids).forEach(k => { const e = $(ids[k]); if(e){ prima[ids[k]] = e.value; e.value = nDec(RP_CONSIGLIATI[k]); } });
   G().set(RP_CONSIGLIATI, {merge: true}).then(() => toast('Valori consigliati applicati')).catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
 };
@@ -4742,7 +4729,7 @@ A['chiudi-periodo'] = async () => {
     const scF = scalaDa() ? {sc: 1} : {};
     const G = aggrega(incl), sfB = sfBuckets(incl), stN = new Set(incl.filter(m => m.tipo === 'storno').map(m => m.rif)), AW = {};
     incl.filter(m => m.tipo === 'bonus_podio' && m.sfida && m.periodo && !stN.has(m.id)).forEach(m => { const k = m.sfida + '|' + m.periodo; (AW[k] = AW[k] || []).push(m.pos > 1 ? m.mid + ':' + m.pos : m.mid); });
-    const riep = sfRiepTrim({...scF, id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, ptC: G.ptC, ptP: G.ptP, ptS: G.ptS, ptB: G.ptB, ser: serieSett(incl, prev ? prev.fino.toMillis() : 0), tot: G.tot, sf: sfB, aw: AW});
+    const riep = sfRiepTrim({...scF, id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, ptC: G.ptC, ptP: G.ptP, ptS: G.ptS, ptB: G.ptB, ptR: G.ptR, giri: G.giri, ser: serieSett(incl, prev ? prev.fino.toMillis() : 0), tot: G.tot, sf: sfB, aw: AW});
     const storico = st.chiusure.map(riepDaChiusura).concat([riep]).sort((x, y) => x.fino - y.fino).slice(-STORICO_MAX).map(sfRiepTrim);
     const bf = {}, stor = new Set(incl.filter(m => m.tipo === 'storno').map(m => m.rif)), lim = Date.now() - 40 * 864e5;
     if(prev && prev.bf) Object.keys(prev.bf).forEach(k => { bf[k] = (prev.bf[k] || []).slice(); });
