@@ -504,7 +504,7 @@ header.hasonesta .prizepill{padding-right:78px}
 /* =====================================================================
    Armieri 5.0 — app condivisa con Firebase (Firestore + accesso anonimo)
    ===================================================================== */
-const VERSION = '1.81.0';
+const VERSION = '1.81.1';
 const MAXOP = 50000, CAFFE_PER_KG = 130, MAX_REGALO = 20;   // MAX_REGALO: crediti (= euro) per collega e per regalo; deve coincidere con firestore.rules (2000 centesimi)
 const PUNTI_DEF = 1, PUNTI_CREDITO_DEF = 3, SUSS_GIORNI = 7;
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
@@ -915,7 +915,7 @@ const riepPremi = () => montepremi() > 0 ? [1, 2, 3].map(i => ['🥇', '🥈', '
 const cfgD = (k, def) => { const v = st.gruppo && st.gruppo[k]; return typeof v === 'number' && isFinite(v) && v >= 0 ? v : def; };
 const ptSpesaEuro = () => Math.min(100, cfgD('ptSpesaEuro', 10)), ptSpesaMax = () => Math.min(1000, cfgN('ptSpesaMax', 500));
 const ptRicEuro = () => Math.min(100, cfgD('ptRicEuro', 1)), ptRicMax = () => Math.min(1000, cfgN('ptRicMax', 100));
-const RIC_PT_DAL = new Date(2026, 10, 25).getTime();   // le ricariche danno punti dal 25/11/2026: le precedenti non ne danno
+const RIC_PT_DAL = new Date(2026, 10, 23).getTime();   // le ricariche danno punti dal 23/11/2026 (lunedì della settimana di lancio): le precedenti non ne danno
 const ptRicE = imp => ptMaster() ? Math.min(ptRicMax(), Math.max(0, Math.round((Number(imp) || 0) / 100 * ptRicEuro()))) : 0;
 const ptSpesaE = imp => ptMaster() ? Math.min(ptSpesaMax(), Math.max(0, Math.round((Number(imp) || 0) / 100 * ptSpesaEuro()))) : 0;
 const nDec = x => String(x).replace('.', ',');
@@ -1880,7 +1880,7 @@ function pRegolamento(){
     'Nessuno convalida un <b>proprio</b> incarico in sospeso: serve un altro Supervisor con il permesso «Punti e Regole» o il Creatore (unica eccezione: il Creatore, se è l\'unico a poter convalidare).'])}
     ${sez('⭐ Punti Collega Modello', [
     !ptMaster() ? '⚠️ <b>Sistema punti disattivato dal Supervisor:</b> nessun accredito; i punti già maturati restano.' : '',
-    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🔋 ricarica convalidata: ${nDec(ptRicEuro())} ${ptRicEuro() === 1 ? 'punto' : 'punti'} per ogni € ricaricato, massimo ${ptRicMax()} per ricarica (dal 25/11/2026) · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
+    `<b>Si guadagnano:</b> ☕ ${ptCaffeE()} per caffè · 🍫 ${nDec(ptSnackEuro())} ${ptSnackEuro() === 1 ? 'punto' : 'punti'} per ogni 1,00 € di snack · 👏 ${ptBfE()} per «Ben fatto» ricevuto · 🎯 compiti convalidati · 🔋 ricarica convalidata: ${nDec(ptRicEuro())} ${ptRicEuro() === 1 ? 'punto' : 'punti'} per ogni € ricaricato, massimo ${ptRicMax()} per ricarica (dal 23/11/2026) · 🧾 spesa convalidata: ${nDec(ptSpesaEuro())} ${ptSpesaEuro() === 1 ? 'punto' : 'punti'} per ogni € speso, arrotondati, massimo ${ptSpesaMax()} per spesa (il rimborso resta al 100%).`,
     '<b>I punti non si riscattano più:</b> non si convertono in crediti e concorrono solo alla classifica (settimanale e generale).',
     `<b>🏆 Premi del podio:</b> ogni settimana (da lunedì a domenica) i primi tre della classifica settimanale vincono un premio in crediti: il Creatore stabilisce il tetto massimo del montepremi settimanale, che si divide tra i primi tre in proporzione 100% · 50% · 25% (circa 57% · 29% · 14%)${premiPodio().some(x => x > 0) ? ': ' + [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : ' (per ora nessuno impostato)'}. Dal lunedì alle 00:01 (a settimana scaduta), in Home, chi è sul podio trova il pulsante «Riscatta premio»: i crediti arrivano subito sul saldo. Il premio si riscatta una sola volta, entro la fine della settimana successiva, e servono almeno ${premiMinPt()} ${premiMinPt() === 1 ? 'punto' : 'punti'}. ${premiPerc() > 0 ? `Il montepremi non supera il ${premiPerc()}% degli incassi della settimana (vendite di caffè, snack e caffè pagati subito): nelle settimane di poco incasso i premi scendono da soli.` : ''}`,
     `<b>Ben fatto!</b> è un pulsante in Home: riconosci un collega con una motivazione (max 80 caratteri): ${bfN()} ${bfN() === 1 ? 'gettone' : 'gettoni'} a ${bfPeriodo() === 'mese' ? 'mese' : 'settimana'}, tu non perdi nulla.`])}
@@ -2087,7 +2087,7 @@ function aggMov(G, m, sg){
     case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*ptPulM(m)); add(G.ptP, x, sg*ptPulM(m)); }); break;
     case 'compito': if(m.stato === 'confermata'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
-    case 'ricarica': if(m.stato === 'confermata'){ t.ric += sg*m.importo; if(!m.fondo) add(G.ptR, m.mid, sg*(m.pt ?? (m.t >= RIC_PT_DAL ? ptRicE(m.importo) : 0))*fx(m)); } break;   // punti diretti per le ricariche (dal 25/11/2026)
+    case 'ricarica': if(m.stato === 'confermata'){ t.ric += sg*m.importo; if(!m.fondo) add(G.ptR, m.mid, sg*(m.pt ?? (m.t >= RIC_PT_DAL ? ptRicE(m.importo) : 0))*fx(m)); } break;   // punti diretti per le ricariche (dal 23/11/2026)
     case 'quota': if((!m.stato || m.stato === 'confermata') && (m.metodo === 'contanti' || m.metodo === 'revolut')) t.quote += sg*m.importo; break;
     case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
     case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)*fx(m)); break;
@@ -2381,7 +2381,7 @@ function clSala(righe, key, G){
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
     p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno svolto' : 'turni svolti'}</p>`,
     s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
-    r: `<p class="hint" style="margin:6px 0 0">🔋 ${ptRicEuro() === 1 ? '1 punto' : nDec(ptRicEuro()) + ' punti'} per ogni 1,00 € ricaricato (massimo ${ptRicMax()} per ricarica), dal 25/11/2026</p>`,
+    r: `<p class="hint" style="margin:6px 0 0">🔋 ${ptRicEuro() === 1 ? '1 punto' : nDec(ptRicEuro()) + ' punti'} per ogni 1,00 € ricaricato (massimo ${ptRicMax()} per ricarica), dal 23/11/2026</p>`,
     b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
   return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
 }
