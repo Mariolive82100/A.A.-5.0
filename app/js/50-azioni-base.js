@@ -187,6 +187,11 @@ async function dopoCollegamento(u, uidPrima){
   authInfo(u);
   if(u.uid !== uidPrima) console.error('UID cambiato dopo il collegamento', uidPrima, u.uid);
 }
+/* l'account è già di un profilo: invece di un errore si propone di usarlo su questo telefono (il profilo attuale resta recuperabile col PIN) */
+async function passaAAccount(signIn){
+  if(!confirm('Questo account è già collegato a un profilo. Vuoi usarlo su questo telefono?\n\nIl profilo che stai usando adesso resta recuperabile con il suo PIN.')) return false;
+  await signIn(); closeSheet(); toast('Accesso eseguito'); return true;
+}
 async function collegaEmail(mail, pw, el){
   if(!/^\S+@\S+\.\S+$/.test(mail)) return toast(AUTH_ERR['auth/invalid-email'], 'err');
   if(pw.length < 6) return toast(AUTH_ERR['auth/weak-password'], 'err');
@@ -194,7 +199,12 @@ async function collegaEmail(mail, pw, el){
   if(!u || !u.isAnonymous) return toast('Hai già un account collegato', 'err');
   const prima = u.uid; if(el) el.disabled = true;
   try { await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(mail, pw)); await dopoCollegamento(u, prima); closeSheet(); toast('Email collegata'); render(); }
-  catch(e){ toast(authErr(e), 'err'); if(el) el.disabled = false; }
+  catch(e){
+    if(e && e.code === 'auth/email-already-in-use'){   // l'email ha già un account: con la stessa password è il suo
+      try { if(await passaAAccount(() => firebase.auth().signInWithEmailAndPassword(mail, pw))) return; } catch(e2){ toast(authErr(e2), 'err'); }
+    } else toast(authErr(e), 'err');
+    if(el) el.disabled = false;
+  }
 }
 /* dal Profilo: collega l'account al profilo già in uso (mai cambio di account: se è già di un altro profilo, errore) */
 A['collega-google'] = async () => {
@@ -202,7 +212,11 @@ A['collega-google'] = async () => {
   if(!u || !u.isAnonymous) return toast('Hai già un account collegato', 'err');
   const prima = u.uid;
   try { await u.linkWithPopup(nuovoGoogle()); await dopoCollegamento(u, prima); toast('Account Google collegato'); render(); }   // la finestra si apre subito dentro il tocco: così non viene bloccata
-  catch(e){ toast(authErr(e), 'err'); }
+  catch(e){
+    if(e && e.code === 'auth/credential-already-in-use' && e.credential){
+      try { await passaAAccount(() => firebase.auth().signInWithCredential(e.credential)); } catch(e2){ toast(authErr(e2), 'err'); }
+    } else toast(authErr(e), 'err');
+  }
 };
 A['collega-email-apri'] = () => openSheet(`<h3>${ic('lock')} Collega email e password</h3><p class="sub">Il tuo profilo resta lo stesso: saldo, crediti e punti non cambiano.</p>
   <label class="f"><span>Email</span><input class="in" id="ac-mail" type="email" autocomplete="email" autocapitalize="off" autofocus></label>

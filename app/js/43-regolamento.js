@@ -59,7 +59,7 @@ function pRegolamento(){
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${sez('🔐 Account di accesso', [
     'In <b>Profilo → Account di accesso</b> puoi collegare il tuo profilo a un account <b>Google</b> oppure a <b>email e password</b>. Il collegamento non cambia nulla: saldo, crediti, punti e storico restano i tuoi. Finché non lo fai, in Home compare un avviso (puoi nasconderlo per oggi).',
-    'Con l\'account collegato ritrovi il tuo profilo su qualsiasi telefono dalla schermata iniziale («Ho già un account»), senza PIN. Se dimentichi la password puoi reimpostarla con l\'email.',
+    'Con l\'account collegato ritrovi il tuo profilo su qualsiasi telefono dalla schermata iniziale («Ho già un account»), senza PIN. Se dimentichi la password puoi reimpostarla con l\'email. Se scegli un account già collegato al tuo profilo, l\'app ti chiede se usarlo su questo telefono.',
     'La tua email non compare mai nell\'app agli altri colleghi e non finisce nei dati del gruppo: la vede solo chi gestisce il progetto Firebase.',
     'Il <b>PIN personale</b> resta valido come ripiego, ad esempio se perdi l\'accesso al tuo account.'])}
   ${g.quotaAnnua > 0 ? sez('📅 Quota annuale', [

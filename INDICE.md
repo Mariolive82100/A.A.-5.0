@@ -49,7 +49,7 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `accountCard`, `pImpostazioni`
 
 ### `js/50-azioni-base.js` — azioni: condivisione, accesso e account (collega Google/email), Bar, Paga, ricarica e riscatto, ruoli
-`joinVerifica`, `nuovoGoogle`, `pwv`, `dopoCollegamento`, `collegaEmail`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
+`joinVerifica`, `passaAAccount`, `nuovoGoogle`, `pwv`, `dopoCollegamento`, `collegaEmail`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
 
 ### `js/51-azioni-gestione.js` — azioni: Mastro Lindo e punti extra, regalo crediti, storni, cassa, inventario, registro caffè, quote, admin
 `rgAggiorna`, `acAggiorna`, `compactMov`, `corrAggiorna`, `caricaProdotto`, `sheetReg`, `salvaRegCaffe`, `quotaAggiorna`, `scollega`, `selMembro`, `bfInizioPeriodo`, `bfRinnovo`, `bfCountdown`, `bfUsati`, `bfAggiorna`, `sfPulCard`, `sxCalcola`, `sxAggiorna`, `vitPremio`

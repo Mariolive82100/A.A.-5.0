@@ -64,12 +64,13 @@ function entryInstall(){
 function entryAccount(){
   return st.authAnon === false
     ? `<p class="hint" style="text-align:center;margin-top:14px">Account: <b>${esc(st.authEmail || 'collegato')}</b><br><button class="btn link" id="btn-account-esci" data-act="account-esci" style="font-size:13px">Cambia account</button></p>`
-    : `<div style="text-align:center;margin-top:14px"><button class="btn link" id="btn-accedi" data-act="accedi-apri" style="color:var(--mut);font-size:13px">Ho già un account (Google o email)</button></div>`;
+    : `<button class="btn block ghost" id="btn-accedi" data-act="accedi-apri" style="margin-top:14px">${ic('user','s')} Accedi con Google o email</button>`;
 }
 
 function entryWelcome(){
   return `<div class="hero"><div class="logo">${ic('coffee','l')}</div><h1>Armieri 5.0</h1><p>Caffè, snack, cassa e turni della saletta,<br>condivisi con i colleghi.</p></div>
-  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Te lo manda il Creatore del gruppo</span></button>${entryAccount()}`;
+  ${st.authAnon === false ? '' : `<button class="tile" id="tile-accedi" data-act="accedi-apri"><div class="ic amber">${ic('user')}</div><b>Accedi con il tuo account</b><span>Google o email: ritrovi il tuo profilo</span></button>`}
+  <button class="tile" data-act="entry" data-v="join"><div class="ic amber">${ic('users')}</div><b>Ho un codice di gruppo</b><span>Te lo manda il Creatore del gruppo</span></button>${st.authAnon === false ? entryAccount() : ''}`;
 }
 
 function entryJoin(){
@@ -87,9 +88,9 @@ function entryCreatore(){
   <div class="card">
     ${st.authAnon === false ? `<button class="btn amber block big" id="btn-entra-account" data-act="join-collega">${ic('check','s')} Entra con il tuo account</button>
     <p class="hint" style="margin:6px 0 12px">Se questo account è già collegato al tuo profilo, entri subito, senza PIN.</p>` : ''}
-    <button class="btn ${st.authAnon === false ? '' : 'amber '}block big" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo</button>
+    <button class="btn ${st.authAnon === false ? 'ghost ' : 'amber '}block big" data-act="recupero-apri">${ic('lock','s')} Ho già un profilo</button>
     <p class="hint" style="margin:6px 0 12px">Eri già nel gruppo (nuovo telefono, app reinstallata…): ti ritrovi con il tuo PIN personale.</p>
-    <button class="btn block big" data-act="join-collega">${ic('user','s')} Sono un nuovo collega</button>
+    <button class="btn ${st.authAnon === false ? 'ghost ' : ''}block big" data-act="join-collega">${ic('user','s')} Sono un nuovo collega</button>
     <p class="hint" style="margin:6px 0 0">Invii una richiesta che un Supervisor deve approvare.</p>
   </div>
   <button class="btn link" id="btn-altro-codice" data-act="entry" data-v="join" style="color:var(--mut);font-size:13px">Usa un altro codice gruppo</button>${entryAccount()}`;
