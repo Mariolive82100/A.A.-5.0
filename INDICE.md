@@ -73,4 +73,4 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 _(nessuna funzione di primo livello)_
 
 ### `css/`
-- `stile.css`: stili generali e mobile, badge beta. `desktop.css`: layout desktop/tablet (media query). `natale.css`: solo il tema natalizio (regole sotto `html[data-tema="natale"]` e neve); i colori del tema attuale restano nel `:root` di `stile.css`.
+- `stile.css`: stili generali e mobile, badge beta. `desktop.css`: layout desktop/tablet (media query). `natale.css`: solo il tema natalizio (regole sotto `html[data-tema="natale"]` neve che cade e neve sui pulsanti); i colori del tema attuale restano nel `:root` di `stile.css`.

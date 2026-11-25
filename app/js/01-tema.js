@@ -1,7 +1,7 @@
 'use strict';
 /* ---------- tema grafico: attuale o natalizio. La scelta resta solo su questo telefono (nessun dato su Firebase) ---------- */
 const TEMI = [['auto', 'Automatico'], ['base', 'Tema attuale'], ['natale', 'Natalizio']];
-const TEMA_COLORE = {base: '#0b1020', natale: '#0a1712'};
+const TEMA_COLORE = {base: '#0b1020', natale: '#1c090d'};
 
 /* periodo natalizio: dal 1° dicembre al 6 gennaio compresi, ogni anno a partire da dicembre 2026 (data del telefono) */
 function periodoNatale(d){

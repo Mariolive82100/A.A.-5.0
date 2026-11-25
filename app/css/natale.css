@@ -1,15 +1,15 @@
-/* ---------- tema natalizio "Notte di Natale": ogni regola vale solo con <html data-tema="natale"> (vedi js/01-tema.js) ---------- */
+/* ---------- tema natalizio "Rosso Natale": ogni regola vale solo con <html data-tema="natale"> (vedi js/01-tema.js) ---------- */
 :root[data-tema="natale"]{
-  --bg:#0a1712;--bg2:#0d1d17;--card:#12251d;--card2:#193126;--line:#27463a;--line2:#345a4a;
-  --tx:#f6f3ea;--tx2:#c5d3ca;--mut:#8fa79a;
-  --amber:#f2c14e;--amber2:#ffd873;--green:#4ade80;--red:#ff7b86;--sky:#7dd3fc;--violet:#c4b5fd;
+  --bg:#1c090d;--bg2:#240d12;--card:#2f1218;--card2:#3f1a22;--line:#5a2831;--line2:#74353f;
+  --tx:#fff6f0;--tx2:#e6cccb;--mut:#bd9a99;
+  --amber:#f6c755;--amber2:#ffdc82;--green:#4ade80;--red:#ff8f98;--sky:#8bd8fd;--violet:#cdbdff;
   color-scheme:dark;
 }
-:root[data-tema="natale"] header{background:rgba(10,23,18,.9)}
-:root[data-tema="natale"] nav.dock{background:rgba(10,23,18,.95)}
-:root[data-tema="natale"] .ov{background:rgba(3,10,7,.74)}
-:root[data-tema="natale"] #toast{background:#1d3a2d}
-:root[data-tema="natale"] #vittoria{background:rgba(5,14,10,.9)}
+:root[data-tema="natale"] header{background:rgba(74,14,24,.92)}
+:root[data-tema="natale"] nav.dock{background:rgba(52,12,19,.96)}
+:root[data-tema="natale"] .ov{background:rgba(14,3,5,.74)}
+:root[data-tema="natale"] #toast{background:#4a1d26}
+:root[data-tema="natale"] #vittoria{background:rgba(20,5,8,.9)}
 
 /* titoli oro-crema, con alberello accanto al nome dell'app */
 :root[data-tema="natale"] .brand b,:root[data-tema="natale"] .hero h1{background-image:linear-gradient(90deg,var(--amber),#fff1c9)}
@@ -21,41 +21,52 @@
     radial-gradient(circle at 12px 5px,#ff5a66 0 2.6px,rgba(255,90,102,.28) 3px,transparent 5px) 0 0/72px 9px repeat-x,
     radial-gradient(circle at 36px 4px,#ffd873 0 2.6px,rgba(255,216,115,.28) 3px,transparent 5px) 0 0/72px 9px repeat-x,
     radial-gradient(circle at 60px 5px,#4ade80 0 2.6px,rgba(74,222,128,.28) 3px,transparent 5px) 0 0/72px 9px repeat-x,
-    linear-gradient(rgba(143,167,154,.45),rgba(143,167,154,.45)) 0 1px/100% 1px no-repeat}
+    linear-gradient(rgba(189,154,153,.45),rgba(189,154,153,.45)) 0 1px/100% 1px no-repeat}
 
 /* pulsanti: oro con testo scuro, rosso bacca per le azioni "rosse" */
 :root[data-tema="natale"] .btn.amber{background:linear-gradient(90deg,#f2c14e,#e5ad2f);color:#1f1503}
 :root[data-tema="natale"] .chips button.on{color:#1f1503}
-:root[data-tema="natale"] .btn.red{background:#b4232f;border-color:#b4232f}
+:root[data-tema="natale"] .btn.red{background:#c62334;border-color:#ff9aa4}
 :root[data-tema="natale"] .btn.green{background:#047857;border-color:#047857}
 
 /* sfumature e bordi che nel tema attuale sono ambra */
-:root[data-tema="natale"] .gm-hint.su{border-color:rgba(242,193,78,.5)}
-:root[data-tema="natale"] .ic.amber,:root[data-tema="natale"] .pill.amber,:root[data-tema="natale"] .steps li::before{background:rgba(242,193,78,.15)}
-:root[data-tema="natale"] .in:focus{box-shadow:0 0 0 3px rgba(242,193,78,.18)}
-:root[data-tema="natale"] .seg input:checked+label{background:rgba(242,193,78,.1)}
-:root[data-tema="natale"] .card.hero{background:linear-gradient(135deg,var(--card),rgba(180,35,47,.26));border-color:rgba(242,193,78,.4)}
-:root[data-tema="natale"] .hero .logo{background:rgba(180,35,47,.24);border-color:rgba(242,193,78,.45)}
-:root[data-tema="natale"] .pc.me .ps{background:rgba(242,193,78,.18);border-color:rgba(242,193,78,.5)}
-:root[data-tema="natale"] .rk.me{border-color:rgba(242,193,78,.5);background:rgba(242,193,78,.1)}
-:root[data-tema="natale"] .sala{background:linear-gradient(135deg,rgba(242,193,78,.16),rgba(180,35,47,.14));border-color:rgba(242,193,78,.38)}
-:root[data-tema="natale"] .tesoro{background:linear-gradient(135deg,var(--card),rgba(180,35,47,.24));border-color:rgba(242,193,78,.35)}
+:root[data-tema="natale"] .gm-hint.su{border-color:rgba(246,199,85,.5)}
+:root[data-tema="natale"] .ic.amber,:root[data-tema="natale"] .pill.amber,:root[data-tema="natale"] .steps li::before{background:rgba(246,199,85,.15)}
+:root[data-tema="natale"] .in:focus{box-shadow:0 0 0 3px rgba(246,199,85,.18)}
+:root[data-tema="natale"] .seg input:checked+label{background:rgba(246,199,85,.1)}
+:root[data-tema="natale"] .card.hero{background:linear-gradient(135deg,var(--card),rgba(214,40,57,.34));border-color:rgba(246,199,85,.4)}
+:root[data-tema="natale"] .hero .logo{background:rgba(214,40,57,.34);border-color:rgba(246,199,85,.45)}
+:root[data-tema="natale"] .pc.me .ps{background:rgba(246,199,85,.18);border-color:rgba(246,199,85,.5)}
+:root[data-tema="natale"] .rk.me{border-color:rgba(246,199,85,.5);background:rgba(246,199,85,.1)}
+:root[data-tema="natale"] .sala{background:linear-gradient(135deg,rgba(246,199,85,.16),rgba(214,40,57,.24));border-color:rgba(246,199,85,.38)}
+:root[data-tema="natale"] .tesoro{background:linear-gradient(135deg,var(--card),rgba(214,40,57,.32));border-color:rgba(246,199,85,.35)}
 :root[data-tema="natale"] .cols i{background:linear-gradient(180deg,var(--amber),#9a6a12)}
-:root[data-tema="natale"] .bar i{background:linear-gradient(90deg,#34d399,#a7f3d0)}
-:root[data-tema="natale"] .banner.amber{background:rgba(242,193,78,.11);border-color:rgba(242,193,78,.34);color:#ffe9a8}
-:root[data-tema="natale"] .avv.amber{--avc:rgba(242,193,78,.75);--avb:rgba(242,193,78,.14);--avt:#ffe9a8;--avg:242,193,78}
-:root[data-tema="natale"] .bac-it.amber{--avc:rgba(242,193,78,.75);--avb:rgba(242,193,78,.12);--avt:#ffe9a8}
+:root[data-tema="natale"] .bar i{background:linear-gradient(90deg,#ef4458,#f6c755)}
+:root[data-tema="natale"] .banner.amber{background:rgba(246,199,85,.11);border-color:rgba(246,199,85,.34);color:#ffe9a8}
+:root[data-tema="natale"] .avv.amber{--avc:rgba(246,199,85,.75);--avb:rgba(246,199,85,.14);--avt:#ffe9a8;--avg:246,199,85}
+:root[data-tema="natale"] .bac-it.amber{--avc:rgba(246,199,85,.75);--avb:rgba(246,199,85,.12);--avt:#ffe9a8}
 :root[data-tema="natale"] .prizepill{color:#ffe9a8}
 
 /* Home e menu: rosso, oro e verde (gli aloni hanno il colore scritto nell'elemento, da qui !important) */
 :root[data-tema="natale"] .home .blob:nth-of-type(1){background:#d12f3d!important}
-:root[data-tema="natale"] .home .blob:nth-of-type(2){background:#f2c14e!important;opacity:.34}
-:root[data-tema="natale"] .home .blob:nth-of-type(3){background:#10b981!important}
-:root[data-tema="natale"] .gbtn.adm{border-color:rgba(242,193,78,.4);background:linear-gradient(135deg,rgba(180,35,47,.3),rgba(242,193,78,.14))}
+:root[data-tema="natale"] .home .blob:nth-of-type(2){background:#f6c755!important;opacity:.28}
+:root[data-tema="natale"] .home .blob:nth-of-type(3){background:#e11d48!important}
+:root[data-tema="natale"] .gbtn.adm{border-color:rgba(246,199,85,.4);background:linear-gradient(135deg,rgba(214,40,57,.4),rgba(246,199,85,.14))}
 @media (min-width:1000px){
-  :root[data-tema="natale"] nav.dock .dk button:first-child{border-color:rgba(242,193,78,.45);background:linear-gradient(135deg,rgba(180,35,47,.45),rgba(242,193,78,.2))}
-  :root[data-tema="natale"] .prizepill{border-color:rgba(242,193,78,.4);background:rgba(242,193,78,.1)}
+  :root[data-tema="natale"] nav.dock .dk button:first-child{border-color:rgba(246,199,85,.45);background:linear-gradient(135deg,rgba(214,40,57,.5),rgba(246,199,85,.2))}
+  :root[data-tema="natale"] .prizepill{border-color:rgba(246,199,85,.4);background:rgba(246,199,85,.1)}
 }
+
+/* neve poggiata sul bordo alto dei pulsanti: sta nel margine sopra le scritte e non intercetta i tocchi (esclusi i pulsanti-link) */
+:root[data-tema="natale"] .btn:not(.link){position:relative}
+:root[data-tema="natale"] .btn:not(.link)::before,:root[data-tema="natale"] .gbtn::before{content:'';position:absolute;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' preserveAspectRatio='none'%3E%3Cpath fill='%23f7fbff' d='M1 7C3 3 8 2 13 3.5C18 0 27 0 32 3C39 1 45 1.500 50 3.500C57 0 68 0 74 3C80 1.500 87 1 92 3.500C99 .5 108 1 112 3.500C116 3 119 5 119 7C117 9 113 8 110 7.500C107 7 107 11 104 11S101 7.500 97 7.500C88 7 84 9 76 8C72 8 72 13.500 68.500 13.500S65 8.500 61 8C52 7 46 9 39 8C35 7.500 35 11 32 11S29 7.500 25 7.500C18 7 14 9 9 8C5 8.500 2 8.500 1 7Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;
+  filter:drop-shadow(0 1px 1px rgba(40,0,8,.35))}
+:root[data-tema="natale"] .btn:not(.link)::before{left:7px;right:7px;top:-4px;height:10px}
+:root[data-tema="natale"] .btn.sm:not(.link)::before{left:6px;right:6px;top:-3px;height:7px}
+:root[data-tema="natale"] .gbtn::before{left:14px;right:14px;top:-5px;height:18px}
+:root[data-tema="natale"] .gbtn.sm::before{height:13px}
+:root[data-tema="natale"] .home{padding-top:6px!important}   /* il riquadro taglia cio' che sporge: spazio per la neve della prima fila */
 
 /* neve: sopra i contenuti, sotto intestazione, barra in basso, menu e finestre; non intercetta i tocchi */
 #neve{position:fixed;inset:0;z-index:25;overflow:hidden;pointer-events:none}
