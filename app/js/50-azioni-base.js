@@ -236,27 +236,6 @@ A['paga-menu'] = () => {
 A['paga-caffe'] = () => A['caffe-menu']();
 A['paga-snack'] = () => A['snack']();
 
-/* --- Lavoro compiuto: +1 alla sfida mensile Indefesso; nessun importo, la verifica e' dell'admin (che puo' stornare) --- */
-const LAVORO_MAX_GG = 5;
-const lavoriMiei = (d, da) => d.movs.filter(m => m.tipo === 'lavoro' && m.mid === st.mid && m.t >= da && !d.stornati.has(m.id));
-A['lavoro-menu'] = () => {
-  return;   // «Lavoro compiuto» temporaneamente disabilitato (coming soon)
-  const d = derived(), o = new Date(); o.setHours(0, 0, 0, 0);
-  const n = lavoriMiei(d, o.getTime()).length, mese = lavoriMiei(d, sfPeriodo('mese', new Date()).da).length;
-  openSheet(`<h3>${LAVORO_ICO} Lavoro compiuto</h3><p class="sub">Hai portato a termine un lavoro o un intervento per la saletta? Registralo: vale <b>+1</b> nella sfida mensile <b>💪 Indefesso</b>. Un admin può verificarlo e stornarlo se non risulta.</p>
-    <label class="f"><span>Nota o riferimento (facoltativo)</span><input class="in" id="lv-nota" maxlength="80" placeholder="es. sistemato lo scaffale"></label>
-    <p class="hint" style="margin:0 0 10px">Questo mese: <b>${mese}</b> · oggi ${n}/${LAVORO_MAX_GG}</p>
-    <button class="btn amber block big" id="btn-lavoro-ok" data-act="lavoro-ok" ${n >= LAVORO_MAX_GG ? 'disabled' : ''}>${n >= LAVORO_MAX_GG ? 'Limite giornaliero raggiunto' : 'Registra lavoro compiuto'}</button>`);
-};
-A['lavoro-ok'] = () => {
-  if(Date.now() - lastTap < 900) return; lastTap = Date.now();
-  const o = new Date(); o.setHours(0, 0, 0, 0);
-  if(lavoriMiei(derived(), o.getTime()).length >= LAVORO_MAX_GG){ closeSheet(); return toast('Hai già registrato ' + LAVORO_MAX_GG + ' lavori oggi', 'err'); }
-  const nota = (val('lv-nota') || '').trim().slice(0, 80);
-  addMov({tipo: 'lavoro', mid: st.mid, ...(nota ? {nota} : {})});
-  closeSheet(); toast('Lavoro registrato: +1 in Indefesso');
-};
-
 /* --- ricarica e riscatto: sempre verso il Fondo Gruppo, conferma di un Supervisor --- */
 A['riscatta-menu'] = () => {
   const puoRisc = (saldo(st.mid) || 0) > 0 && creditoLibero() > 0;
@@ -376,12 +355,10 @@ A['conferma-paga-spesa'] = ds => {
     .then(() => { aggiornaArticoli(mv, true); closeSheet(); toast('Spesa pagata dalla cassa ✓'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
-/* --- Incarichi dei vecchi compiti: restano solo quelli ancora aperti (assegnato / in attesa), gestiti da «Incarichi in sospeso» in Sfide e dalle Notifiche --- */
+/* --- Incarichi dei vecchi compiti: restano solo quelli ancora aperti (assegnato / in attesa), gestiti da «Incarichi in sospeso» nelle Notifiche --- */
 const cpAperto = m => m.stato === 'assegnato' || m.stato === 'attesa';
 const cpIncarichi = () => { const s = derived().stornati; return tuttiMov().filter(m => m.tipo === 'compito' && !s.has(m.id)); };
 const cpAperti = () => cpIncarichi().filter(cpAperto);
-/* segnale sul tab Sfide: numero di incarichi in sospeso da convalidare (solo chi gestisce) */
-const cpSegnali = () => ({conv: nCpConv()});
 A['cp-fatto'] = ds => {
   const m = tuttiMov().find(x => x.id === ds.id);
   if(!m || m.tipo !== 'compito' || m.mid !== st.mid || m.stato !== 'assegnato' || m._pending) return toast('Questo incarico non è più da svolgere', 'err');
@@ -403,7 +380,7 @@ const PERMESSI = [
   ['cassa', '💶', 'Cassa e Storni', 'Entrate, giroconti, correzione saldo cassa, storni'],
   ['inventario', '📦', 'Inventario e Scorte', 'Prezzi e articoli, giacenze, scorta caffè, Esaurito'],
   ['soci', '👥', 'Quote e Saldi Soci', 'Quote annuali, saldi e punti, PIN, archivia / espelli'],
-  ['compiti', '🏆', 'Sfide e Regole', 'Premi delle sfide, parametri di punteggio e premi'],
+  ['compiti', '🏆', 'Punti e Regole', 'Mastro Lindo, parametri di punteggio e premi'],
   ['sistema', '🛠️', 'Strumenti di Sistema', 'Moderazione della Bacheca in Home, backup, chiusura periodo']];
 const PERM_IDS = PERMESSI.map(x => x[0]);
 function sonoCreatore(){ return !!st.gruppo && (st.gruppo.creatoDa === st.uid || (!!st.mid && st.gruppo.creatoreMid === st.mid)); }
@@ -413,7 +390,7 @@ function can(p){ return sonoCreatore() || (!!st.admDoc && permDi(st.uid).include
 const canAccessi = () => can('inbox') || can('soci');
 function ruolo(){ return sonoCreatore() ? 'Creatore' : st.isAdmin ? 'Supervisor' : 'Collega'; }
 const midDiUid = uid => { const u = st.utenti.find(x => x.id === uid); return u ? u.mid : null; };
-/* vecchi «supervisori dei compiti» (lista sul gruppo): continuano a funzionare con il solo permesso Sfide e Regole */
+/* vecchi «supervisori dei compiti» (lista sul gruppo): continuano a funzionare con il solo permesso Punti e Regole */
 const supervisoriIds = () => { const v = st.gruppo && st.gruppo.supervisori; return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; };
 const isSup = () => !!st.mid && supervisoriIds().includes(st.mid);
 /* mid -> [uid dei telefoni con documento admin], escluso il Creatore (lo leggono solo Creatore e Supervisor) */
@@ -427,6 +404,13 @@ const badgePerm = ids => PERMESSI.filter(x => ids.includes(x[0])).map(x => `<spa
 const cpSoloAdmin = () => sonoCreatore() && supervisoriIds().length === 0 && !st.admins.some(a => permDi(a.id).includes('compiti') && midDiUid(a.id) !== st.mid);   // il Creatore è l'unico a poter convalidare: può chiudere anche un compito proprio
 const cpPuoConv = m => m.stato === 'attesa' && !m._pending && !m._local && can('compiti') && (m.mid !== st.mid || cpSoloAdmin());
 const nCpConv = () => (can('compiti') && ptMaster()) ? cpAperti().filter(cpPuoConv).length : 0;
+function incarichiSospesi(){
+  if(!can('compiti')) return '';
+  const l = cpAperti().slice().sort((a, b) => a.t - b.t); if(!l.length) return '';
+  return `<div class="card" id="sf-sospesi"><h3>📋 Incarichi in sospeso <span class="pill violet">${l.length}</span></h3>
+    <p class="hint" style="margin:0 0 8px">Compiti del vecchio Briefing ancora da svolgere o da convalidare: convalidali o annullali per chiuderli.</p>
+    <div class="list">${l.map(m => cpRiga(m, st.mid)).join('')}</div></div>`;
+}
 function cpConvCard(){
   if(!can('compiti') || !ptMaster()) return '';
   const l = cpAperti().filter(cpPuoConv); if(!l.length) return '';

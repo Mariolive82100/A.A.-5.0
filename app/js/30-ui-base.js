@@ -53,7 +53,7 @@ const revOff = () => revolutOn() ? [] : ['revolut'];
    RENDER
    ===================================================================== */
 const PAGES = {
-  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], sfide:['Sfide','trophy'], supervisor:['Gestione Supervisor','shield'], pin:['Gestione PIN','lock'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'],
+  bar:['Bar','coffee'], feed:['Feed movimenti','activity'], supervisor:['Gestione Supervisor','shield'], pin:['Gestione PIN','lock'], saletta:['Saletta','sparkles'], classifiche:['Classifica e statistiche','chart'], gioco:['Chi paga il caffè?','dice'], registro:['Cassa e registro','receipt'], crediti:['Crediti','wallet'], notifiche:['Notifiche','bell'],
   cassa:['Registro cassa','wallet'], inventario:['Inventario & listino','package'], quote:['Quote annuali','banknote'],
   regolamento:['Regolamento','receipt'], membri:['Gestione Soci','users'], statistiche:['Classifica e statistiche','chart'], impostazioni:['Impostazioni','settings'], backup:['Backup & Ripristino','download'], chiusura:['Chiusura periodo','archive']
 };
@@ -92,13 +92,12 @@ function doRender(){
 
   let d = derived();
   assicuraQuote(d); d = derived();
-  vittoriaCheck();
   // header
   const s = d.S.saldi[st.mid] || 0;
 
   $('syncdot').className = 'dot ' + ({ok:'ok', off:'off', err:'err'}[st.sync] || '');
   $('hdr-sub').textContent = st.sync === 'err' ? 'Errore: ' + st.syncErr : st.sync === 'off' ? 'Offline · si sincronizza dopo' : st.sync === 'ok' ? (st.gruppo.nome || 'Saletta') : 'Collegamento…';
-  if(st.page === 'briefing' || st.page === 'compiti') st.page = 'sfide';   // il vecchio Briefing è diventato Sfide
+  if(st.page === 'briefing' || st.page === 'compiti' || st.page === 'sfide') st.page = 'classifiche';   // Briefing e Sfide sono confluiti nella Classifica
   if(!pagineConsentite().includes(st.page)) st.page = 'bar';
   if(st.page === 'statistiche'){ st.page = 'classifiche'; st.clMod = 'stat'; }
   const cn = contatori(d);
@@ -108,15 +107,15 @@ function doRender(){
   if(st.page === 'regolamento' && !LS.get(REG_KEY)) LS.set(REG_KEY, 1);   // aprire il regolamento vale come presa visione
   const rd = $('hdr-reg-dot'); if(rd) rd.classList.toggle('hidden', !!LS.get(REG_KEY));
   $('hdr-menu').classList.remove('hidden'); $('hdr-search').classList.toggle('hidden', !st.isAdmin);
-  const tabs = [['bar','Home','coffee'],['sfide','Sfide','trophy'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
-  const nb = cn.tot, cs = cpSegnali();
-  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'sfide' && cs.conv ? `<span class="tb" id="tb-sfide">${cs.conv}</span>` : ''}${p === 'saletta' && perleNuova() ? '<span class="tdot" id="dot-saletta" aria-label="Nuova perla nella bacheca"></span>' : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
+  const tabs = [['bar','Home','coffee'],['classifiche','Classifica e statistiche','chart'],['registro','Cassa e registro','receipt'],['saletta','Saletta','sparkles'],['notifiche','Notifiche','bell']];
+  const nb = cn.tot;
+  $('dock').innerHTML = `<div class="dk" style="width:100%">${tabs.map(([p, l, i]) => `<button data-act="go" data-p="${p}" class="${(st.page === p || (p === 'saletta' && SALETTA_SUB.includes(st.page))) ? 'on' : ''}" id="dock-${p}" aria-label="${l}"><span class="tbw">${ic(i)}${p === 'saletta' && perleNuova() ? '<span class="tdot" id="dot-saletta" aria-label="Nuova perla nella bacheca"></span>' : ''}${p === 'notifiche' && nb ? `<span class="tb" id="tb-notifiche">${nb}</span>` : ''}</span>${l}</button>`).join('')}</div>`;
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   $('fab-ov').classList.remove('on'); $('fab-menu').classList.remove('on');
   sincronizzaGiacenze(d); sincronizzaEstratti(); sincronizzaSolo();
   renderDrawer();
 
-  const fn = {bar:pBar, onesta:pOnesta, caffereg:pCaffeReg, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, sfide:pSfide, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
+  const fn = {bar:pBar, onesta:pOnesta, caffereg:pCaffeReg, feed:pFeed, registro:pRegistro, crediti:pCrediti, notifiche:pNotifiche, supervisor:pSupervisor, pin:pPin, saletta:pSaletta, classifiche:pClassifiche, spesa:pSpesa, gioco:pGioco, ruota:pRuota, perle:pPerle, cassa:pCassa, inventario:pInventario, quote:pQuote, regolamento:pRegolamento, membri:pMembri, admin:pImpostazioni, regole:pRegole, backup:pBackup, chiusura:pChiusura, impostazioni:pImpostazioni}[st.page] || pBar;
   main.classList.remove('wide'); main.dataset.p = st.page;
   main.innerHTML = fn(d);
   restore();
@@ -180,7 +179,7 @@ const QS_VOCI = [
   {e:'🔐', t:'Gestione PIN', s:'Reset PIN, PIN temporaneo', perm:'soci', p:'pin', k:'pin reset temporaneo codice password sblocco'},
   {e:'🛡️', t:'Gestione Supervisor', s:'Nomina, permessi e ruoli', perm:'creatore', p:'supervisor', k:'supervisor permessi permesso ruoli ruolo nomina revoca creatore admin amministratore'},
   {e:'⚙️', t:'Regole punti e premi', s:'Punteggi e premi del podio', perm:'compiti', p:'regole', k:'punti premi podio crediti ben fatto soglia tessera fedelta regole punteggi scala credito conversione'},
-  {e:'🏆', t:'Premi delle sfide', s:'Sfide · assegna i premi a periodo concluso', perm:'compiti', p:'sfide', a:'sf-panoramica', k:'sfide sfida premi premio assegna benefattore caffeina lindo spesa ricarica incarichi sospeso compiti briefing'},
+  {e:'🧹', t:'Mastro Lindo', s:'Classifica · assegna i punti delle pulizie', perm:'compiti', p:'classifiche', k:'mastro lindo pulizie punti extra assegna compiti incarichi'},
   {e:'💾', t:'Backup e ripristino', s:'Esporta i dati, ripristina', perm:'sistema', p:'backup', k:'backup esporta esportazione ripristino ripristina scarica dati salvataggio'},
   {e:'📦', t:'Chiusura periodo', s:'Chiusura, estratti, archivio', perm:'sistema', p:'chiusura', k:'chiusura periodo estratti estratto archivio chiudere'},
   {e:'📢', t:'Bacheca, eventi e sondaggi', s:'Home · avvisi, annunci, sondaggi, eventi', perm:null, p:'bar', a:'bacheca', k:'bacheca avviso avvisi annuncio annunci info novita sondaggio sondaggi evento eventi compleanno compleanni votazione'},
@@ -218,7 +217,7 @@ function qsFiltra(){
 }
 
 const SALETTA_SUB = ['saletta','inventario','gioco','ruota','perle','spesa'];
-const PAGINE_COLLEGA = ['bar','onesta','caffereg','sfide','saletta','classifiche','spesa','gioco','inventario','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
+const PAGINE_COLLEGA = ['bar','onesta','caffereg','saletta','classifiche','spesa','gioco','inventario','ruota','perle','impostazioni','regolamento','registro','crediti','notifiche'];
 const PAGINE_UTENTE = PAGINE_COLLEGA.filter(p => p !== 'admin');
 const PAGINE_ADM = PAGINE_UTENTE.concat(['onesta','regole','backup','chiusura','membri','quote','pin','supervisor','statistiche','cassa','feed']);
 /* ogni voce di gestione compare solo a chi ha il permesso (il Creatore ha tutto) */

@@ -11,7 +11,6 @@ const CHIUSURA_SOGLIA_MOV = 250, CHIUSURA_SOGLIA_GG = 30;   // il banner in Home
 const CHIUSURA_RECENTE_GG = 15, CHIUSURA_MIN_NUOVI = 5;   // sotto questi valori una nuova chiusura chiede una doppia conferma
 const CHIUSURA_MARGINE = 15 * 60000; // i movimenti degli ultimi 15 minuti restano nel periodo aperto
 const ARCHIVIO_CHUNK = 1500;
-const LAVORO_ICO = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true" style="color:#7dd3fc;display:inline-block;vertical-align:-4px"><path d="M12 1.5l1.3 5.2.6 3.6 7.6 5.7v2.4l-7.4-2.3-.4 3.3 2.2 1.8V23L12 22.2 8.2 23v-1.6l2.2-1.8-.4-3.3-7.5 2.3v-2.4l7.6-5.7.6-3.6z"/></svg>';
 const PID_CAFFE = 'caffe';        // articolo speciale: scorta di buste di caffe'
 
 /* ---------- utilita' ---------- */

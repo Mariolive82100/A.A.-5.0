@@ -1,95 +1,28 @@
 'use strict';
-/* --- sfide fisse: navigazione e assegnazione del premio (unica azione dell'admin) --- */
-A['sf-apri'] = ds => { if(!SF_PER[ds.s]) return; if(sfHd === 0) sfHPush(); sfSez = ds.s; sfDet = null; sfTab = 'corso'; window.scrollTo(0, 0); render(); };
 A['chiusura-nascondi'] = () => { LS.set('chiusuraNasc_' + st.gid, oggiISO()); render(); };
 A['vittoria-chiudi'] = () => { const e = $('vittoria'); if(e) e.remove(); vitOpen = false; };
-A['sf-det'] = ds => { if(!SF_FISSE[ds.id]) return; if(sfHd === 1) sfHPush(); sfDet = ds.id; sfTab = ds.t === 'concluso' ? 'concluso' : 'corso'; window.scrollTo(0, 0); render(); };
-/* Classifica di una sfida come immagine PNG (canvas), condivisibile */
-function sfDatiImg(x){
-  const conc = sfTab === 'concluso', p = conc ? sfPrec(x) : sfPeriodo(x.per, new Date()), R = sfClassifica(x.tipo, p);
-  const aw = conc ? sfAssegnati()[x.id + '|' + p.key] : null, pOn = ptMaster();
-  const full = id => plain(sfNome(id)), ab = n => { const w = n.trim().split(/\s+/); return w.length < 2 || w[0].length <= 2 ? n : w[0] + ' ' + w[1].charAt(0).toUpperCase() + '.'; };
-  const ids = Array.from(new Set(R.map(r => r.id).concat(aw || []))), cont = {}; ids.forEach(id => { const k = ab(full(id)); cont[k] = (cont[k] || 0) + 1; });
-  const nm = id => { const k = ab(full(id)); return cont[k] > 1 ? full(id) : k; };   // se due colleghi darebbero la stessa sigla, resta il nome intero
-  return {conc, p, aw, nm, valori: x.tipo !== 'ricarica', righe: R.map(r => ({pos: r.pos, nome: nm(r.id), txt: (r.txt || '') + (r.sub ? ' · ' + r.sub : ''), pt: pOn ? sfPtRiga(x, r, conc, aw) : null}))};
-}
-function disegnaSfida(x, D){
-  const W = 1080, P = 56, F = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const MAXR = 24, righe = D.righe.slice(0, MAXR), altri = D.righe.length - righe.length;
-  const hh = 290, th = 70, rh = D.valori ? 104 : 66, legenda = righe.some(r => r.pt);
-  const Ht = hh + th + Math.max(1, righe.length) * rh + (altri > 0 ? 66 : 0) + (legenda ? 56 : 0) + 130;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = Ht;
-  const g = cv.getContext('2d');
-  /* testo che sta sempre nella larghezza data: riduce il corpo, poi accorcia con «…» */
-  const fit = (t, w, px, wt, min) => {
-    let s = px; g.font = `${wt} ${s}px ${F}`;
-    while(g.measureText(t).width > w && s > min){ s -= 1; g.font = `${wt} ${s}px ${F}`; }
-    if(g.measureText(t).width > w){ while(t.length > 1 && g.measureText(t + '…').width > w) t = t.slice(0, -1); t += '…'; }
-    return t;
-  };
-  const grad = g.createLinearGradient(0, 0, 0, Ht); grad.addColorStop(0, '#171a24'); grad.addColorStop(1, '#0d0f16');
-  g.fillStyle = grad; g.fillRect(0, 0, W, Ht); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-  g.fillStyle = '#f5a524'; g.fillText(fit(x.nome, W - 2 * P, 52, 800, 30), P, 100);
-  g.fillStyle = '#e8eaf0'; g.fillText(fit((D.conc ? 'Classifica finale · ' : 'Classifica in corso · ') + D.p.label, W - 2 * P, 32, 600, 22), P, 150);
-  const win = D.conc && D.aw && D.aw.length;
-  const prem = win ? `✅ Premio assegnato: ${D.aw.map(D.nm).join(', ')} (+${x.pt} pt)` : D.conc ? `⏳ Premio da assegnare: +${x.pt} pt` : `+${x.pt} punti in palio`;
-  g.fillStyle = win ? '#34d399' : '#aab0c2'; g.fillText(fit(prem, W - 2 * P, 30, 500, 20), P, 200);
-  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, 226, W - 2 * P, 2);
-  let y = hh + 10;
-  g.fillStyle = '#f5a524'; g.font = `700 26px ${F}`;
-  g.fillText('#', P, y); g.fillText('COLLEGA', P + 96, y);
-  g.textAlign = 'right'; if(legenda) g.fillText('PUNTI', W - P, y); g.textAlign = 'left';
-  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(P, y + 14, W - 2 * P, 2); y += 14;
-  if(!righe.length){ y += rh; g.fillStyle = '#7b8194'; g.font = `500 30px ${F}`; g.fillText('Nessuno in classifica per ora', P, y - 22); }
-  const XN = P + 96;
-  righe.forEach((r, i) => {
-    y += rh;
-    const top = y - rh + 6, base1 = D.valori ? top + 44 : top + 42;
-    if(i % 2 === 0){ g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(P - 12, top, W - 2 * P + 24, rh - 6); }
-    g.fillStyle = '#e8eaf0'; g.font = `700 34px ${F}`; g.fillText(r.pos <= 3 ? sfMed(r.pos) : String(r.pos), P, base1);
-    let wp = 0;
-    if(r.pt){ const tp = (r.pt.k === 'ok' ? '✅ ' : r.pt.k === 'da' ? '⏳ ' : '') + '+' + x.pt + ' pt'; g.font = `700 30px ${F}`; wp = g.measureText(tp).width + 24;
-      g.textAlign = 'right'; g.fillStyle = r.pt.k === 'ok' ? '#34d399' : r.pt.k === 'da' ? '#fbbf24' : '#7dd3fc'; g.fillText(tp, W - P, base1); g.textAlign = 'left'; }
-    g.fillStyle = '#f2f4f8'; g.fillText(fit(r.nome, W - P - XN - wp, 36, 600, 22), XN, base1);
-    if(D.valori && r.txt){ g.fillStyle = '#aab0c2'; g.fillText(fit(r.txt, W - P - XN, 28, 500, 18), XN, base1 + 38); }
-  });
-  if(altri > 0){ y += 66; g.fillStyle = '#7b8194'; g.font = `500 26px ${F}`; g.fillText(`…e altri ${altri} ${altri === 1 ? 'collega' : 'colleghi'}`, P, y - 22); }
-  if(legenda){ y += 56; g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText(D.conc ? '✅ punti assegnati  ·  ⏳ punti da assegnare' : 'I punti vanno a chi è in testa a fine periodo', P, y - 18); }
-  if(!D.valori){ g.fillStyle = '#7b8194'; g.font = `500 24px ${F}`; g.fillText('🔒 Per privacy si vede solo l\'ordine, non gli importi', P, Ht - 84); }
-  g.fillStyle = '#586079'; g.font = `500 24px ${F}`; g.fillText('Generato da Armieri 5.0', P, Ht - 42);
-  return cv;
-}
-A['sf-img'] = async () => {
-  const x = sfDet && SF_FISSE[sfDet]; if(!x) return;
-  const D = sfDatiImg(x), cv = disegnaSfida(x, D);
-  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
-  if(!blob) return toast('Impossibile creare l\'immagine', 'err');
-  const testo = `${x.nome} — ${D.conc ? 'classifica finale' : 'classifica in corso'} · ${D.p.label}`;
-  await condividiBlob(blob, `sfida_${x.id.replace('sfauto_', '')}_${oggiISO()}.png`, x.nome, testo, 'Immagine scaricata: allegala al messaggio');
-};
-A['sf-back'] = () => { if(sfHd > 0){ history.back(); return; } sfTab = 'corso'; if(sfDet) sfDet = null; else sfSez = null; window.scrollTo(0, 0); render(); };
-/* premio a fine periodo: un movimento 'bonus_podio' per vincitore con ID deterministico (create-only: nessun doppio accredito) */
-A['sf-assegna'] = ds => {
-  const x = SF_FISSE[ds.id]; if(!x || !can('compiti')) return;
-  const e = sfDaAssegnare(x).find(y => y.p.key === ds.k); if(!e) return toast('Premio già assegnato o non più disponibile', 'err');
-  if(e.parziale && !confirm('Nel periodo c\'è stata una chiusura: i dati potrebbero essere parziali.\n\nAssegnare comunque il premio?')) return;
-  e.win.forEach(r => addMov({tipo: 'bonus_podio', mid: r.id, pos: 1, sfida: x.id, periodo: e.p.key, periodoTxt: e.p.label, titolo: x.nome.slice(0, 60), punti: x.pt}, `sfi_${x.id}_${e.p.key}_${r.id}`, true, er => toast('Premio non assegnato (' + errMsg(er) + ')', 'err')));
-  toast('🏆 Premio assegnato: ' + e.win.map(r => nomeBreve(r.id) || nomeM(r.id)).join(', ') + ' (+' + x.pt + ' pt)');
-};
-/* --- punti extra durante una sfida: l'admin (Creatore o «Sfide e Regole») dà punti a mano a uno o più colleghi, nella Tessera Fedeltà.
-   Movimento 'bonus_podio' con extra:1 e perExtra (senza il campo 'periodo': non conta come premio assegnato). ID automatico, quindi si possono dare più volte. --- */
+/* --- Mastro Lindo: punti dati a mano ai colleghi che hanno pulito (movimento 'bonus_podio' con extra:1 e perExtra). ID automatico, quindi si possono dare più volte. --- */
 const MAX_PT_EXTRA = 100;
+function sfPulCard(){
+  const dd = derived(), puo = st.isAdmin && can('compiti') && ptMaster(), stor = sonoCreatore() || can('cassa');
+  const L = dd.movs.filter(m => m.tipo === 'bonus_podio' && m.extra && m.sfida === 'pulizie' && !dd.stornati.has(m.id)).sort((a, b) => b.t - a.t).slice(0, 8);
+  return `<div class="card" id="sf-pulizie" style="margin-top:12px"><h3>🧹 Mastro Lindo${L.length ? ` <span class="pill violet">${L.length}</span>` : ''}</h3>
+    <p class="hint" style="margin:0 0 8px">Quando qualcuno fa le pulizie, il Creatore o un admin con «Punti e Regole» assegna un montepremi di <b>${pulMonte()} punti</b>: se pulisce una persona li prende tutti, se sono di più si dividono in parti uguali. Contano nella classifica della settimana.</p>
+    ${L.length ? `<div class="list">${L.map(m => `<div class="li"><div class="av">🧹</div><div class="grow"><div class="t" style="font-size:13.5px;white-space:normal"><b>${sfNome(m.mid)}</b> · +${m.punti || 0} pt${m.monte ? ' (quota di ' + m.monte + ' tra ' + (m.nPart || '?') + ')' : ''}${m.causale ? ' · «' + esc(m.causale) + '»' : ''}</div><div class="d">${quando(m.t)}</div></div>${puo && stor && !m._pending ? `<button class="btn sm ghost" id="btn-pul-storno-${m.id}" data-act="storno" data-id="${m.id}">↩️ Storna</button>` : ''}</div>`).join('')}</div>` : '<div class="empty">Nessuna pulizia registrata di recente.</div>'}
+    ${puo ? `<button class="btn amber block" id="btn-pul-apri" data-act="sf-extra" data-id="pulizie" style="margin-top:10px">🧹 Assegna i punti</button>` : ''}</div>`;
+}
 A['sf-extra'] = ds => {
-  const x = SF_FISSE[ds.id]; if(!x || !can('compiti') || !ptMaster()) return;
+  const x = sxSf(ds.id); if(!x || !can('compiti') || !ptMaster()) return;
   const col = membriAttivi().filter(m => m.id !== st.mid).sort((a, b) => nomeM(a.id).localeCompare(nomeM(b.id)));
   if(!col.length) return toast('Non ci sono altri colleghi', 'err');
-  openSheet(`<h3>🎯 Punti extra</h3>
-    <p class="sub">Sfida <b>${esc(x.nome)}</b> · ${esc(sfPeriodo(x.per, new Date()).label)}. I punti vanno subito nei punti accumulati dei colleghi scelti${x.tipo === 'pulizie' ? ' e contano nella graduatoria della sfida' : ''}.</p>
+  const pul = true;
+  openSheet(`<h3>🧹 Mastro Lindo</h3>
+    <p class="sub">Montepremi <b>${pulMonte()} punti</b>, fissato dal Creatore: scegli chi ha pulito e lo divido in parti uguali (una persona sola lo prende tutto). I punti vanno subito nella classifica della settimana.</p>
     ${cercaBox('sx-lista')}<div id="sx-lista" style="max-height:32vh;overflow:auto;margin:6px 0 10px">${col.map(m => `<label class="check" data-q="${qMem(m)}"><input type="checkbox" class="sx-c" value="${m.id}" data-chg="sx-upd"><b style="flex:1;font-size:14px">${esc(nomeM(m.id))}</b></label>`).join('')}${cercaVuoto('sx-lista')}</div>
-    <div data-chg="sx-upd" style="margin-bottom:8px">${segOpts('sx-modo', [['tot', 'Montante da dividere'], ['cad', 'Punti a ciascuno']], x.tipo === 'pulizie' ? 'tot' : 'cad')}</div>
-    <label class="f"><span id="sx-lbl">Punti</span><input class="in mono" id="sx-q" inputmode="numeric" maxlength="3" value="10" data-chg="sx-upd"></label>
+    ${pul ? '' : `<div data-chg="sx-upd" style="margin-bottom:8px">${segOpts('sx-modo', [['tot', 'Montante da dividere'], ['cad', 'Punti a ciascuno']], 'cad')}</div>`}
+    <label class="f"><span id="sx-lbl">Punti</span><input class="in mono" id="sx-q" inputmode="numeric" maxlength="3" value="${pul ? pulMonte() : 10}" ${pul ? 'readonly' : ''} data-chg="sx-upd"></label>
     <div id="sx-tot" class="stat" style="margin:4px 0 8px;padding:10px;font-size:13.5px;text-align:center"></div>
-    <label class="f"><span>Motivo (facoltativo)</span><input class="in" id="sx-msg" maxlength="60" placeholder="Es. Pulizie fatte da solo, bonus sfida"></label>
+    <label class="f"><span>Motivo (facoltativo)</span><input class="in" id="sx-msg" maxlength="60" placeholder="Es. pulizie del sabato"></label>
     <button class="btn amber block big" id="sx-invia" data-act="sx-invia" data-id="${x.id}" disabled>Assegna i punti</button>`);
   sxAggiorna();
 };
@@ -109,11 +42,12 @@ function sxAggiorna(){
   if(b) b.disabled = !c.ok;
 }
 A['sx-invia'] = ds => {
-  const x = SF_FISSE[ds.id]; if(!x || !can('compiti') || !ptMaster()) return;
+  const x = sxSf(ds.id); if(!x || !can('compiti') || !ptMaster()) return;
   const ids = [...document.querySelectorAll('#sheet input.sx-c:checked')].map(e => e.value).filter(v => v !== st.mid && membro(v));
   if(!ids.length) return toast('Seleziona almeno un collega', 'err');
-  const c = sxCalcola(); if(!c.ok || c.n !== ids.length) return toast(`Punti non validi: da 1 a ${MAX_PT_EXTRA} per collega`, 'err');
-  const n = c.per, msg = val('sx-msg').trim().slice(0, 60), p = sfPeriodo(x.per, new Date());
+  const c = sxCalcola(); if(x.id === 'pulizie' && (!c.tot || c.q !== pulMonte())) return toast('Montepremi non valido, riapri la finestra', 'err');
+  if(!c.ok || c.n !== ids.length) return toast(`Punti non validi: da 1 a ${MAX_PT_EXTRA} per collega`, 'err');
+  const n = c.per, msg = val('sx-msg').trim().slice(0, 60), p = sfWeek();
   ids.forEach(mid => addMov({tipo: 'bonus_podio', mid, sfida: x.id, extra: 1, perExtra: p.key, periodoTxt: p.label, titolo: x.nome.slice(0, 60), punti: n, ...(c.tot ? {monte: c.q, nPart: ids.length} : {}), ...(msg ? {causale: msg} : {})},
     null, true, er => toast('Punti non assegnati (' + errMsg(er) + ')', 'err')));
   closeSheet(); toast(`🎯 +${n} pt a ${ids.length} ${ids.length === 1 ? 'collega' : 'colleghi'}`);
@@ -244,7 +178,7 @@ A['esito'] = ds => {
   if(mv && mv.tipo === 'compito' && !cpPuoConv(mv)) return toast('Non puoi convalidare questo compito', 'err');
   if(mv && mv.tipo === 'quota' && ds.v === 'confermata' && statoQuota(derived(), mv.mid, String(mv.anno)) === 'pagata') return toast('Quota già registrata per questo collega', 'err');
   if(mv && mv.tipo === 'spesa' && mv.fonte === 'misto' && ds.v === 'confermata') return A['paga-spesa'](ds);   // la spesa mista si convalida scegliendo il canale della quota in denaro
-  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && mv.tipo === 'spesa' && ds.v === 'confermata' ? {pt: ptSpesaE(mv.importo)} : {})})
+  C('movimenti').doc(ds.id).update({stato: ds.v, esitoDa: myName(), esitoTs: TS(), ...(mv && ds.v === 'confermata' && (mv.tipo === 'spesa' || (mv.tipo === 'ricarica' && !mv.fondo)) ? {pt: mv.tipo === 'spesa' ? ptSpesaE(mv.importo) : ptRicE(mv.importo)} : {})})
     .then(() => { if(mv && mv.tipo === 'spesa') aggiornaArticoli(mv, ds.v === 'confermata'); toast(ds.v === 'confermata' ? 'Confermata ✓' : 'Rifiutata'); }).catch(e => toast(errMsg(e), 'err'));
 };
 
@@ -652,26 +586,37 @@ A['bf-invia'] = () => {
 A['salva-punti'] = () => {
   const n = id => Math.floor(Number(val(id))), d = id => Math.round(Number(val(id).replace(',', '.')) * 100) / 100;
   const v = {ptCaffe: n('rp-caffe'), ptBenFatto: n('rp-bf'), ptSpesaMax: n('rp-spmax'), bfN: n('rp-bfn'),
-    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), resaKg: n('rp-resa')};
+    ptSnackEuro: d('rp-snackeuro'), ptSpesaEuro: d('rp-speuro'), ptRicEuro: d('rp-riceuro'), ptRicMax: n('rp-ricmax'), resaKg: n('rp-resa')};
   const inR = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi, inD = x => isFinite(x) && x >= 0 && x <= 100;
-  const ok = inR(v.resaKg, 1, 500) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inR(v.bfN, 1, 20);
+  const ok = inR(v.resaKg, 1, 500) && inR(v.ptCaffe, 0, 100) && inR(v.ptBenFatto, 0, 100) && inR(v.ptSpesaMax, 0, 1000) && inR(v.ptRicMax, 0, 1000) && inD(v.ptSnackEuro) && inD(v.ptSpesaEuro) && inD(v.ptRicEuro) && inR(v.bfN, 1, 20);
   if(!ok) return toast('Valori non validi', 'err');
   const sw = {ptOn: !!($('rp-on') && $('rp-on').checked)};
   RP_SW.forEach(([id, k]) => { sw[k] = !!($(id) && $(id).checked); });
   G().set({...v, ...sw, bfPeriodo: val('rp-bfp') === 'mese' ? 'mese' : 'settimana'}, {merge: true}).then(() => toast('Regole salvate')).catch(e => toast(errMsg(e), 'err'));
 };
 /* valori consigliati: una sola scrittura, solo su richiesta del Supervisor; nulla viene sovrascritto in automatico */
-const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptBenFatto: 20};
+const RP_CONSIGLIATI = {ptCaffe: 10, ptSnackEuro: 10, ptSpesaEuro: 10, ptSpesaMax: 500, ptRicEuro: 1, ptRicMax: 100, ptBenFatto: 20};
 A['salva-premi-podio'] = () => {
   if(!sonoCreatore()) return toast('Solo il Creatore può impostare i premi', 'err');
-  const v = [1, 2, 3].map(i => Math.round(Number(val('rp-premio' + i).replace(',', '.')) * 100));
-  if(!v.every(x => Number.isInteger(x) && x >= 0 && x <= 50000)) return toast('Importi non validi (da 0 a 500 €)', 'err');
-  G().set({premiPodio: v}, {merge: true}).then(() => toast('Premi del podio salvati')).catch(e => toast(errMsg(e), 'err'));
+  const b = Math.round(Number(val('rp-montepremi').replace(',', '.')) * 100);
+  if(!Number.isInteger(b) || b < 0 || b > 80000) return toast('Importo non valido (da 0 a 800 €)', 'err');
+  const v = [Math.round(b * 4 / 7), Math.round(b * 2 / 7)]; v.push(b - v[0] - v[1]);   // montepremi diviso 100% · 50% · 25% (4/7, 2/7, 1/7), in centesimi: il 3° prende il resto così la somma torna esattamente; le regole confrontano il premio riscattato con questa lista
+  const pc = Number(val('rp-premiperc')), mp = Number(val('rp-premiminpt'));
+  if(!Number.isInteger(pc) || pc < 0 || pc > 100) return toast('Percentuale non valida (da 0 a 100)', 'err');
+  if(!Number.isInteger(mp) || mp < 1 || mp > 1000) return toast('Punti minimi non validi (da 1 a 1000)', 'err');
+  G().set({premiPodio: v, premiPerc: pc, premiMinPt: mp}, {merge: true}).then(() => toast('Premi del podio salvati')).catch(e => toast(errMsg(e), 'err'));
+};
+A['salva-sf-punti'] = () => {
+  if(!sonoCreatore()) return toast('Solo il Creatore può impostare i montepremi', 'err');
+  const v = {}; let ok = true;
+  const pl = Number(val('rp-sf-pulizie')); if(!Number.isInteger(pl) || pl < 0 || pl > MAX_PT_EXTRA) ok = false; v.pulizie = pl;
+  if(!ok) return toast('Montepremi non valido (intero da 0 a 100)', 'err');
+  G().set({sfPunti: {...((st.gruppo && st.gruppo.sfPunti) || {}), ...v}}, {merge: true}).then(() => toast('Montepremi Mastro Lindo salvato')).catch(e => toast(errMsg(e), 'err'));
 };
 A['rp-consigliati'] = () => {
   if(!can('compiti')) return;
   if(!confirm('Applicare i valori consigliati?\n\nCaffè 10 punti · snack 10 punti per 1,00 € · rimborsi 10 punti per € (tetto 500) · «Ben fatto» 20.\nVale per gli eventi futuri: quelli passati non cambiano.')) return;
-  const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptBenFatto: 'rp-bf'}, prima = {};
+  const ids = {ptCaffe: 'rp-caffe', ptSnackEuro: 'rp-snackeuro', ptSpesaEuro: 'rp-speuro', ptSpesaMax: 'rp-spmax', ptRicEuro: 'rp-riceuro', ptRicMax: 'rp-ricmax', ptBenFatto: 'rp-bf'}, prima = {};
   Object.keys(ids).forEach(k => { const e = $(ids[k]); if(e){ prima[ids[k]] = e.value; e.value = nDec(RP_CONSIGLIATI[k]); } });
   G().set(RP_CONSIGLIATI, {merge: true}).then(() => toast('Valori consigliati applicati')).catch(e => { Object.keys(prima).forEach(id => { const x = $(id); if(x) x.value = prima[id]; }); toast(errMsg(e), 'err'); });
 };

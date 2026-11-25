@@ -19,14 +19,9 @@ function indietro(){
   if($('drawer').classList.contains('on')){ A['drawer-close'](); return true; }
   if(!inAppOra()){ if(st.entry){ st.entry = null; render(); return true; } return false; }
   if(st.pinDoc === null || (st.pinDoc && st.pinDoc.temporaneo)) return false;   // schermata bloccante: nessuna navigazione
-  if(st.page === 'sfide' && (sfDet || sfSez)){ A['sf-back'](); return true; }   // dentro le Sfide: un livello indietro, non la Home
   if(st.page !== 'bar'){ A['go']({p: SALETTA_SUB.includes(st.page) && st.page !== 'saletta' ? 'saletta' : 'bar'}); return true; }
   return false;
 }
-/* Livelli delle Sfide (schede → elenco → classifica): ognuno ha una propria voce di cronologia, creata da un tocco dell'utente.
-   Indietro la toglie in modo naturale e l'app aggiorna la schermata; così più Indietro di fila non consumano la sentinella e non fanno uscire dall'app. */
-let sfHd = 0;
-const sfHPush = () => { if(!backArmata) return; try { history.pushState({armieri: 'sf', d: ++sfHd}, ''); } catch(e){ sfHd--; } };
 const overlayAperto = () => !!(($('infopop') && $('infopop').classList.contains('on')) || $('sheet').classList.contains('on') || $('drawer').classList.contains('on') || $('vittoria'));
 function chiudiOverlay(){
   if($('vittoria')) A['vittoria-chiudi']();
@@ -37,15 +32,7 @@ function chiudiOverlay(){
 window.addEventListener('popstate', () => {
   if(!backArmata) return;
   const hs = history.state;
-  if(hs && (hs.armieri === 'sf' || hs.armieri === 'guard')){
-    const d = hs.armieri === 'sf' ? hs.d : 0;
-    if(sfHd > d){
-      if(overlayAperto()){ chiudiOverlay(); try { for(let k = d + 1; k <= sfHd; k++) history.pushState({armieri: 'sf', d: k}, ''); } catch(e){} return; }   // prima si chiude finestra/menu, il livello resta
-      sfHd = d;
-      if(st.page === 'sfide'){ if(d < 2) sfDet = null; if(d < 1){ sfSez = null; sfTab = 'corso'; } window.scrollTo(0, 0); render(); }
-    }
-    return;   // avanti/indietro verso una voce dell'app: niente altro da fare
-  }
+  if(hs && hs.armieri === 'guard') return;   // voce di guardia dell'app: niente altro da fare
   if(indietro()){ backRiarma(); return; }
   toast('Premi ancora Indietro per uscire');
   clearTimeout(backTimer);

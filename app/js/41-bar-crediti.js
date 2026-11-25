@@ -9,13 +9,13 @@ function bannerChiusura(d){
   const giorni = k.last ? Math.floor(k.ms / 864e5) : 0;
   const inizioMese = !!k.last && o.getDate() <= 5 && k.t < new Date(o.getFullYear(), o.getMonth(), 1).getTime() && n >= 50;
   if(!(n >= CHIUSURA_SOGLIA_MOV || (!!k.last && giorni > CHIUSURA_SOGLIA_GG && k.nuovi >= CHIUSURA_MIN_NUOVI) || inizioMese)) return '';
-  const rich = d.pendenti.length, premi = sfLista().reduce((a, x) => a + sfDaAssegnare(x).length, 0);
+  const rich = d.pendenti.length;
   const sub = n + (n === 1 ? ' movimento aperto' : ' movimenti aperti') + (k.last ? ', ultima chiusura ' + (giorni === 0 ? 'oggi' : giorni === 1 ? '1 giorno fa' : giorni + ' giorni fa') : ', nessuna chiusura finora');
   const nasc = `<button class="btn link" id="btn-chiusura-nascondi" data-act="chiusura-nascondi" style="padding:0;color:inherit;opacity:.8">Nascondi per oggi</button>`;
-  if(rich || premi){
-    const parti = [rich ? `${rich} ${rich === 1 ? 'richiesta in attesa' : 'richieste in attesa'}` : '', premi ? `${premi} ${premi === 1 ? 'premio sfide da assegnare' : 'premi sfide da assegnare'}` : ''].filter(Boolean).join(' e ');
+  if(rich){
+    const parti = [rich ? `${rich} ${rich === 1 ? 'richiesta in attesa' : 'richieste in attesa'}` : ''].filter(Boolean).join(' e ');
     return `<div class="banner amber" id="banner-chiusura">${ic('alert')}<div class="grow">⚠️ <b>Prima di chiudere:</b> hai ${parti}.<br><span style="font-size:12.5px">${sub}</span>
-      <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">${rich ? '<button class="btn sm amber" id="btn-chiusura-richieste" data-act="go" data-p="notifiche">Vai alle richieste</button>' : ''}${premi ? '<button class="btn sm amber" id="btn-chiusura-sfide" data-act="go" data-p="sfide">Vai alle Sfide</button>' : ''}${nasc}</div></div></div>`;
+      <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">${rich ? '<button class="btn sm amber" id="btn-chiusura-richieste" data-act="go" data-p="notifiche">Vai alle richieste</button>' : ''}${nasc}</div></div></div>`;
   }
   return `<div class="banner sky" id="banner-chiusura">${ic('archive')}<div class="grow">📦 <b>Momento ideale per la Chiusura Periodo</b><br><span style="font-size:12.5px">${sub}</span>
     <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn sm" id="btn-chiusura-apri" data-act="go" data-p="chiusura">Apri Chiusura periodo</button>${nasc}</div></div></div>`;
@@ -55,7 +55,7 @@ function pBar(d){
     <div class="blob" style="width:180px;height:180px;background:#10b981;bottom:2%;left:20%"></div>
     <div class="grid">
       <button class="gbtn" id="btn-paga" data-act="paga-menu" ${noCaffe && noSnack ? 'disabled' : ''}><span class="em">💳</span>Paga${noCaffe && noSnack ? '<small>credito insufficiente</small>' : '<small>Caffè, snack e bibite</small>'}</button>
-      <button class="gbtn" id="btn-lavoro" disabled aria-disabled="true"><span class="em"><svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" aria-hidden="true" style="color:#7dd3fc;display:block"><path d="M12 1.5l1.3 5.2.6 3.6 7.6 5.7v2.4l-7.4-2.3-.4 3.3 2.2 1.8V23L12 22.2 8.2 23v-1.6l2.2-1.8-.4-3.3-7.5 2.3v-2.4l7.6-5.7.6-3.6z"/></svg></span>Lavoro compiuto<small>Coming soon</small></button>
+      <button class="gbtn" id="btn-soon" disabled aria-disabled="true"><span class="em">✨</span>Coming soon<small>Novità in arrivo</small></button>
       <button class="gbtn" id="btn-benfatto" data-act="benfatto" ${bfRestanti() > 0 ? '' : 'disabled'}><span class="em">👏</span>Ben fatto<small id="bf-stato">${!onP('ptBfOn') && bfRestanti() > 0 ? 'Riconosci un collega' : bfRestanti() > 0 ? bfRestanti() + (bfRestanti() === 1 ? ' gettone disponibile' : ' gettoni disponibili') : 'Disponibile ' + bfCountdown()}</small></button>
       <button class="gbtn" id="btn-crediti-home" data-act="crediti-menu"><span class="em">🎁</span>Regala o scambia crediti<small>Tra colleghi</small></button>
     </div>
@@ -101,9 +101,9 @@ function pNotifiche(d){
   const daApp = st.isAdmin && (can('inbox') || can('compiti') || canAccessi()) ? `<div class="card" id="da-approvare" style="padding-bottom:4px"><h3><span>🛡️ Da approvare</span></h3>${inboxAdmin(d)}</div>` : '';
   return `<h2>${ic('bell')} Notifiche</h2><p class="sub">${st.isAdmin ? 'Richieste da approvare e notifiche che ti riguardano.' : 'Richieste da gestire ed esiti che ti riguardano.'}</p>
   ${daApp}${st.isAdmin ? '' : cpConvCard()}${scambiRicevuti(d)}${scambiInviati(d)}${richiesteUtente(d) || ''}
-  ${storicoRichieste(d)}
   <div class="card"><h3><span>Esiti e accrediti</span><button class="btn link" data-act="notif-letti">Segna tutte come lette</button></h3>
-    ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>`;
+    ${list.length ? `<div class="list" id="notif-list">${list.map(n => `<div class="li" style="${n.t > seen ? 'border-color:var(--amber)' : ''}"><div class="av">${n.e}</div><div class="grow"><div class="t" style="white-space:normal;font-size:13.5px">${n.x}${n.t > seen ? ' <span class="pill amber">nuova</span>' : ''}</div><div class="d">${quando(n.t)}</div></div></div>`).join('')}</div>` : '<div class="empty">Nessuna notifica.</div>'}</div>
+  ${incarichiSospesi()}${storicoRichieste(d)}`;
 }
 function inboxAdmin(d){
   const it = [];

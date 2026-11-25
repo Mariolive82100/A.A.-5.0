@@ -138,12 +138,26 @@ const ptCaffeE = () => onP('ptCaffeOn') ? ptCaffe() : 0;
 /* snack: punti proporzionali al prezzo (punti per ogni 1,00 €, arrotondati all'intero), calcolati dal prezzo senza impostarli articolo per articolo */
 const ptSnackEuro = () => Math.min(100, cfgD('ptSnackEuro', 10));
 const ptSnackP = prezzo => onP('ptCaffeOn') ? Math.max(0, Math.round((Number(prezzo) || 0) / 100 * ptSnackEuro())) : 0;
+const PREMI_PERC = [1, 0.5, 0.25];   // distribuzione del premio: 1° 100%, 2° 50%, 3° 25%
 /* premi del podio settimanale, in crediti: li imposta solo il Creatore nel documento del gruppo (premiPodio = 3 importi in centesimi: 1°, 2°, 3°) */
 const premiPodio = () => { const v = st.gruppo && st.gruppo.premiPodio; return [0, 1, 2].map(i => Array.isArray(v) && Number.isInteger(v[i]) && v[i] > 0 ? Math.min(50000, v[i]) : 0); };
 const premioPos = pos => premiPodio()[pos - 1] || 0;
+const premiPerc = () => Math.min(100, cfgN('premiPerc', 30)), premiMinPt = () => Math.min(1000, Math.max(1, cfgN('premiMinPt', 1)));
+/* tetto legato agli incassi: il montepremi effettivo della settimana è il minore tra quello impostato e premiPerc % delle vendite (caffè, snack, caffè pagati subito); si divide sempre 4/7 · 2/7 · 1/7 e non supera mai l'importo impostato per la posizione (lo richiedono le regole) */
+function premiEff(inc){
+  const base = premiPodio(), tot = base.reduce((a, b) => a + b, 0), pc = premiPerc();
+  if(!pc || inc == null || tot <= 0) return base;
+  const P = Math.min(tot, Math.floor(Math.max(0, inc) * pc / 100)), a = Math.round(P * 4 / 7), b = Math.round(P * 2 / 7), v = [a, b, P - a - b];
+  return v.map((x, i) => Math.min(x, base[i]));
+}
+const montepremi = () => premiPodio().reduce((a, b) => a + b, 0);
+const riepPremi = () => montepremi() > 0 ? [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') + ' (massimo ' + eur(montepremi()) + ')' : 'nessun premio impostato';
 /* punti spesa (importo in centesimi → euro): proporzionali all'importo (rapporto punti/€ × importo, arrotondati all'intero, con tetto per singola spesa); il rimborso in denaro/crediti resta al 100% */
 const cfgD = (k, def) => { const v = st.gruppo && st.gruppo[k]; return typeof v === 'number' && isFinite(v) && v >= 0 ? v : def; };
 const ptSpesaEuro = () => Math.min(100, cfgD('ptSpesaEuro', 10)), ptSpesaMax = () => Math.min(1000, cfgN('ptSpesaMax', 500));
+const ptRicEuro = () => Math.min(100, cfgD('ptRicEuro', 1)), ptRicMax = () => Math.min(1000, cfgN('ptRicMax', 100));
+const RIC_PT_DAL = new Date(2026, 10, 23).getTime();   // le ricariche danno punti dal 23/11/2026 (lunedì della settimana di lancio): le precedenti non ne danno
+const ptRicE = imp => ptMaster() ? Math.min(ptRicMax(), Math.max(0, Math.round((Number(imp) || 0) / 100 * ptRicEuro()))) : 0;
 const ptSpesaE = imp => ptMaster() ? Math.min(ptSpesaMax(), Math.max(0, Math.round((Number(imp) || 0) / 100 * ptSpesaEuro()))) : 0;
 const nDec = x => String(x).replace('.', ',');
 const ptBfE = () => onP('ptBfOn') ? ptBenFatto() : 0;

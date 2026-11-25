@@ -25,6 +25,8 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
     <div class="grid2">
       <label class="f"><span>🧾 Punti per ogni € di rimborso</span><input class="in mono" id="rp-speuro" inputmode="decimal" value="${nDec(ptSpesaEuro())}"></label>
       <label class="f"><span>Tetto punti per spesa</span><input class="in mono" id="rp-spmax" inputmode="numeric" value="${ptSpesaMax()}"></label>
+      <label class="f"><span>🔋 Punti per ogni € ricaricato</span><input class="in mono" id="rp-riceuro" inputmode="decimal" value="${nDec(ptRicEuro())}"></label>
+      <label class="f"><span>Tetto punti per ricarica</span><input class="in mono" id="rp-ricmax" inputmode="numeric" value="${ptRicMax()}"></label>
     </div>
     <p class="hint" style="margin:-4px 0 8px;font-size:12px">Snack e spese: punti = importo × tariffa, arrotondati all'intero (le spese anche limitate dal tetto). Il rimborso resta al 100%.</p>
     <div class="grid2">
@@ -42,13 +44,21 @@ const cardRegolePunti = () => `  <div class="card" id="card-regole-punti">
       <label class="f"><span>Ogni</span><select class="in" id="rp-bfp"><option value="settimana" ${bfPeriodo() === 'settimana' ? 'selected' : ''}>settimana</option><option value="mese" ${bfPeriodo() === 'mese' ? 'selected' : ''}>mese</option></select></label>
     </div>
   </div>
-  <div class="card" id="rp-c"><h3>C · Premi del podio settimanale</h3>
-    ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Crediti che vincono i primi tre della classifica settimanale (da lunedì a domenica). Li imposta solo il Creatore. Metti 0 per nessun premio. Chi è sul podio li riscatta da solo, in Home, a settimana chiusa.</p>
-    <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      ${[1, 2, 3].map(i => `<label class="f"><span>${['🥇 1°', '🥈 2°', '🥉 3°'][i - 1]} (€)</span><input class="in mono" id="rp-premio${i}" inputmode="decimal" value="${(premioPos(i) / 100).toFixed(2).replace('.', ',')}"></label>`).join('')}
-    </div>
-    <button class="btn amber block" id="btn-salva-premi" data-act="salva-premi-podio" style="margin-top:8px">Salva i premi</button>`
-    : `<p class="hint" style="margin:0">I premi li imposta solo il Creatore. Attuali: ${premiPodio().some(x => x > 0) ? [1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ') : 'nessun premio impostato'}.</p>`}
+  <div class="card" id="rp-c"><h3>C · Premi del podio settimanale (massimi)</h3>
+    ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Imposta il <b>tetto massimo del montepremi</b> della settimana (da lunedì a domenica): è il massimo che si distribuisce, e lo divido io tra i primi tre in proporzione <b>100% · 50% · 25%</b>, cioè circa 57% · 29% · 14%. Lo imposta solo il Creatore. Metti 0 per nessun premio. Chi è sul podio lo riscatta da solo, in Home, a settimana chiusa.</p>
+    <label class="f"><span>💰 Tetto massimo del montepremi (€)</span><input class="in mono" id="rp-montepremi" inputmode="decimal" value="${(montepremi() / 100).toFixed(2).replace('.', ',')}"></label>
+    <p class="hint" id="rp-premi-riep" style="margin:6px 0 0">Attuali: ${riepPremi()}</p>
+    <label class="f"><span>📉 Quota massima degli incassi (%)</span><input class="in mono" id="rp-premiperc" inputmode="numeric" value="${premiPerc()}"></label>
+    <label class="f"><span>⭐ Punti minimi per il podio</span><input class="in mono" id="rp-premiminpt" inputmode="numeric" value="${premiMinPt()}"></label>
+    <p class="hint" style="margin:0 0 6px;font-size:12px">Il montepremi non supera questa quota delle vendite della settimana (caffè, snack, caffè pagati subito); 0 = nessun limite. Nelle settimane di poco incasso i premi scendono da soli, mai oltre il tetto massimo.</p>
+    <button class="btn amber block" id="btn-salva-premi" data-act="salva-premi-podio" style="margin-top:8px">Salva il montepremi</button>`
+    : `<p class="hint" style="margin:0">I premi li imposta solo il Creatore. Attuali: ${riepPremi()}.</p>`}
+  </div>
+  <div class="card" id="rp-d"><h3>D · Mastro Lindo</h3>
+    ${sonoCreatore() ? `<p class="hint" style="margin:0 0 8px;font-size:12px">Montepremi di punti che il Creatore o un admin con «Punti e Regole» assegna quando qualcuno fa le pulizie: se pulisce una persona li prende tutti, se sono di più si dividono in parti uguali. Lo imposta solo il Creatore.</p>
+    <label class="f"><span>🧹 Mastro Lindo (da 0 a 100, diviso tra chi pulisce)</span><input class="in mono" id="rp-sf-pulizie" inputmode="numeric" value="${pulMonte()}"></label>
+    <button class="btn amber block" id="btn-salva-sf-punti" data-act="salva-sf-punti" style="margin-top:4px">Salva il montepremi</button>`
+    : `<p class="hint" style="margin:0">Il montepremi lo imposta solo il Creatore. Attuale: 🧹 Mastro Lindo ${pulMonte()} punti.</p>`}
   </div>
   </div>
   <button class="btn amber block" id="btn-salva-punti" data-act="salva-punti" style="margin-bottom:12px">Salva le regole</button>
@@ -166,6 +176,6 @@ A['aggiorna'] = async () => {
 };
 A['drawer-close'] = () => { $('drawer').classList.remove('on'); $('drawer-ov').classList.remove('on'); };
 A['sheet-close'] = closeSheet;
-A['go'] = ds => { if(sfHd > 0){ const n = sfHd; sfHd = 0; try { history.go(-n); } catch(e){} } if(ds.p === 'sfide'){ sfSez = null; sfDet = null; sfTab = 'corso'; } if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
+A['go'] = ds => { if(ds.p === 'crediti') st.creditiTab = ds.t || null; st.fab = false; st.page = pagineConsentite().includes(ds.p) ? ds.p : 'bar'; LS.set('page', ds.p); A['drawer-close'](); closeSheet(); window.scrollTo(0,0); render(); };
 A['entry'] = ds => { st.entry = ds.v || null; render(); };
 

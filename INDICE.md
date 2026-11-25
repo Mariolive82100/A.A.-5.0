@@ -19,7 +19,7 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `initFirebase`, `onErr`, `setSync`, `disconnect`, `connect`, `stopData`, `syncMode`, `subMovimenti`
 
 ### `js/20-dati.js` — dati derivati: saldi, punti, scale, regole punti, scambi
-`tuttiMov`, `emptyState`, `emptyStats`, `applyMov`, `applyStat`, `derived`, `debitoLibero`, `riscala`, `riepScala`, `giorniLavorativi`, `scambiRicevuti`, `scambiInviati`, `creditoLibero`
+`tuttiMov`, `emptyState`, `emptyStats`, `applyMov`, `applyStat`, `derived`, `debitoLibero`, `riscala`, `riepScala`, `giorniLavorativi`, `scambiRicevuti`, `scambiInviati`, `creditoLibero`, `premiEff`
 
 ### `js/30-ui-base.js` — scritture, toast, sheet, render/scroll, condivisione, ricerca rapida, installazione PWA
 `addMov`, `guard`, `toast`, `openSheet`, `closeSheet`, `segOpts`, `assicuraQuote`, `render`, `doRender`, `cardShareMark`, `cardTesto`, `renderDrawer`, `qsRisultati`, `qsFiltra`
@@ -36,11 +36,11 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 ### `js/43-regolamento.js` — `pRegolamento` (testo del regolamento interno)
 `pRegolamento`
 
-### `js/44-sfide.js` — Sfide (fisse, classifiche, premi)
-`cpRiga`, `vittoriaCheck`, `sfPeriodo`, `sfRimanente`, `sfCd`, `sfBuckets`, `sfRiepTrim`, `sfInit`, `sfMerge`, `sfClassifica`, `sfPrec`, `sfDaAssegnare`, `sfPtRiga`, `sfPremi`, `sfBoxE`, `sfBox`, `sfCard`, `sfCardConc`, `sfDettaglio`, `pSfide`
+### `js/44-incarichi-pulizie.js` — incarichi e punti (riga incarico, avviso punti off), Mastro Lindo (montepremi, azione diretta)
+`cpRiga`
 
 ### `js/45-eventi-statistiche.js` — eventi, statistiche saletta, classifiche punti, Tasso di Onestà, statistiche per periodo
-`prossimaData`, `giorniA`, `pSaletta`, `rangeSal`, `caricaArcMov`, `serieGen`, `graficoBarre`, `nuovoAgg`, `aggMov`, `aggrega`, `aggRange`, `aggPeriodo`, `clPerKey`, `clRange`, `riepDaChiusura`, `serieSett`, `aggConChiusi`, `noteChiusi`, `serieCont`, `rankList`, `posMese`, `aggiornaPillola`, `clRighe`, `clConteggi`, `clTitoli`, `clHero`, `onestaIndici`, `pCaffeReg`, `pOnesta`, `cardOnesta`, `clSala`, `viewMiei`, `clIo`, `clClassifica`, `pClassifiche`, `scRange`, `pStatConsumi`, `pClassificaPunti`
+`prossimaData`, `giorniA`, `pSaletta`, `rangeSal`, `caricaArcMov`, `serieGen`, `graficoBarre`, `nuovoAgg`, `aggMov`, `aggrega`, `aggRange`, `aggPeriodo`, `clPerKey`, `clRange`, `riepDaChiusura`, `serieSett`, `aggConChiusi`, `noteChiusi`, `serieCont`, `rankList`, `aggiornaPillola`, `clRighe`, `clConteggi`, `clTitoli`, `clHero`, `onestaIndici`, `pCaffeReg`, `pOnesta`, `cardOnesta`, `clSala`, `viewMiei`, `clIo`, `clClassifica`, `pClassifiche`, `scRange`, `pStatConsumi`, `pClassificaPunti`, `classSett`, `premioSett`, `homeSett`, `clCategorie`
 
 ### `js/46-spesa-cassa-quote.js` — lista spesa, gioco, cassa, inventario, quote, statistiche, colleghi, gestione PIN
 `pSpesa`, `aggiornaArticoli`, `giocoSt`, `pGioco`, `pCassa`, `scortaRighe`, `realeDisp`, `caffeLivello`, `cardCaffeScorta`, `pInventario`, `quoteMigra`, `pQuote`, `consumiRange`, `disegnaConsumi`, `labelChiusura`, `pMembri`, `pPin`
@@ -49,10 +49,10 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `pRegole`, `pBackup`, `infoChiusura`, `pChiusura`, `pImpostazioni`
 
 ### `js/50-azioni-base.js` — azioni: condivisione, Bar, Paga, ricarica e riscatto, ruoli
-`joinVerifica`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`
+`joinVerifica`, `giocoAvvia`, `giocoChiediRuota`, `annullaConsumo`, `rbAggiorna`, `sonoCreatore`, `permDi`, `can`, `ruolo`, `cpConvCard`, `sincronizzaSolo`, `pSupervisor`, `svSheet`, `incarichiSospesi`
 
-### `js/51-azioni-gestione.js` — azioni: sfide, regalo crediti, storni, cassa, inventario, registro caffè, quote, admin
-`sfDatiImg`, `disegnaSfida`, `rgAggiorna`, `acAggiorna`, `podioDaAssegnare`, `compactMov`, `corrAggiorna`, `caricaBusteCaffe`, `caricaProdotto`, `sheetReg`, `salvaRegCaffe`, `quotaAggiorna`, `scollega`, `selMembro`, `bfInizioPeriodo`, `bfRinnovo`, `bfCountdown`, `bfUsati`, `bfAggiorna`
+### `js/51-azioni-gestione.js` — azioni: Mastro Lindo e punti extra, regalo crediti, storni, cassa, inventario, registro caffè, quote, admin
+`rgAggiorna`, `acAggiorna`, `compactMov`, `corrAggiorna`, `caricaBusteCaffe`, `caricaProdotto`, `sheetReg`, `salvaRegCaffe`, `quotaAggiorna`, `scollega`, `selMembro`, `bfInizioPeriodo`, `bfRinnovo`, `bfCountdown`, `bfUsati`, `bfAggiorna`, `sfPulCard`, `sxCalcola`, `sxAggiorna`, `vitPremio`
 
 ### `js/52-azioni-pin-backup.js` — azioni: Punti Collega, Ben fatto, PIN, backup/ripristino, archivio
 `scaricaBlob`, `condividiBlob`, `costruisciBackup`, `leggiBackup`, `datiRendiconto`, `opzRd`, `disegnaRendiconto`, `testoRendiconto`, `datiArchivio`, `pArchivio`, `testoArchivio`, `disegnaArchivio`, `aggiornaAnteprimaRd`

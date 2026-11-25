@@ -137,22 +137,22 @@ function graficoBarre(S, o){
 A['sc-pick'] = ds => { const i = Number(ds.i); st.scSel = (st.scSel && st.scSel.c === ds.c && st.scSel.i === i) ? null : {c: ds.c, i}; render(); };
 
 /* aggregazione di una lista di movimenti (periodo corrente, oppure movimenti da archiviare alla chiusura) */
-function nuovoAgg(){ return {ptC:{}, ptP:{}, ptS:{}, ptB:{}, caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
+function nuovoAgg(){ return {ptL:{}, ptR:{}, giri:{}, ptC:{}, ptP:{}, ptS:{}, ptB:{}, caffe:{}, snack:{}, euro:{}, spese:{}, speseN:{}, turni:{}, pPul:{}, regDati:{}, bfRic:{}, tot:{ric:0, quote:0, regali:0, regaliN:0, speseTot:0, speseCassa:0, riscatti:0, entrate:0, uscite:0, giro:0}}; }
 function aggMov(G, m, sg){
   sg = sg || 1; const t = G.tot;
   switch(m.tipo){
-    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ if(m.tipo === 'caffe') add(G.ptC, m.mid, sg*(m.pt ?? m.qta)*fx(m)); add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
+    case 'caffe': case 'caffe_pagato': if(m.stato !== 'annullata'){ if(m.tipo === 'caffe' && m.qta > 1) add(G.giri, m.mid, sg); if(m.tipo === 'caffe') add(G.ptC, m.mid, sg*(m.pt ?? m.qta)*fx(m)); add(G.caffe, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); } break;
     case 'snack': if(m.stato !== 'annullata'){ add(G.snack, m.mid, sg*m.qta); add(G.euro, m.mid, sg*m.importo); add(G.ptC, m.mid, sg*(m.pt ?? 0)*fx(m)); } break;
     case 'spesa': if(m.stato === 'confermata'){ add(G.ptS, m.mid, sg*(m.pt ?? PUNTI_SPESA)*fx(m)); add(G.spese, m.mid, sg*m.importo); add(G.speseN, m.mid, sg); t.speseTot += sg*m.importo; if(m.fonte === 'contanti' || m.fonte === 'revolut') t.speseCassa += sg*(Number.isInteger(m.quotaDenaro) && m.quotaDenaro > 0 ? m.quotaDenaro : m.importo); } break;
     case 'pulizia': (m.mids || []).forEach(x => { add(G.turni, x, sg); add(G.pPul, x, sg*ptPulM(m)); add(G.ptP, x, sg*ptPulM(m)); }); break;
     case 'compito': if(m.stato === 'confermata'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
     case 'obiettivo': if(m.fase === 'fatto'){ add(G.turni, m.mid, sg); add(G.pPul, m.mid, sg*(m.punti || 0)); add(G.ptP, m.mid, sg*(m.punti || 0)); } break;
-    case 'ricarica': if(m.stato === 'confermata') t.ric += sg*m.importo; break;
+    case 'ricarica': if(m.stato === 'confermata'){ t.ric += sg*m.importo; if(!m.fondo) add(G.ptR, m.mid, sg*(m.pt ?? (m.t >= RIC_PT_DAL ? ptRicE(m.importo) : 0))*fx(m)); } break;   // punti diretti per le ricariche (dal 23/11/2026)
     case 'quota': if((!m.stato || m.stato === 'confermata') && (m.metodo === 'contanti' || m.metodo === 'revolut')) t.quote += sg*m.importo; break;
     case 'regalo': if(!m.trasf){ t.regali += sg*m.importo; t.regaliN += sg; add(G.regDati, m.daMid, sg*m.importo); } break;
     case 'ben_fatto': add(G.bfRic, m.aMid, sg); add(G.ptB, m.aMid, sg*(m.pt ?? 2)*fx(m)); break;
     case 'punti_adj': add(m.kind === 'caffe' ? G.ptC : G.ptP, m.mid, sg*m.punti*fx(m)); break;
-    case 'bonus_podio': if(m.extra && m.sfida === 'sfauto_pulizie') add(G.ptP, m.mid, sg*(m.punti || 0)); break;   // Mastro Lindo: i punti dell'admin contano nella classifica punti del mese e nel Podio
+    case 'bonus_podio': if(m.sfida){ add(G.ptP, m.mid, sg*(m.punti || 0)); if(m.sfida === 'pulizie') add(G.ptL, m.mid, sg*(m.punti || 0)); } break;   // sfide: premi ai vincitori e punti extra contano nella classifica (settimana in cui vengono assegnati) e in quella generale
     case 'riscatto': if(m.stato === 'confermata' || !m.stato) t.riscatti += sg*m.importo; break;
     case 'entrata': t.entrate += sg*m.importo; break;
     case 'uscita': t.uscite += sg*m.importo; break;
@@ -173,11 +173,12 @@ function aggRange(d, r, slot){
 }
 function aggPeriodo(d){ return aggRange(d, rangeSal(), 'st'); }
 /* periodo della classifica punti: settimana in corso (da lunedì) o "sempre" = cumulato */
-function clPerKey(){ return st.clP === 'sempre' ? 'sempre' : 'settimana'; }
+function clPerKey(){ return st.clP === 'scorsa' ? 'scorsa' : 'settimana'; }
 function clRange(){
   const o = new Date(), y = o.getFullYear(), m = o.getMonth(), p = clPerKey();
   const ini = dt => { dt.setHours(0, 0, 0, 0); return dt.getTime(); };
   if(p === 'sempre') return {da: 0, a: Infinity, label: 'Classifica generale di sempre'};
+  if(p === 'scorsa'){ const lun = lunediDi(o), ini = new Date(lun); ini.setDate(ini.getDate() - 7); const dom = new Date(ini); dom.setDate(dom.getDate() + 6); const dm = x => `${pad(x.getDate())}/${pad(x.getMonth() + 1)}`; return {da: ini.getTime(), a: lun.getTime() - 1, label: `Settimana conclusa dal ${dm(ini)} al ${dm(dom)}`}; }
   const dow = (o.getDay() + 6) % 7; return {da: ini(new Date(y, m, o.getDate() - dow)), a: Infinity, label: 'Questa settimana'};
 }
 /* classifica della settimana (da lunedì a domenica): corrente o scorsa, tutto in memoria dai movimenti già caricati */
@@ -188,9 +189,10 @@ function classSett(d, prev){
   const dom = new Date(ini); dom.setDate(dom.getDate() + 6);
   const dm = x => `${pad(x.getDate())}/${pad(x.getMonth() + 1)}`, label = `Settimana dal ${dm(ini)} al ${dm(dom)}`;
   const G = aggConChiusi(d, {da: ini.getTime(), a: prev ? lun.getTime() - 1 : Infinity, label}, prev ? 'pw' : 'hd').G;
-  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id)}));
+  const righe = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, tot: nz(G.ptC, m.id) + nz(G.ptP, m.id) + nz(G.ptS, m.id) + nz(G.ptB, m.id) + nz(G.ptR, m.id)}));
   righe.sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome));
-  return {key: settKey(ini), label, righe};
+  const inc = Object.values(G.euro || {}).reduce((a, v) => a + (v || 0), 0);   // incassi della settimana: vendite di caffè, snack e caffè pagati subito
+  return {key: settKey(ini), label, righe, inc};
 }
 const PREMI_DAL = '2026-11-16';   // lunedì della prima settimana con i premi in crediti: si riscatta dal lunedì successivo
 /* premio della settimana scorsa per il collegato: sul podio con almeno 1 punto e premio impostato; «fatto» se già riscattato */
@@ -199,8 +201,8 @@ function premioSett(d){
   if(Date.now() < lunediDi(new Date()).getTime() + 60000) return null;   // il premio si riscatta solo a settimana scaduta: dal lunedì alle 00:01
   const P = classSett(d, true), i = P.righe.findIndex(x => x.id === st.mid);
   if(P.key < PREMI_DAL) return null;   // le settimane precedenti all'introduzione dei premi non danno diritto a nulla
-  if(i < 0 || i > 2 || P.righe[i].tot <= 0) return null;
-  const importo = premioPos(i + 1); if(importo <= 0) return null;
+  if(i < 0 || i > 2 || P.righe[i].tot < premiMinPt()) return null;   // serve almeno premiMinPt punti
+  const importo = premiEff(P.inc)[i]; if(importo <= 0) return null;
   const id = `pp_${P.key}_${st.mid}`;
   return {pos: i + 1, key: P.key, id, importo, label: P.label, medal: ['🥇', '🥈', '🥉'][i], fatto: !!LS.get(id + '_' + st.gid) || tuttiMov().some(m => m.id === id)};
 }
@@ -226,7 +228,7 @@ const riepLabel = p => (p.da ? dBreve(p.da) : 'inizio') + ' → ' + dBreve(p.fin
 
 /* ---------- Continuità tra periodi chiusi e periodo aperto (tutto in memoria, nessuna lettura in più) ----------
    Regola: nei totali e nei grafici entrano solo i periodi chiusi compresi INTERAMENTE nell'intervallo scelto. */
-const AGG_MAPS = ['ptC', 'ptP', 'ptS', 'ptB', 'caffe', 'snack', 'euro', 'spese', 'speseN', 'turni', 'pPul', 'regDati', 'bfRic'];
+const AGG_MAPS = ['ptL', 'ptR', 'giri', 'ptC', 'ptP', 'ptS', 'ptB', 'caffe', 'snack', 'euro', 'spese', 'speseN', 'turni', 'pPul', 'regDati', 'bfRic'];
 /* scomposizione settimanale di gruppo salvata nel riepilogo: [lunedì ms, consumi, turni, spese, ricariche] */
 function serieSett(list, lo){
   const w = {}, fs = [fCons, fTurni, fSpese, fRic];
@@ -283,19 +285,21 @@ const nonDisp = '<div class="hint">Dato non disponibile per i periodi chiusi pri
 
 /* ---------- Classifica punti: scheda personale, podio, righe compatte, titoli onorari ----------
    Tutto in memoria: righe da derived()/aggRange, conteggi dai movimenti già caricati e dallo storico dell'estratto. */
-const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Sfide'], ['s', '🧾', 'Spese'], ['b', '👏', 'Ben fatto']];
-const CL_KEYS = ['tot', 'c', 'p', 's', 'b'];
+const CL_CAT = [['c', '☕', 'Consumi'], ['p', '🎯', 'Extra'], ['s', '🧾', 'Spese'], ['r', '🔋', 'Ricariche'], ['b', '👏', 'Ben fatto']];
+const CL_KEYS = ['tot', 'c', 'p', 's', 'r', 'b'];
 function aggiornaPillola(d, av){
   const hd = $('hdr'); if(!hd) return;
   /* premi in crediti del podio settimanale, sempre sott'occhio (nascosti se nessun premio e' impostato o se i punti sono disattivati) */
-  const pz = $('hdr-prize'), pr = premiPodio(), premi = (!av && st.mid && ptMaster()) ? [1, 2, 3].filter(i => pr[i - 1] > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} ${eur(pr[i - 1])}`) : [];
-  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = premi.join('<span class="pz-s"> · </span>'); pz.title = 'In palio ogni settimana'; } }
+  const pz = $('hdr-prize'), mx = premiPodio(), pr = (!av && st.mid && ptMaster() && premiPerc() > 0 && st.ready.mv && st.ready.m && d) ? premiEff(classSett(d, false).inc) : mx, ridotto = pr.some((x, i) => x < mx[i]);   // in testa: premi effettivi della settimana in corso, in base agli incassi finora
+  let premi = (!av && st.mid && ptMaster() && mx.some(x => x > 0)) ? [1, 2, 3].filter(i => pr[i - 1] > 0).map(i => `${['🥇', '🥈', '🥉'][i - 1]} ${eur(pr[i - 1])}`) : [];
+  if(!premi.length && !av && st.mid && ptMaster() && mx.some(x => x > 0)) premi = ['ancora nessuno (dipendono dagli incassi)'];
+  if(pz){ pz.classList.toggle('hidden', !premi.length); hd.classList.toggle('hasprize', !!premi.length); if(premi.length){ pz.innerHTML = '<span class="pz-l">Premi di questa settimana:&nbsp;</span>' + premi.join('<span class="pz-s"> · </span>'); pz.title = premiPerc() > 0 ? 'Premi di questa settimana in base agli incassi finora: salgono con le vendite, fino a un massimo di ' + eur(mx.reduce((a, b) => a + b, 0)) : 'In palio ogni settimana'; } }
   const op = $('hdr-onesta'), iO = (op && !av && st.mid && st.page === 'bar') ? onestaIndici(d) : null;
   if(op){ op.classList.toggle('hidden', !iO); hd.classList.toggle('hasonesta', !!iO); if(iO){ op.className = 'onpill ' + (iO.g == null ? 'mut' : onCls(iO.g)); op.innerHTML = '🛡️ ' + onPill(iO.g); op.title = 'Tasso di Onestà (caffè + snack e bibite)'; } }
 }
 function clRighe(d){
   const r = clRange(), M = aggConChiusi(d, r, 'cl'), G = M.G;
-  const righe = membriAttivi().map(m => { const c = nz(G.ptC, m.id), p = nz(G.ptP, m.id), s = nz(G.ptS, m.id), b = nz(G.ptB, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, b, tot: c + p + s + b}; });
+  const righe = membriAttivi().map(m => { const c = nz(G.ptC, m.id), p = nz(G.ptP, m.id), s = nz(G.ptS, m.id), r = nz(G.ptR, m.id), b = nz(G.ptB, m.id); return {m, nome: nomeBreve(m.id) || m.nome, c, p, s, r, b, tot: c + p + s + r + b}; });
   const pos = {}; righe.slice().sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome)).forEach((x, i) => { pos[x.m.id] = i + 1; });
   return {r, righe, pos, M};
 }
@@ -431,12 +435,13 @@ function cardOnesta(d){
 /* totali aggregati della sala per il tipo di punti scelto */
 function clSala(righe, key, G){
   const tot = k => righe.reduce((a, x) => a + x[k], 0), nn = o => Math.max(0, sumo(o));
-  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti sfide', s: 'Punti spesa', b: 'Punti «Ben fatto»'}[key];
+  const lab = {tot: 'Totale punti', c: 'Punti caffè', p: 'Punti extra', s: 'Punti spesa', r: 'Punti ricariche', b: 'Punti «Ben fatto»'}[key];
   const det = {
     tot: `<div class="hero-grid" style="margin-top:8px">${CL_CAT.map(([k, e, l]) => `<div><span>${e}</span><b>${tot(k)}</b><small>${l}</small></div>`).join('')}</div>`,
     c: `<p class="hint" style="margin:6px 0 0">☕ ${nn(G.caffe)} caffè · 🍫 ${nn(G.snack)} snack registrati dalla saletta</p>`,
     p: `<p class="hint" style="margin:6px 0 0">🎯 ${nn(G.turni)} ${nn(G.turni) === 1 ? 'turno svolto' : 'turni svolti'}</p>`,
     s: `<p class="hint" style="margin:6px 0 0">🧾 ${nn(G.speseN)} ${nn(G.speseN) === 1 ? 'spesa convalidata' : 'spese convalidate'} · ${eur(Math.max(0, G.tot.speseTot || 0))} anticipati per la saletta</p>`,
+    r: `<p class="hint" style="margin:6px 0 0">🔋 ${ptRicEuro() === 1 ? '1 punto' : nDec(ptRicEuro()) + ' punti'} per ogni 1,00 € ricaricato (massimo ${ptRicMax()} per ricarica), dal 23/11/2026</p>`,
     b: `<p class="hint" style="margin:6px 0 0">👏 ${nn(G.bfRic)} «Ben fatto» scambiati tra colleghi</p>`}[key];
   return `<div class="sala" id="cl-sala"><div class="between"><span class="sala-l">${lab} della saletta</span><b class="sala-v mono" id="cl-sala-v">${tot(key)}</b></div>${det}</div>`;
 }
@@ -474,18 +479,18 @@ function clClassifica(d, R, T, c){
   const k0 = st.clSort && st.clSort.k, key = CL_KEYS.includes(k0) ? k0 : 'tot';
   const ord = righe.slice().sort((a, b) => b[key] - a[key] || b.tot - a.tot || a.nome.localeCompare(b.nome));
   const bdg = mid => { const e = T.filter(t => t.mids.includes(mid)).map(t => t.e).join(''); return e ? `<span class="rk-bdg">${e}</span>` : ''; };
-  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti sfide']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
+  const chips = [['tot', 'Totale punti'], ['c', '☕ Punti caffè'], ['p', '🎯 Punti extra']].concat(righe.some(x => x.s > 0) || key === 's' ? [['s', '🧾 Punti spesa']] : [], [['r', '🔋 Punti ricariche'], ['b', '👏 Punti «Ben fatto»']]);   // «Punti spesa» solo se nel periodo ci sono punti storici
   const chipsH = `<div class="chips" id="cl-chips">${chips.map(([v, l]) => `<button id="cl-chip-${v}" class="${key === v ? 'on' : ''}" data-act="cl-chip" data-k="${v}">${l}</button>`).join('')}</div>`;
   const podio = ord.filter(x => x[key] > 0).slice(0, 3), rest = ord.slice(podio.length);
   const col = (x, i) => !x ? '<div class="pc"></div>' : `<div class="pc ${x.m.id === st.mid ? 'me' : ''}"><div class="md">${['🥇', '🥈', '🥉'][i]}</div><div class="pn">${esc(x.nome)}</div><div class="pb">${bdg(x.m.id)}${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}</div><div class="pv">${x[key]}</div><div class="ps" style="height:${[92, 70, 54][i]}px">${i + 1}</div></div>`;
   const podioH = podio.length ? `<div class="pod" id="cl-podio">${col(podio[1], 1)}${col(podio[0], 0)}${col(podio[2], 2)}</div>` : `<div class="empty">Nessun punto in questa categoria nel periodo.</div>`;
   const riga = (x, i) => `<div class="rk ${x.m.id === st.mid ? 'me' : ''} ${x[key] ? '' : 'z'}"><div class="n">${podio.length + i + 1}</div><div class="nm"><div class="nt"><b class="nn">${esc(x.nome)}</b>${x.m.id === st.mid ? '<span class="pill amber">Tu</span>' : ''}${bdg(x.m.id)}</div>
-      <div class="mi"><span>☕ ${x.c}</span><span>🎯 ${x.p}</span><span>🧾 ${x.s}</span><span>👏 ${x.b}</span></div></div>
+      <div class="mi">${CL_CAT.map(([k, e]) => `<span>${e} ${x[k]}</span>`).join('')}</div></div>
       <div class="v">${x[key]}${key !== 'tot' ? `<small>tot ${x.tot}</small>` : ''}</div></div>`;
   const P = storicoPeriodi(), arc = st.isAdmin && P.length && P[P.length - 1].fino > r.da;
   const podioCard = `<div class="card"><h3><span>🏆 Podio e classifica punti</span></h3>${chipsH}${clSala(righe, key, M.G)}
     ${righe.length ? `${podioH}<div id="cl-lista">${rest.map(riga).join('')}</div>` : '<div class="empty">Nessun collega.</div>'}
-    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Sfide: i punti delle sfide (per esempio Mastro Lindo), assegnati dal Creatore o dagli admin. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
+    ${infoBtn(`Tocca un filtro per ordinare. Caffè: ${ptCaffe()} per caffè, ${nDec(ptSnackEuro())} per ogni 1,00 € di snack. Extra: i punti di Mastro Lindo (dati dal Creatore o dagli admin) e i compiti. Spesa e ricariche: punti per ogni euro, con un tetto per singola operazione. Ben fatto: ${ptBenFatto()} per ogni riconoscimento ricevuto. Sono i punti guadagnati nel periodo scelto in alto (comprese eventuali rettifiche).`, 'Come funziona')}
     ${arc ? (st.arcMov ? '<p class="hint" style="margin:6px 0 0">Il dettaglio dei periodi chiusi è incluso.</p>' : `<button class="btn sm block ghost" style="margin-top:8px" data-act="carica-arc-mov" ${st.arcLoading ? 'disabled' : ''}>${st.arcLoading ? 'Carico…' : 'Includi il dettaglio dei periodi chiusi (legge l\'archivio)'}</button>`) : ''}</div>
   `;
   return {podio: podioCard};
@@ -500,11 +505,12 @@ function pClassifiche(d){
 }
 A['cl-mod'] = ds => { st.clMod = ds.v === 'stat' ? 'stat' : (ds.v === 'arc' && st.isAdmin) ? 'arc' : 'classifica'; st.scSel = null; render(); };
 /* --- modalità «Statistiche»: pagamenti/consumi (caffè e snack) per ambito e periodo, tutto dai movimenti già in memoria --- */
-const SC_PER = [['ieri', 'Ieri'], ['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['mese', 'Questo mese']];
+const SC_PER = [['ieri', 'Ieri'], ['oggi', 'Oggi'], ['settimana', 'Questa settimana'], ['scorsa', 'Settimana scorsa']];
 const scPer = () => SC_PER.some(x => x[0] === st.scP) ? st.scP : 'oggi';
 function scRange(){
   const p = scPer();
   if(p === 'ieri'){ const o = new Date(), da = new Date(o.getFullYear(), o.getMonth(), o.getDate() - 1).getTime(); return {p, da, a: new Date(o.getFullYear(), o.getMonth(), o.getDate()).getTime() - 1, label: `Ieri (${dBr(da)})`}; }
+  if(p === 'scorsa'){ const o = new Date(), dow = (o.getDay() + 6) % 7, lun = new Date(o.getFullYear(), o.getMonth(), o.getDate() - dow), da = new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() - 7).getTime(), a = lun.getTime() - 1; return {p, da, a, label: `Settimana scorsa (${dBr(da)} - ${dBr(a)})`}; }
   return rpRange(p);
 }
 const scChips = (id, act, cur, opz) => `<div class="chips" id="${id}">${opz.map(([v, l]) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
@@ -539,6 +545,18 @@ function pStatConsumi(d){
 }
 A['sc-amb'] = ds => { st.scA = ds.v === 'io' ? 'io' : 'saletta'; render(); };
 A['sc-per'] = ds => { if(!SC_PER.some(x => x[0] === ds.v)) return; st.scP = ds.v; render(); };
+const CL_CATC = [['caffe', '☕ Caffè', 'caffè', 'caffe'], ['giri', '🔄 Giri', 'giri', 'giri'], ['pul', '🧹 Mastro Lindo', 'pt', 'ptL'], ['bf', '👏 Ben fatto', '«Ben fatto»', 'bfRic']];
+A['cl-catc'] = ds => { st.clCatc = CL_CATC.some(x => x[0] === ds.v) ? ds.v : 'caffe'; render(); };
+/* classifica per categoria (conteggi nel periodo scelto): le vecchie sfide ora sono semplici classifiche, senza premi */
+function clCategorie(c){
+  const cur = CL_CATC.find(x => x[0] === st.clCatc) || CL_CATC[0], G = c.G || {};
+  const ord = membriAttivi().map(m => ({id: m.id, nome: nomeBreve(m.id) || m.nome, v: Math.max(0, nz(G[cur[3]], m.id))})).filter(x => x.v > 0).sort((a, b) => b.v - a.v || a.nome.localeCompare(b.nome));
+  let pos = 0, prev = null; ord.forEach((x, i) => { if(x.v !== prev){ pos = i + 1; prev = x.v; } x.pos = pos; });
+  return `<div class="card" id="cl-categorie"><h3><span>🎖️ Classifiche per categoria</span></h3>
+    <div class="chips" id="cl-catc">${CL_CATC.map(([v, l]) => `<button id="cl-catc-${v}" class="${cur[0] === v ? 'on' : ''}" data-act="cl-catc" data-v="${v}">${l}</button>`).join('')}</div>
+    ${ord.length ? `<div class="list" style="margin-top:6px">${ord.map(x => `<div class="li"><div class="av">${['🥇', '🥈', '🥉'][x.pos - 1] || x.pos}</div><div class="grow"><div class="t"><b>${esc(x.nome)}</b>${x.id === st.mid ? ' <span class="pill amber">tu</span>' : ''}</div></div><b class="mono">${x.v} ${cur[2]}</b></div>`).join('')}</div>` : `<div class="empty">Nessun dato in questa categoria nel periodo.</div>`}
+    ${infoBtn('Classifiche nel periodo scelto in alto. Sono solo statistiche: non assegnano premi né punti. I punti di spesa e ricariche sono nel podio qui sopra.', 'Come funziona')}</div>`;
+}
 function pClassificaPunti(d){
   const avvPunti = avvisoPuntiOff();
   const amb = st.clAmb === 'io' ? 'io' : 'saletta', per = clPerKey();
@@ -546,17 +564,17 @@ function pClassificaPunti(d){
   const chip = (act, cur, v, l) => `<button id="${act}-${v}" class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
   const filtri = `<div class="card" id="cl-filtri">
     <div class="chips" id="cl-amb">${chip('cl-amb', amb, 'saletta', '👥 Saletta')}${chip('cl-amb', amb, 'io', '👤 Io')}</div>
-    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'settimana', '📅 Questa settimana')}${chip('cl-per', per, 'sempre', '🏆 Di sempre')}</div>
-    ${per === 'settimana' && premiPodio().some(x => x > 0) ? `<p class="hint" id="cl-premi" style="margin:8px 0 0">In palio a fine settimana: ${[1, 2, 3].filter(i => premioPos(i) > 0).map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(premioPos(i))).join(' · ')}</p>` : ''}
+    <div class="chips" id="cl-per" style="margin-top:8px">${chip('cl-per', per, 'settimana', '📅 Questa settimana')}${chip('cl-per', per, 'scorsa', '🏁 Settimana scorsa')}</div>
+    ${per === 'settimana' && premiPodio().some(x => x > 0) ? (() => { const C = classSett(d, false), pe = premiEff(C.inc), cap = premiPerc() > 0 && pe.some((x, i) => x < premioPos(i + 1)); return `<p class="hint" id="cl-premi" style="margin:8px 0 0">In palio a fine settimana: ${[1, 2, 3].map(i => ['🥇', '🥈', '🥉'][i - 1] + ' ' + eur(pe[i - 1])).join(' · ')}${premiPerc() > 0 ? ` <small class="mut">(al massimo ${eur(montepremi())}; il montepremi è il ${premiPerc()}% degli incassi della settimana${cap ? ', per ora ridotto' : ''})</small>` : ''}</p>`; })() : ''}
     <p class="sub" style="margin:8px 0 0">${esc(r.label)}${st.isAdmin ? '' : ' · dati dall\'ultima chiusura di periodo'}</p>
     ${noteChiusi(c)}${c.noPt ? '<p class="hint">Alcuni periodi chiusi inclusi non hanno il dettaglio dei punti (disponibile dalle chiusure fatte con la 1.14.1): i loro punti non sono conteggiati.</p>' : ''}</div>`;
   if(amb === 'io') return `${avvPunti}${filtri}${clHero(R.righe, R.pos, T, r)}
-  ${clIo(R.righe, c)}`;
+  ${clIo(R.righe, c)}${sfPulCard()}`;
   const Z = clClassifica(d, R, T, c);
-  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}</div></div>`;
+  return `${avvPunti}${filtri}<div class="cl-grid">${'<div class="clg-h">' + clHero(R.righe, R.pos, T, r) + '</div>'}<div class="clg-p">${Z.podio}${clCategorie(c)}${sfPulCard()}</div></div>`;
 }
 A['cl-amb'] = ds => { st.clAmb = ds.v === 'io' ? 'io' : 'saletta'; st.scSel = null; render(); };
-A['cl-per'] = ds => { st.clP = ds.v === 'sempre' ? 'sempre' : 'settimana'; st.scSel = null; render(); };
+A['cl-per'] = ds => { st.clP = ds.v === 'scorsa' ? 'scorsa' : 'settimana'; st.scSel = null; render(); };
 A['cl-chip'] = ds => { st.clSort = {k: CL_KEYS.includes(ds.k) ? ds.k : 'tot', dir: -1}; render(); };
 A['carica-arc-mov'] = () => { if(!st.arcLoading && !st.arcMov) caricaArcMov(); };
 

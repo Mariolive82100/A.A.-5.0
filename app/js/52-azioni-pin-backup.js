@@ -186,10 +186,9 @@ A['chiudi-periodo'] = async () => {
     const id = 'c' + fino.toMillis();
     const b = db.batch();
     const scF = scalaDa() ? {sc: 1} : {};
-    const G = aggrega(incl), sfB = sfBuckets(incl), stN = new Set(incl.filter(m => m.tipo === 'storno').map(m => m.rif)), AW = {};
-    incl.filter(m => m.tipo === 'bonus_podio' && m.sfida && m.periodo && !stN.has(m.id)).forEach(m => { const k = m.sfida + '|' + m.periodo; (AW[k] = AW[k] || []).push(m.mid); });
-    const riep = sfRiepTrim({...scF, id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, ptC: G.ptC, ptP: G.ptP, ptS: G.ptS, ptB: G.ptB, ser: serieSett(incl, prev ? prev.fino.toMillis() : 0), tot: G.tot, sf: sfB, aw: AW});
-    const storico = st.chiusure.map(riepDaChiusura).concat([riep]).sort((x, y) => x.fino - y.fino).slice(-STORICO_MAX).map(sfRiepTrim);
+    const G = aggrega(incl);
+    const riep = ({...scF, id, da: prev ? prev.fino.toMillis() : 0, fino: fino.toMillis(), n: incl.length, caffe: G.caffe, snack: G.snack, euro: G.euro, spese: G.spese, speseN: G.speseN, turni: G.turni, pPul: G.pPul, regDati: G.regDati, bfRic: G.bfRic, ptC: G.ptC, ptP: G.ptP, ptS: G.ptS, ptB: G.ptB, ptR: G.ptR, ptL: G.ptL, giri: G.giri, ser: serieSett(incl, prev ? prev.fino.toMillis() : 0), tot: G.tot});
+    const storico = st.chiusure.map(riepDaChiusura).concat([riep]).sort((x, y) => x.fino - y.fino).slice(-STORICO_MAX);
     const bf = {}, stor = new Set(incl.filter(m => m.tipo === 'storno').map(m => m.rif)), lim = Date.now() - 40 * 864e5;
     if(prev && prev.bf) Object.keys(prev.bf).forEach(k => { bf[k] = (prev.bf[k] || []).slice(); });
     incl.filter(m => m.tipo === 'ben_fatto' && !stor.has(m.id)).forEach(m => { (bf[m.mid] = bf[m.mid] || []).push(m.t); });
