@@ -6,7 +6,7 @@ const chiusuraNasc = () => LS.get('chiusuraNasc_' + st.gid) === oggiISO();
 const accountNasc = () => LS.get('accNasc') === oggiISO();
 function bannerAccount(){
   if(st.authAnon !== true || accountNasc()) return '';
-  return `<div class="banner sky" id="banner-account">${ic('lock')}<div class="grow"><b>Collega il tuo account</b><br><span style="font-size:12.5px">Con Google o email non perdi il profilo se cambi telefono. Saldo e punti restano quelli di oggi.</span>
+  return `<div class="banner amber" id="banner-account">${ic('lock')}<div class="grow"><b>Collega il tuo account</b><br><span style="font-size:12.5px">Con Google o email non perdi il profilo se cambi telefono. Saldo e punti restano quelli di oggi.</span>
     <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn sm amber" id="btn-account-vai" data-act="account-vai">Collega ora</button><button class="btn link" id="btn-account-nascondi" data-act="account-nascondi" style="padding:0;color:inherit;opacity:.8">Nascondi per oggi</button></div></div></div>`;
 }
 function bannerChiusura(d){
