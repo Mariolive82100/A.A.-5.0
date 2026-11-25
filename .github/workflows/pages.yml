@@ -1,8 +1,11 @@
 name: Deploy to GitHub Pages
 
+# main  -> sito ufficiale alla radice
+# beta  -> versione di prova in /beta/ (stesso sito, stessa origine)
+# Ogni esecuzione ricostruisce l'intero sito da entrambi i rami, cosi' un push su uno non cancella l'altro.
 on:
   push:
-    branches: [main]
+    branches: [main, beta]
   workflow_dispatch:
 
 permissions:
@@ -21,8 +24,24 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Checkout beta
+        uses: actions/checkout@v4
+        with:
+          ref: beta
+          path: beta
+
+      - name: Assembla il sito (main alla radice, beta in /beta/)
+        run: |
+          mkdir _site
+          cp -r main/app/. _site/
+          mkdir _site/beta
+          cp -r beta/app/. _site/beta/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -30,8 +49,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # cartella pubblicata: "app" se i file stanno in app/, "." se stanno nella radice del repo
-          path: app
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
