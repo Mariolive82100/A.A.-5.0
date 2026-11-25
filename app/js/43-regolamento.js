@@ -58,7 +58,7 @@ function pRegolamento(){
     '<b>Accesso:</b> si entra solo con il codice del gruppo, che solo il Creatore può vedere e mandare come link (☰ → Impostazioni → «Invita i colleghi»); la condivisione dell\'app e il codice non sono visibili a Supervisor e colleghi, a cui basta chiederlo al Creatore. Se esci dal gruppo, il telefono ricorda l\'ultimo gruppo: basta il tuo PIN personale per rientrare. Non è possibile creare nuovi gruppi.',
     'Chi ha un ruolo non può approvare o convalidare le proprie richieste (salvo il Creatore se è l\'unico a poterlo fare per i compiti). Tutte le uscite di denaro dalla cassa passano da «Rimborso spesa».'])}
   ${sez('🔐 Account di accesso', [
-    'In <b>Profilo → Account di accesso</b> puoi collegare il tuo profilo a un account <b>Google</b> oppure a <b>email e password</b>. Il collegamento non cambia nulla: saldo, crediti, punti e storico restano i tuoi.',
+    'In <b>Profilo → Account di accesso</b> puoi collegare il tuo profilo a un account <b>Google</b> oppure a <b>email e password</b>. Il collegamento non cambia nulla: saldo, crediti, punti e storico restano i tuoi. Finché non lo fai, in Home compare un avviso (puoi nasconderlo per oggi).',
     'Con l\'account collegato ritrovi il tuo profilo su qualsiasi telefono dalla schermata iniziale («Ho già un account»), senza PIN. Se dimentichi la password puoi reimpostarla con l\'email.',
     'La tua email non compare mai nell\'app agli altri colleghi e non finisce nei dati del gruppo: la vede solo chi gestisce il progetto Firebase.',
     'Il <b>PIN personale</b> resta valido come ripiego, ad esempio se perdi l\'accesso al tuo account.'])}

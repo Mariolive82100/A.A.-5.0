@@ -2,6 +2,13 @@
 /* ---------- pagina BAR ---------- */
 /* consiglio di Chiusura Periodo (solo chi ha «Strumenti di sistema»): tutto dai dati già in memoria */
 const chiusuraNasc = () => LS.get('chiusuraNasc_' + st.gid) === oggiISO();
+/* invito a collegare Google / email: solo a chi è dentro con la sessione anonima; si può nascondere per oggi */
+const accountNasc = () => LS.get('accNasc') === oggiISO();
+function bannerAccount(){
+  if(st.authAnon !== true || accountNasc()) return '';
+  return `<div class="banner sky" id="banner-account">${ic('lock')}<div class="grow"><b>Collega il tuo account</b><br><span style="font-size:12.5px">Con Google o email non perdi il profilo se cambi telefono. Saldo e punti restano quelli di oggi.</span>
+    <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn sm amber" id="btn-account-vai" data-act="account-vai">Collega ora</button><button class="btn link" id="btn-account-nascondi" data-act="account-nascondi" style="padding:0;color:inherit;opacity:.8">Nascondi per oggi</button></div></div></div>`;
+}
 function bannerChiusura(d){
   if(!can('sistema') || !st.ready.mv || chiusuraNasc()) return '';
   const k = infoChiusura(d), n = d.movs.length, o = new Date();
@@ -35,6 +42,7 @@ function pBar(d){
   return `
   ${can('sistema') ? bannerBackup() : ''}
   ${bannerChiusura(d)}
+  ${bannerAccount()}
   ${scRic ? `<div class="banner amber" id="banner-scambi">${ic('alert')}<div class="grow"><b>${scRic === 1 ? 'Un collega vuole comprare' : scRic + ' colleghi vogliono comprare'} crediti da te</b></div><button class="btn sm amber" data-act="go" data-p="notifiche">Vedi</button></div>` : ''}
   ${quotaDa ? (qAtt ? `<div class="banner amber" id="banner-quota">${ic('clock')}<div class="grow">⏳ <b>Quota saletta</b> (${eur(qAtt.importo)}): richiesta inviata, in attesa di conferma.</div><button class="btn sm ghost" id="btn-annulla-quota" data-act="annulla-richiesta" data-id="${qAtt.id}">Annulla</button></div>` : `<div class="banner red" id="banner-quota">${ic('alert')}<div class="grow">⚠️ <b>Quota saletta non ancora saldata</b> (${eur(st.gruppo.quotaAnnua)}).</div><button class="btn sm amber" id="btn-paga-quota" data-act="paga-quota">Paga quota</button></div>`) : ''}
   <div class="card" style="text-align:center">

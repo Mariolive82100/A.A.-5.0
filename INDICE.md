@@ -28,7 +28,7 @@ Guida per lavorare su una sola sezione senza rileggere tutta l'app. Leggere ques
 `renderEntry`, `entryInstall`, `entryWelcome`, `entryJoin`, `entryCreatore`, `entryRichiesta`, `entryAccount`, `entryRecupero`, `entryPinGate`
 
 ### `js/41-bar-crediti.js` — pagina Bar, consiglio chiusura, richieste, notifiche, crediti
-`bannerChiusura`, `pBar`, `richiesteUtente`, `contatori`, `pNotifiche`, `inboxAdmin`, `pCrediti`
+`bannerAccount`, `bannerChiusura`, `pBar`, `richiesteUtente`, `contatori`, `pNotifiche`, `inboxAdmin`, `pCrediti`
 
 ### `js/42-registro-feed.js` — tesoreria, registro movimenti, giacenze, scorta caffè, descrizione movimenti, feed
 `tesoro`, `pRegistro`, `storicoRichieste`, `notifiche`, `sincronizzaEstratti`, `sincronizzaGiacenze`, `regCaffe`, `contaCaffe`, `statoCaffe`, `calcolaCaffe`, `statoProd`, `descMov`, `puoStornare`, `righeMov`, `feedLista`, `cassaRange`, `periodoChips`, `pFeed`

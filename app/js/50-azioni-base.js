@@ -247,6 +247,11 @@ A['accedi-email'] = async (ds, el) => {
   catch(e){ toast(authErr(e), 'err'); el.disabled = false; }
 };
 A['crea-account'] = (ds, el) => { if(st.mid) return toast('Sei già dentro: usa il Profilo', 'err'); return collegaEmail(val('ac-mail'), pwv('ac-pw'), el); };
+A['account-nascondi'] = () => { LS.set('accNasc', oggiISO()); render(); };
+A['account-vai'] = () => {
+  A['go']({p: 'impostazioni'});
+  setTimeout(() => { const el = $('card-account'); if(el){ el.scrollIntoView({block: 'center', behavior: 'smooth'}); el.classList.add('qs-flash'); setTimeout(() => el.classList.remove('qs-flash'), 1800); } }, 160);
+};
 A['account-esci'] = async () => {
   if(st.mid) return;
   if(!confirm('Uscire da questo account su questo telefono?')) return;
